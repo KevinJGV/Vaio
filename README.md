@@ -9,32 +9,30 @@ que se nutre, alimentado por el portafolio, GitHub, Spotify y el CV — accesibl
 
 ## Stack (Fase 1 / MVP)
 
-- **Runtime agéntico:** Vercel AI SDK (`ai`) + OpenRouter (cadena de fallback multi-proveedor).
+- **Monorepo:** pnpm workspaces — `apps/agent` (el servicio) + `packages/contracts` (tipos/zod
+  compartidos), hueco para `apps/web`. Arquitectura interna **ports/adapters-lite**.
+- **Runtime agéntico:** Vercel AI SDK (`ai` v6) + OpenRouter (cadena de fallback multi-proveedor).
 - **Server:** Hono (TS) — `POST /chat` (stream), `GET /health`.
-- **Memoria/RAG:** Neon Postgres + `pgvector` (tabla `documents`; `facts` en fase 2).
+- **Memoria/RAG:** Neon Postgres + `pgvector` vía **Drizzle ORM** (tabla `documents`; `facts` en fase 2).
+- **Tooling:** Biome (lint+format), Vitest (tests), zod (validación de env). **Node 24** (LTS).
 - **Hosting:** Railway (always-on).
 - **Ingesta:** `cv.vindevsito.dev`, `vindevsito.dev/me`, GitHub API, Last.fm.
 
 ## Estado
 
-🚧 **Fase 1 en arranque.** Scaffold creado. **Pendientes (bloqueantes y no) para retomar:
-[`docs/NEXT-STEPS.md`](docs/NEXT-STEPS.md).** Resumen del siguiente paso (con context7 para fijar
-la API real del Vercel AI SDK v6 y versiones):
-- [ ] `npm install` (deps abajo) + verificar API del AI SDK con context7.
-- [ ] `src/memory.ts` — cliente Neon/pgvector + `searchMemory`.
-- [ ] `src/ingest.ts` — pipeline de ingesta (fetch fuentes → chunk → embed → upsert).
-- [ ] `src/agent.ts` — `streamText` con OpenRouter + tools + system prompt.
-- [ ] `src/index.ts` — wire `/chat` (stream) y `/health`.
-- [ ] Deploy a Railway + Neon + secrets.
-- [ ] Integración en el portafolio: `ChatSheet.tsx` + proxy `/api/agent`.
+🟢 **Fase 1 — código COMPLETO y verificado** (typecheck/build/lint/test verdes; server corre con
+degradación). Deps al día (majors actualizados por Dependabot y verificados). **Bloqueante para
+correr de verdad: keys** (OpenRouter/Neon/embeddings/GitHub) + deploy.
+**Siguiente paso y pendientes: [`docs/NEXT-STEPS.md`](docs/NEXT-STEPS.md).**
 
 ## Desarrollo
 
 ```bash
-npm install
+pnpm install
 cp .env.example .env   # completar secrets
-npm run ingest         # poblar la memoria (una vez / cron)
-npm run dev            # server local en :8787
+pnpm ingest            # poblar la memoria (necesita Neon+embeddings; a mano / cron)
+pnpm dev               # server local en :8787 (filtra @vaio/agent)
+pnpm typecheck && pnpm build && pnpm lint && pnpm test   # verificación
 ```
 
 ## Cuentas/keys necesarias (las provee Kevin)

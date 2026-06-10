@@ -4,6 +4,12 @@ Estado (2026-06-10): **código de Fase 1 COMPLETO** en monorepo pnpm (`apps/agen
 `packages/contracts`), arquitectura ports/adapters, **Drizzle ORM + migración inicial**,
 Biome + Vitest (12 tests verdes). Verificado: typecheck/build/lint/test limpios; server
 corre (`/health` 200, `/chat` 401 sin key, 400 body inválido, cortesía 200 sin OpenRouter).
+
+**Ya en `main` además:** Node **24** (LTS) en `.nvmrc`/CI/`engines`; Biome alineado con `clon-ai`
+(formato + reglas); Dependabot configurado para el monorepo (globs + grouping); y **deps mayores
+al día y verificadas** (ai 6, zod 4, openrouter-provider 2, hono-node-server 2, drizzle 0.45,
+TS 6, vitest 4 + vite 8). Fixes aplicados: `declaration:false` en la app (TS4058 de ai v6) y `vite@^8`.
+
 **Falta: keys + deploy + el frontend (`apps/web`) y la integración del portafolio.**
 Diseño completo: [`SPEC.md`](SPEC.md) · Workflow: [`../CLAUDE.md`](../CLAUDE.md).
 

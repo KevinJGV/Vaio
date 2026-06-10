@@ -1,6 +1,7 @@
 # Spec — Agente personal de IA "Vaio"
 
-**Estado:** Fase 1 (MVP) en arranque · 2026-06-09
+**Estado:** Fase 1 (MVP) — código completo y verificado (monorepo pnpm + ports/adapters +
+Drizzle + Biome/Vitest, deps al día, Node 24); **pendiente keys + deploy**. Actualizado 2026-06-10
 **Repos:** este spec vive en AMBOS — el portafolio (`KevinJGV`) y el repo del agente
 (`Vaio`). Mantener en sync.
 

@@ -28,7 +28,7 @@ Arquitectura interna de `apps/agent` (**ports/adapters-lite**): `core/` = lógic
 implementaciones (Drizzle/Neon, embeddings, OpenRouter, http, sources). El `core` depende de
 puertos, nunca de adapters → fase 2/3 (Telegram/correo, Neon→Graphiti) enchufan sin reescribir.
 
-## Comandos (pnpm — Node >= 20)
+## Comandos (pnpm — Node 24, `engines: >=22`)
 
 - `pnpm install` — instala deps de todo el workspace.
 - `pnpm dev` — server local con recarga (`tsx watch`, `:8787`) (filtra `@vaio/agent`).
@@ -63,7 +63,11 @@ puertos, nunca de adapters → fase 2/3 (Telegram/correo, Neon→Graphiti) enchu
 4. **Verificar con evidencia** (typecheck/build/run/probar endpoint/probar fallback) ANTES de
    decir "listo". **Nunca declares hecho sin haberlo corrido.** Si un test falla, dilo con la
    salida.
-5. **Mantener `docs/SPEC.md` en sync** (y la copia del portafolio) si cambió el diseño.
+5. **Mantener docs y memoria vivos.** Si cambió el diseño → `docs/SPEC.md` en sync (y la copia
+   del portafolio). Y **cuando Kevin señale que algo está hecho / en `main` / desplegado, o que
+   "estamos en la versión X"**, reconciliar SIEMPRE los ficheros y memorias al estado **real**
+   (`SPEC.md`, `NEXT-STEPS.md` estado+siguiente paso, `LEARNINGS.md`, `README.md`, `.env.example`,
+   versiones de deps verificadas con `pnpm install`+typecheck/build/test) y dejar claro el siguiente paso.
 6. **Secrets**: jamás en git. `.env` local + secrets en Railway. Nunca los imprimas/loguees.
 7. **Registrar aprendizajes** no obvios (decisiones, gotchas) para la próxima sesión.
 
@@ -145,7 +149,7 @@ Ref: `docs/LEARNINGS.md` (panorama SDD 2026 y por qué se difirió).
 Antes de escribir/modificar código que toque estas APIs, tu primera acción es resolver la lib
 en **context7** y consultar la API específica:
 
-- **Vercel AI SDK** (`ai`) — `streamText`, tools, structured output, streaming. La v6 cambió API.
+- **Vercel AI SDK** (`ai`, **v6** — ya migrado) — `streamText`, tools, structured output, streaming.
 - **Hono** (`hono`, `@hono/node-server`) — routing, middleware, streaming de respuestas.
 - **OpenRouter** (`@openrouter/ai-sdk-provider`) — provider + **cadena de fallback** (`models: []`).
 - **Drizzle ORM** (`drizzle-orm`, `drizzle-kit`) — schema `pgTable`/`vector`, `cosineDistance`,
