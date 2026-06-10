@@ -4,6 +4,7 @@ updates:
   # `directories` (plural, admite globs) → root + cada app/package. Los globs dejan
   # cubierto apps/web automáticamente cuando exista. (Dependabot soporta pnpm
   # workspaces en GA desde feb-2025.)
+  
   - package-ecosystem: npm
     directories:
       - "/"
