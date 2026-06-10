@@ -1,7 +1,10 @@
 # Pendientes — Vaio (para retomar)
 
-Estado: **scaffold + spec + CLAUDE.md/AGENTS.md + hooks + CI/Dependabot** listos y commiteados
-(`b41370a`, `9248c43`, `3bf48cd`). Falta el código real de la Fase 1 y el deploy.
+Estado (2026-06-10): **código de Fase 1 COMPLETO** en monorepo pnpm (`apps/agent` +
+`packages/contracts`), arquitectura ports/adapters, **Drizzle ORM + migración inicial**,
+Biome + Vitest (12 tests verdes). Verificado: typecheck/build/lint/test limpios; server
+corre (`/health` 200, `/chat` 401 sin key, 400 body inválido, cortesía 200 sin OpenRouter).
+**Falta: keys + deploy + el frontend (`apps/web`) y la integración del portafolio.**
 Diseño completo: [`SPEC.md`](SPEC.md) · Workflow: [`../CLAUDE.md`](../CLAUDE.md).
 
 ---
@@ -27,18 +30,16 @@ Acciones de Kevin además: crear el **repo de Vaio en GitHub** y **conectarlo a 
 
 ## 🟢 No bloqueante (se puede hacer ya, sin keys)
 
-- **`npm install`** → resuelve deps + crea `package-lock.json` (activa typecheck/CI/hooks). Primer paso.
-- **Escribir el código de la Fase 1 con context7** (se escribe y **typecheckea** sin keys; solo
-  *correrlo* necesita las cuentas):
-  - `memory.ts` — cliente Neon + pgvector (schema en el propio archivo) + `searchMemory`/`upsert`.
-  - `ingest.ts` — fetch de fuentes públicas → chunk → embed → upsert.
-  - `agent.ts` — `streamText` (Vercel AI SDK) + OpenRouter (fallback) + tool `searchMemory` + system prompt.
-  - `index.ts` — cablear `/chat` (stream) sobre `agent.ts`.
+- **Código de Fase 1: HECHO** (monorepo, ports/adapters, Drizzle, tests). ✅
+- **`apps/web` (frontend)** — la visión nueva: dashboard de configs/datos/conectores/flujos.
+  Reusa `@vaio/contracts`. Diseñar con `brainstorming` antes de codear.
 - **Integración en el portafolio (`KevinJGV`)** — **verificable con `npm run build`** aunque Vaio
   no esté live: `src/components/react/ChatSheet.tsx` (isla `client:visible`, botón flotante glass) +
   proxy `src/pages/api/agent.ts` (origin-check + rate-limit + stream passthrough).
-- **DX opcional** (si se quiere): Prettier/ESLint; `Dockerfile` (Railway autodetecta Node, no es
-  imprescindible).
+- **Sincronizar la copia del SPEC en el portafolio** (`KevinJGV/docs/superpowers/specs/
+  2026-06-09-vaio-agent-design.md`) con los cambios de arquitectura de hoy (pendiente).
+- **DX opcional**: `Dockerfile` (Railway autodetecta Node/pnpm, no imprescindible); Turborepo
+  (sumar cuando exista el 2º app).
 
 ---
 

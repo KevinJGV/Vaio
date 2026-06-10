@@ -1,0 +1,35 @@
+{
+  "name": "@vaio/agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @vaio/contracts build && tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "ingest": "tsx src/ingest.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/adapters/db/migrate.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1",
+    "@openrouter/ai-sdk-provider": "^1",
+    "@vaio/contracts": "workspace:*",
+    "ai": "^5",
+    "dotenv": "^16",
+    "drizzle-orm": "^0.36.0",
+    "hono": "^4",
+    "pg": "^8",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/pg": "^8",
+    "drizzle-kit": "^0.31.0",
+    "tsx": "^4",
+    "typescript": "^5",
+    "vitest": "^2"
+  }
+}

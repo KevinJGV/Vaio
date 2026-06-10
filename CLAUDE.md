@@ -12,18 +12,37 @@ lateral) y —más adelante— por Telegram y correo. **TypeScript** · **Hono**
 
 ---
 
-## Comandos
+## Estructura (monorepo pnpm)
 
-- `npm install` — instalar deps (Node >= 20).
-- `npm run dev` — server local con recarga (`tsx watch`, `:8787`).
-- `npm run typecheck` — `tsc --noEmit`. **Verificación canónica rápida.**
-- `npm run build` — compila a `dist/` (`tsc`).
-- `npm run start` — corre el build (`node dist/index.js`).
-- `npm run ingest` — pobla la memoria (fuentes → embeddings → Neon). A mano / cron.
+```
+vaio/                     # raíz del monorepo (pnpm workspaces)
+  apps/agent/             # el servicio (Hono + AI SDK), arquitectura ports/adapters
+    src/{core,ports,adapters,config.ts,index.ts,ingest.ts}
+    migrations/           # SQL de drizzle-kit
+  packages/contracts/     # @vaio/contracts — tipos + zod compartidos (web↔agent)
+  (apps/web/)             # futuro frontend (configs/datos/flujos) — aún no existe
+```
 
-**Antes de declarar trabajo completo:** `npm run typecheck` sin errores **y** correr el
-server (`/health` 200; si tocaste el agente, probar `/chat` con una respuesta real). Ver
-"Verificación" abajo.
+Arquitectura interna de `apps/agent` (**ports/adapters-lite**): `core/` = lógica pura
+(agent loop, chunking); `ports/` = interfaces (`MemoryStore`, `Embedder`); `adapters/` =
+implementaciones (Drizzle/Neon, embeddings, OpenRouter, http, sources). El `core` depende de
+puertos, nunca de adapters → fase 2/3 (Telegram/correo, Neon→Graphiti) enchufan sin reescribir.
+
+## Comandos (pnpm — Node >= 20)
+
+- `pnpm install` — instala deps de todo el workspace.
+- `pnpm dev` — server local con recarga (`tsx watch`, `:8787`) (filtra `@vaio/agent`).
+- `pnpm typecheck` — `pnpm -r typecheck` (tsc --noEmit por workspace). **Verificación canónica rápida.**
+- `pnpm build` — `pnpm -r build` (compila contracts → agent, orden topológico).
+- `pnpm test` — `pnpm -r test` (Vitest: lógica pura — chunking/parsing/fallback).
+- `pnpm lint` / `pnpm format` — Biome check / check --write.
+- `pnpm ingest` — pobla la memoria (fuentes → embeddings → Neon). A mano / cron.
+- `pnpm --filter @vaio/agent db:generate` — genera migración Drizzle (offline, sin DB).
+- `pnpm --filter @vaio/agent db:migrate` — aplica migraciones (necesita `DATABASE_URL`).
+
+**Antes de declarar trabajo completo:** `pnpm -r typecheck` + `pnpm exec biome check .` +
+`pnpm -r test` sin errores **y** correr el server (`/health` 200; si tocaste el agente, probar
+`/chat` con una respuesta real). Ver "Verificación" abajo.
 
 ---
 
@@ -105,7 +124,9 @@ en **context7** y consultar la API específica:
 - **Vercel AI SDK** (`ai`) — `streamText`, tools, structured output, streaming. La v6 cambió API.
 - **Hono** (`hono`, `@hono/node-server`) — routing, middleware, streaming de respuestas.
 - **OpenRouter** (`@openrouter/ai-sdk-provider`) — provider + **cadena de fallback** (`models: []`).
-- **pg + pgvector** — driver, operadores de similaridad (`<=>` coseno), índices (HNSW).
+- **Drizzle ORM** (`drizzle-orm`, `drizzle-kit`) — schema `pgTable`/`vector`, `cosineDistance`,
+  índice HNSW `vector_cosine_ops`, migraciones (`generate`/`migrate`), driver `node-postgres`.
+- **Biome** (`@biomejs/biome`) y **Vitest** — config y CLI al ajustarlos.
 
 ⚠️ **Modelos/precios**: el catálogo (DeepSeek, Gemini Flash, Qwen, MiniMax, Llama free…) y sus
 precios **cambian seguido** — verifícalos en vivo en `openrouter.ai/models` al elegir/ajustar
@@ -117,11 +138,14 @@ la cadena. No hardcodees suposiciones de training.
 
 - **TypeScript estricto** (`tsconfig`: `strict`, `noUncheckedIndexedAccess`). Tipar todo.
 - **ESM** (`"type": "module"`): imports relativos con extensión `.js` (p.ej. `./agent.js`).
-- **Un módulo, una responsabilidad**: `index.ts` (server/routing), `agent.ts` (loop + tools +
-  system prompt), `memory.ts` (Neon/pgvector + RAG), `ingest.ts` (fuentes → memoria).
+- **ports/adapters-lite**: `core/` puro (sin I/O), `ports/` interfaces, `adapters/` I/O.
+  El core depende de puertos, no de adapters. `index.ts` hace el wiring (inyecta adapters).
+  Tipos del borde compartidos viven en `@vaio/contracts`.
 - **Errores**: el agente nunca debe tirar al usuario un error crudo. `try/catch` con
   degradación (fallback de modelo, o respuesta de cortesía). Logs útiles, sin secrets.
-- **Sin dependencias nuevas sin razón concreta** — el servicio se mantiene liviano.
+- **Validación de entorno**: env se parsea/valida con zod en `config.ts` (fail-fast).
+- **Deps**: livianas y justificadas. Stack fijado: Drizzle ORM (DB+migraciones), Biome
+  (lint+format), Vitest (tests), zod (validación). No sumar más sin razón concreta.
 - Idioma de respuesta del agente = el del usuario (`locale` que manda el portafolio).
 
 ## Tono / persona del agente
@@ -176,7 +200,9 @@ CI en `.github/workflows/ci.yml` (`npm ci` + `typecheck` + `build`) y Dependabot
 Aprendizajes de desarrollo → `docs/LEARNINGS.md`.
 
 ## No tocar (generados / sensibles)
-`node_modules/`, `dist/`, `.env`, `package-lock.json` (lo maneja npm).
+`node_modules/`, `dist/`, `.env`, `pnpm-lock.yaml` (lo maneja pnpm). Las migraciones en
+`apps/agent/migrations/` las genera `drizzle-kit` (editar solo para SQL custom, p.ej. el
+`CREATE EXTENSION vector` que se antepone en la migración inicial).
 
 ## Estado / fase actual
 👉 **Pendientes (bloqueantes y no) para retomar: [`docs/NEXT-STEPS.md`](docs/NEXT-STEPS.md).**

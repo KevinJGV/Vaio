@@ -27,6 +27,14 @@ demostrable y vamos capando.
 | **Hosting agente** | **Railway** (always-on, predecible, Postgres/cron) | Vercel functions (pelea con background), Fly (más ops) |
 | **Canales** | Telegram webhook + Resend (saliente, ya existe) — fase 2 | polling (lento), email entrante → fase 3 |
 | **Compresión memoria** | "caveman" al guardar conversaciones — fase 2 | — |
+| **Repo** | **Monorepo pnpm** (`apps/agent` + `packages/contracts`, hueco `apps/web`) | Multi-repo (fricción para compartir contratos web↔agente) |
+| **Arquitectura agente** | **ports/adapters-lite** (core puro + puertos + adapters) | Hexagonal completo (ceremonia excesiva), módulos planos (poco desacople para fases) |
+| **DB** | **Drizzle ORM + migraciones** (driver `node-postgres`) | pg crudo (sin migraciones versionadas), Prisma (pesado, pgvector no first-class) |
+| **Tooling** | **Biome** (lint+format), **zod** (validación env), **Vitest** (tests) | ESLint+Prettier (2 deps), sin tests |
+
+> **Por qué subir el listón de ingeniería ahora** (antes minimalista): el usuario proyecta un
+> **frontend** (configs/datos/conectores/flujos) → monorepo + contratos compartidos desde el
+> inicio evita una migración disruptiva post-deploy. Decidido el 2026-06-10.
 
 ⚠️ **Modelos exactos y precios** (chat + embeddings) se fijan **al construir** vía OpenRouter
 — el research trajo datos post-corte (ene-2026) que cambian mensualmente. La **estrategia**
@@ -58,8 +66,10 @@ OpenRouter: models:[barato, fallback, llama-free]  → "siempre responde" + cach
 - **Server**: Hono (TS, ligero, buen streaming) en Node, deploy en Railway (always-on + health).
 - **Runtime**: Vercel AI SDK (`ai`) + provider **OpenRouter** (`@openrouter/ai-sdk-provider`).
   `streamText({ model, system, messages, tools })`. Cadena de fallback de OpenRouter.
-- **Memoria/RAG**: Neon + `pgvector`. Tabla `documents(id, source, url, chunk, embedding vector, updated_at)`.
-  Tool `searchMemory(query)` → similarity search top-k → inyecta contexto al system.
+- **Memoria/RAG**: Neon + `pgvector` vía **Drizzle ORM**. Tabla `documents(id, source, url,
+  chunk, embedding vector(1536), updated_at)` + índice HNSW `vector_cosine_ops`; búsqueda con
+  `cosineDistance`. Migraciones con `drizzle-kit` (la inicial antepone `CREATE EXTENSION vector`).
+  Puerto `MemoryStore` (adapter `neon-memory`); tool `searchMemory(query)` → top-k → contexto al system.
 - **Embeddings**: modelo barato hosteado (decidir al construir; p.ej. OpenAI `text-embedding-3-small`).
 - **Ingesta** (`ingest.ts`, a mano y luego cron Railway):
   - `cv.vindevsito.dev/` y `/en/` → texto limpio del CV.
@@ -115,7 +125,8 @@ centavos · Upstash free. **≈ $5–10/mes**. (Re-verificar al construir.)
 - Portafolio: ChatSheet abre, envía y **streamea**; proxy bloquea origins ajenos + rate-limit;
   funciona ES/EN.
 - Deploy: Vaio en Railway (health verde), proxy del portafolio apuntando; smoke test end-to-end.
-- Proceso: context7 para Astro/React/Vercel AI SDK/Hono al implementar; `npm run build` pasa.
+- Proceso: context7 para Astro/React/Vercel AI SDK/Hono/Drizzle/Biome al implementar;
+  `pnpm -r typecheck`, `pnpm -r build`, `pnpm exec biome check .` y `pnpm -r test` pasan.
 
 ---
 

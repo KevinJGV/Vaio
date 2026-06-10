@@ -3,28 +3,27 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Agente personal de IA de Kevin — chat con memoria, alimentado por portafolio/GitHub/Spotify/CV.",
-  "engines": { "node": ">=20" },
-  "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "ingest": "tsx src/ingest.ts",
-    "typecheck": "tsc --noEmit"
+  "description": "Monorepo de Vaio — agente personal de IA de Kevin (apps/agent) + contratos compartidos (packages/contracts).",
+  "engines": {
+    "node": ">=20"
   },
-  "//deps": "Versiones a fijar con `npm install` + context7 (API del Vercel AI SDK v6).",
-  "dependencies": {
-    "@hono/node-server": "^1",
-    "@openrouter/ai-sdk-provider": "^1",
-    "ai": "^4",
-    "dotenv": "^16",
-    "hono": "^4",
-    "pg": "^8"
+  "packageManager": "pnpm@10.24.0",
+  "scripts": {
+    "dev": "pnpm --filter @vaio/agent dev",
+    "ingest": "pnpm --filter @vaio/agent ingest",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "lint": "biome check .",
+    "format": "biome check --write ."
   },
   "devDependencies": {
-    "@types/node": "^20",
-    "@types/pg": "^8",
-    "tsx": "^4",
+    "@biomejs/biome": "^2.2.4",
     "typescript": "^5"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }
