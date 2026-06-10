@@ -127,6 +127,18 @@ No acoplar el repo del portafolio; leer sus fuentes públicas.
    usa Kevin?" cita el CV) **y** verificar que al fallar el primario sigue respondiendo.
 4. Evidencia antes de afirmaciones: pega la salida si algo falla; no digas "funciona" sin correrlo.
 
+## Automatización (hooks + CI) — refuerza el workflow, no lo reemplaza
+Este repo trae hooks de Claude Code en `.claude/settings.json` (aplican al abrir Claude Code
+**dentro de Vaio**):
+- **PostToolUse** (editar `.ts`) → corre `typecheck` y **bloquea** si falla (salta limpio sin
+  `node_modules`). Análogo al `astro check` del portafolio.
+- **UserPromptSubmit** → inyecta recordatorio de **context7** si el prompt menciona las libs.
+- **PreToolUse (git)** → **bloquea** commitear el `.env` real.
+
+Igual seguí verificando vos: los hooks son una red, no sustituyen el "correr y probar".
+CI en `.github/workflows/ci.yml` (`npm ci` + `typecheck` + `build`) y Dependabot semanal.
+Aprendizajes de desarrollo → `docs/LEARNINGS.md`.
+
 ## No tocar (generados / sensibles)
 `node_modules/`, `dist/`, `.env`, `package-lock.json` (lo maneja npm).
 
