@@ -1,10 +1,23 @@
 version: 2
 updates:
+  # Monorepo pnpm: un único pnpm-lock.yaml en la raíz cubre todos los workspaces.
+  # `directories` (plural, admite globs) → root + cada app/package. Los globs dejan
+  # cubierto apps/web automáticamente cuando exista. (Dependabot soporta pnpm
+  # workspaces en GA desde feb-2025.)
   - package-ecosystem: npm
-    directory: "/"
+    directories:
+      - "/"
+      - "/apps/*"
+      - "/packages/*"
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # Agrupa minor+patch en un solo PR por semana para no inundar de PRs el monorepo.
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
