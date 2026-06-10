@@ -18,7 +18,7 @@
     "@openrouter/ai-sdk-provider": "^1",
     "@vaio/contracts": "workspace:*",
     "ai": "^5",
-    "dotenv": "^16",
+    "dotenv": "^17",
     "drizzle-orm": "^0.36.0",
     "hono": "^4",
     "pg": "^8",
