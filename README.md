@@ -17,7 +17,8 @@ que se nutre, alimentado por el portafolio, GitHub, Spotify y el CV — accesibl
 
 ## Estado
 
-🚧 **Fase 1 en arranque.** Scaffold creado. Pendiente (siguiente paso, con context7 para fijar
+🚧 **Fase 1 en arranque.** Scaffold creado. **Pendientes (bloqueantes y no) para retomar:
+[`docs/NEXT-STEPS.md`](docs/NEXT-STEPS.md).** Resumen del siguiente paso (con context7 para fijar
 la API real del Vercel AI SDK v6 y versiones):
 - [ ] `npm install` (deps abajo) + verificar API del AI SDK con context7.
 - [ ] `src/memory.ts` — cliente Neon/pgvector + `searchMemory`.

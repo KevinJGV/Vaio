@@ -143,6 +143,7 @@ Aprendizajes de desarrollo → `docs/LEARNINGS.md`.
 `node_modules/`, `dist/`, `.env`, `package-lock.json` (lo maneja npm).
 
 ## Estado / fase actual
+👉 **Pendientes (bloqueantes y no) para retomar: [`docs/NEXT-STEPS.md`](docs/NEXT-STEPS.md).**
 **Fase 1 (MVP)** en scaffold. Pendiente: `memory.ts`, `ingest.ts`, `agent.ts` reales + deploy.
 Roadmap (Fase 2 memoria viva + escalación Telegram/correo; Fase 3 Graphiti + email entrante)
 en `docs/SPEC.md`. **Bloqueante para correr de verdad:** keys (OpenRouter/Neon/Railway/GitHub/
