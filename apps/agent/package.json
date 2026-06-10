@@ -17,7 +17,7 @@
     "@hono/node-server": "^1",
     "@openrouter/ai-sdk-provider": "^1",
     "@vaio/contracts": "workspace:*",
-    "ai": "^5",
+    "ai": "^6",
     "dotenv": "^16",
     "drizzle-orm": "^0.36.0",
     "hono": "^4",
