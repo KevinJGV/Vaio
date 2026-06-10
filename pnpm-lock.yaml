@@ -22,13 +22,13 @@ importers:
         version: 1.19.14(hono@4.12.25)
       '@openrouter/ai-sdk-provider':
         specifier: ^1
-        version: 1.5.4(ai@5.0.197(zod@3.25.76))(zod@3.25.76)
+        version: 1.5.4(ai@5.0.197(zod@4.4.3))(zod@4.4.3)
       '@vaio/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
       ai:
         specifier: ^5
-        version: 5.0.197(zod@3.25.76)
+        version: 5.0.197(zod@4.4.3)
       dotenv:
         specifier: ^16
         version: 16.6.1
@@ -42,8 +42,8 @@ importers:
         specifier: ^8
         version: 8.21.0
       zod:
-        specifier: ^3.25.0
-        version: 3.25.76
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^20
@@ -67,8 +67,8 @@ importers:
   packages/contracts:
     dependencies:
       zod:
-        specifier: ^3.25.0
-        version: 3.25.76
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       typescript:
         specifier: ^5
@@ -1329,24 +1329,24 @@ packages:
     resolution: {integrity: sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ==}
     engines: {node: '>=0.4'}
 
-  zod@3.25.76:
-    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+  zod@4.4.3:
+    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
 snapshots:
 
-  '@ai-sdk/gateway@2.0.98(zod@3.25.76)':
+  '@ai-sdk/gateway@2.0.98(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 2.0.3
-      '@ai-sdk/provider-utils': 3.0.25(zod@3.25.76)
+      '@ai-sdk/provider-utils': 3.0.25(zod@4.4.3)
       '@vercel/oidc': 3.1.0
-      zod: 3.25.76
+      zod: 4.4.3
 
-  '@ai-sdk/provider-utils@3.0.25(zod@3.25.76)':
+  '@ai-sdk/provider-utils@3.0.25(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 2.0.3
       '@standard-schema/spec': 1.1.0
       eventsource-parser: 3.1.0
-      zod: 3.25.76
+      zod: 4.4.3
 
   '@ai-sdk/provider@2.0.3':
     dependencies:
@@ -1696,15 +1696,15 @@ snapshots:
 
   '@jridgewell/sourcemap-codec@1.5.5': {}
 
-  '@openrouter/ai-sdk-provider@1.5.4(ai@5.0.197(zod@3.25.76))(zod@3.25.76)':
+  '@openrouter/ai-sdk-provider@1.5.4(ai@5.0.197(zod@4.4.3))(zod@4.4.3)':
     dependencies:
       '@openrouter/sdk': 0.1.27
-      ai: 5.0.197(zod@3.25.76)
-      zod: 3.25.76
+      ai: 5.0.197(zod@4.4.3)
+      zod: 4.4.3
 
   '@openrouter/sdk@0.1.27':
     dependencies:
-      zod: 3.25.76
+      zod: 4.4.3
 
   '@opentelemetry/api@1.9.0': {}
 
@@ -1839,13 +1839,13 @@ snapshots:
       loupe: 3.2.1
       tinyrainbow: 1.2.0
 
-  ai@5.0.197(zod@3.25.76):
+  ai@5.0.197(zod@4.4.3):
     dependencies:
-      '@ai-sdk/gateway': 2.0.98(zod@3.25.76)
+      '@ai-sdk/gateway': 2.0.98(zod@4.4.3)
       '@ai-sdk/provider': 2.0.3
-      '@ai-sdk/provider-utils': 3.0.25(zod@3.25.76)
+      '@ai-sdk/provider-utils': 3.0.25(zod@4.4.3)
       '@opentelemetry/api': 1.9.0
-      zod: 3.25.76
+      zod: 4.4.3
 
   assertion-error@2.0.1: {}
 
@@ -2220,4 +2220,4 @@ snapshots:
 
   xtend@4.0.2: {}
 
-  zod@3.25.76: {}
+  zod@4.4.3: {}
