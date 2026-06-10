@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^1",
-    "@openrouter/ai-sdk-provider": "^1",
+    "@openrouter/ai-sdk-provider": "^2",
     "@vaio/contracts": "workspace:*",
     "ai": "^5",
     "dotenv": "^16",
