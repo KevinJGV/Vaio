@@ -13,24 +13,24 @@ export function htmlToText(html: string): string {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/\s+/g, " ")
-    .trim();
+    .trim()
 }
 
 /** Parte texto en chunks de ~`size` chars con `overlap` de solape, en límites de palabra. */
 export function chunkText(text: string, size = 900, overlap = 150): string[] {
-  const clean = text.trim();
-  if (clean.length <= size) return clean ? [clean] : [];
-  const chunks: string[] = [];
-  let start = 0;
+  const clean = text.trim()
+  if (clean.length <= size) return clean ? [clean] : []
+  const chunks: string[] = []
+  let start = 0
   while (start < clean.length) {
-    let end = Math.min(start + size, clean.length);
+    let end = Math.min(start + size, clean.length)
     if (end < clean.length) {
-      const lastSpace = clean.lastIndexOf(" ", end);
-      if (lastSpace > start + size / 2) end = lastSpace;
+      const lastSpace = clean.lastIndexOf(" ", end)
+      if (lastSpace > start + size / 2) end = lastSpace
     }
-    chunks.push(clean.slice(start, end).trim());
-    if (end >= clean.length) break;
-    start = end - overlap;
+    chunks.push(clean.slice(start, end).trim())
+    if (end >= clean.length) break
+    start = end - overlap
   }
-  return chunks.filter(Boolean);
+  return chunks.filter(Boolean)
 }

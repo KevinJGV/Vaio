@@ -1,14 +1,28 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.4.16/schema.json",
-  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true,
+    "root": "."
+  },
   "files": {
-    "includes": ["**", "!**/dist", "!**/*.gen.ts", "!apps/agent/migrations"]
+    "includes": [
+      "**/*.js",
+      "**/*.ts",
+      "**/*.json",
+      "!**/dist",
+      "!**/*.gen.ts",
+      "!apps/agent/migrations"
+    ]
   },
   "formatter": {
     "enabled": true,
+    "formatWithErrors": true,
     "indentStyle": "space",
     "indentWidth": 2,
-    "lineWidth": 90
+    "lineEnding": "lf",
+    "lineWidth": 80
   },
   "assist": {
     "enabled": true,
@@ -16,9 +30,68 @@
   },
   "linter": {
     "enabled": true,
-    "rules": { "recommended": true }
+    "rules": {
+      "recommended": true,
+      "correctness": {
+        "noUnusedImports": "warn"
+      },
+      "style": {
+        "noNonNullAssertion": "warn",
+        "useImportType": "warn",
+        "useNodejsImportProtocol": "warn"
+      },
+      "suspicious": {
+        "noExplicitAny": "warn",
+        "noImplicitAnyLet": "warn"
+      }
+    }
   },
   "javascript": {
-    "formatter": { "quoteStyle": "double", "semicolons": "always" }
-  }
+    "formatter": {
+      "quoteStyle": "double",
+      "quoteProperties": "asNeeded",
+      "trailingCommas": "es5",
+      "semicolons": "asNeeded",
+      "arrowParentheses": "always",
+      "bracketSpacing": true
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["apps/agent/**/*.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": {
+              "level": "warn",
+              "options": { "allow": ["log", "info", "warn", "error", "debug"] }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/web/**/*.ts", "apps/web/**/*.tsx"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "useExhaustiveDependencies": "error",
+            "useUniqueElementIds": "off"
+          },
+          "a11y": {
+            "useValidAnchor": "warn",
+            "useKeyWithClickEvents": "warn",
+            "noNoninteractiveElementToInteractiveRole": "warn",
+            "useSemanticElements": "off"
+          },
+          "suspicious": {
+            "noArrayIndexKey": "off"
+          },
+          "nursery": {
+            "useSortedClasses": { "level": "error", "fix": "safe" }
+          }
+        }
+      }
+    }
+  ]
 }
