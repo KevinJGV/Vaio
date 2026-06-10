@@ -116,6 +116,30 @@ Bugs/comportamiento raro → **`superpowers:systematic-debugging`**. Aislamiento
 - Lado portafolio: el proxy **`/api/agent`** es la única ruta pública del agente → ahí va la
   protección (origin-check + rate-limit + stream passthrough). El agente nunca se expone directo.
 
+### Cuándo escalar a OpenSpec (disparador de decisión)
+
+Hoy el método es **`docs/SPEC.md` (fuente de verdad) + superpowers** (brainstorming →
+writing-plans → executing/subagent-driven → verification). Es lo eficiente para el estado
+actual: **un servicio, solo-dev, ~una feature por vez**. NO adoptar tooling SDD más pesado
+(OpenSpec, Spec Kit) antes de tiempo — sobre-especificar/“spec rot” es un costo real.
+
+**Adoptar OpenSpec cuando se cumpla CUALQUIERA de estas condiciones:**
+1. **Disparador estructural:** `apps/web` **y** fase 2 (facts/escalación) están **ambos activos**
+   a la vez (≥2 features en vuelo que tocan `SPEC.md`).
+2. **Disparador por síntomas:** aparecen **≥2** de estas señales (= `SPEC.md` monolítico quedó chico):
+   - Tenés que preguntar “¿esto ya está implementado o solo planeado?” (el doc mezcla hecho vs propuesto).
+   - Conflictos/pisadas de edición en `SPEC.md` entre features distintos.
+   - “¿Por qué decidimos X hace N features?” es irrecuperable (no hay archivo de cambios durable).
+   - Re-explicás el mismo contexto cada sesión por falta de spec direccionable por capacidad.
+   - Una feature rompe otra en silencio porque sus specs no son separables.
+   - Corrés 2+ features/agentes en paralelo y el doc único es cuello de botella.
+
+**Al adoptar** (modo recomendado = híbrido): `openspec init` (perfil Claude Code); OpenSpec maneja
+el ciclo por-feature (`openspec/changes/<f>/{proposal,design,tasks,specs}` → `archive/`);
+`docs/SPEC.md` queda como **visión/norte** (fases, decisiones macro); superpowers `brainstorming`
+y `systematic-debugging` siguen para ideación y bugs. Actualizar este `CLAUDE.md` al hacerlo.
+Ref: `docs/LEARNINGS.md` (panorama SDD 2026 y por qué se difirió).
+
 ## Docs de librerías → usa context7 (obligatorio)
 
 Antes de escribir/modificar código que toque estas APIs, tu primera acción es resolver la lib

@@ -43,6 +43,14 @@ Acciones de Kevin además: crear el **repo de Vaio en GitHub** y **conectarlo a 
 
 ---
 
+## Decisión diferida: OpenSpec (tooling SDD)
+
+Evaluado el 2026-06-10. **Decisión: NO adoptar todavía** — el flujo actual (`SPEC.md` +
+superpowers) es eficiente para un servicio / una feature por vez, y meter tooling SDD pesado
+ahora arriesga sobre-especificación / spec rot. **El disparador exacto para adoptarlo está
+en [`../CLAUDE.md`](../CLAUDE.md) → "Cuándo escalar a OpenSpec"** (resumen: cuando `apps/web` +
+fase 2 estén activos a la vez, o aparezcan ≥2 síntomas de que el `SPEC.md` monolítico quedó chico).
+
 ## Secuencia sugerida
 1. (Kevin) cuentas + keys en `.env`; repo GitHub + Railway; env del portafolio en Vercel. *(bloqueante)*
 2. `npm install`. *(ya)*
