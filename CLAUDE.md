@@ -61,6 +61,42 @@ server (`/health` 200; si tocaste el agente, probar `/chat` con una respuesta re
 
 ---
 
+## Metodología: spec-driven + skills + subagents
+
+Las skills de **`superpowers`** y **`context7`** están habilitadas **globalmente** → usalas en
+Vaio. Esta es la disciplina establecida para features/cambios no triviales:
+
+**Ciclo spec-driven (feature grande / cambio creativo):**
+1. **`superpowers:brainstorming`** — ANTES de codear cualquier feature/creatividad (explora
+   intención y diseño). No es opcional para algo nuevo.
+2. **`superpowers:writing-plans`** — plan del trabajo multi-paso → reflejalo en `docs/SPEC.md`.
+3. Ejecutar: **`superpowers:subagent-driven-development`** (tareas independientes en esta sesión)
+   o **`superpowers:executing-plans`** (con checkpoints de revisión).
+4. **`superpowers:test-driven-development`** — tests antes del código (lógica de `memory`/`ingest`/
+   `agent`: chunking, parsing, selección de fallback, retrieval).
+5. **`superpowers:verification-before-completion`** — evidencia (typecheck/build/run) antes de "listo".
+6. **`superpowers:requesting-code-review`** / **`receiving-code-review`** — antes de mergear.
+7. **`superpowers:finishing-a-development-branch`** — para integrar.
+Bugs/comportamiento raro → **`superpowers:systematic-debugging`**. Aislamiento → **`using-git-worktrees`**.
+
+**Subagents (cuándo desplegarlos):**
+- **`superpowers:dispatching-parallel-agents`** — 2+ tareas independientes sin estado compartido.
+- **`Explore`** (subagente read-only) — búsqueda amplia en código/web cuando no estás seguro del match.
+- **`subagent-driven-development`** — ejecutar tareas independientes del plan vía subagentes.
+- Regla: trabajo independiente/paralelo → subagentes; secuencial/acoplado → directo. No paralelizar
+  cosas que comparten estado o dependen entre sí.
+
+**Diseño de rutas (API + routing del agente) — diseñar ANTES de codear:**
+- Superficie HTTP actual: `POST /chat` (stream, auth `x-agent-key`), `GET /health`. Planeadas
+  (fase 2): `POST /tg` (Telegram webhook), `POST /mail` (email entrante, fase 3). **Toda ruta
+  nueva → documentala en `docs/SPEC.md`.**
+- Rutas **finas**: el routing vive en `index.ts` (Hono); la lógica en módulos (`agent`/`memory`/
+  `ingest`). Nada de lógica pesada en el handler.
+- "Routing" del agente (qué decide): qué **tools** expone y cuándo (`searchMemory`; fase 2:
+  `escalate` con umbral de confianza). Cambios de tools/umbral → al SPEC.
+- Lado portafolio: el proxy **`/api/agent`** es la única ruta pública del agente → ahí va la
+  protección (origin-check + rate-limit + stream passthrough). El agente nunca se expone directo.
+
 ## Docs de librerías → usa context7 (obligatorio)
 
 Antes de escribir/modificar código que toque estas APIs, tu primera acción es resolver la lib
