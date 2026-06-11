@@ -106,3 +106,18 @@ El código typecheckeó sin cambios de API salvo **dos rupturas reales**:
   recordatorio **obligatorio** vía `additionalContext`. Hace determinístico el *disparo/timing*, NO la
   *acción* (escribir el archivo sigue siendo del modelo) → es recordatorio fuerte, no un gate que
   bloquea (evaluado; frágil). CLAUDE.md/memoria solos son probabilísticos.
+- **Confirmado (jun-2026)**: `additionalContext` SÍ se honra en `PostToolUse(ExitPlanMode)` con
+  matcher `"ExitPlanMode"` (es una tool real, no un permission dialog) — el recordatorio apareció al
+  salir de plan mode. (El claude-code-guide se equivocó diciendo que era `PermissionRequest`.)
+
+### Deploy a Railway (jun-2026) — gotchas
+- **Monorepo pnpm: el agente NO bootea sin `@vaio/contracts` compilado**. `routes.js` importa
+  `chatBodySchema` (objeto **zod**, valor en runtime, no solo tipo) → necesita
+  `packages/contracts/dist/index.js`. Railway/nixpacks autodetectado compila solo `apps/agent` (`tsc`)
+  y NO corre `pnpm -r build` → `ERR_MODULE_NOT_FOUND` en loop. **Fix**: `railway.json` en la raíz con
+  `build.buildCommand: "pnpm -r build"` + `deploy.startCommand: "pnpm --filter @vaio/agent start"`
+  (+ `healthcheckPath: /health`). Cambiar el Root Directory NO alcanza: el problema es el build command.
+  Defensa extra: `apps/agent` `build` = `pnpm --filter @vaio/contracts build && tsc`.
+- **`LOG_FORMAT=json` (o `NODE_ENV=production`) en prod**: `pino-pretty` es **devDependency**; el
+  formato `pretty` por defecto (cuando `NODE_ENV !== production`) intenta cargar ese transport → si el
+  runtime podó devDeps, crashea. `json` no usa transport y es lo correcto para Railway (captura stdout).

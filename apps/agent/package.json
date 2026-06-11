@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm --filter @vaio/contracts build && tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "pnpm --filter @vaio/contracts build && tsc",
     "start": "node dist/index.js",
     "ingest": "tsx src/ingest.ts",
     "typecheck": "tsc --noEmit",
