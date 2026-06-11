@@ -10,8 +10,11 @@ import {
   vector,
 } from "drizzle-orm/pg-core"
 
-/** Dimensión del modelo de embeddings (text-embedding-3-small = 1536). Cambiarla
- *  implica una migración (el ancho de la columna `vector(N)` es fijo). */
+/** Dimensión de los embeddings. `gemini-embedding-2` da 3072 nativo, pero el índice HNSW de
+ *  pgvector está limitado a 2000 dims para el tipo `vector` → truncamos a 1536 vía Matryoshka
+ *  (sin pérdida de calidad, mitad de storage). El adapter pide `dimensions: 1536` al modelo.
+ *  (Para 3072 completos habría que usar `halfvec(3072)`, indexable hasta 4000.)
+ *  Cambiar este valor implica regenerar la migración (el ancho de `vector(N)` es fijo). */
 export const EMBEDDING_DIM = 1536
 
 export const documents = pgTable(

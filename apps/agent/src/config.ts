@@ -18,8 +18,9 @@ const envSchema = z.object({
   // Memoria (Neon + embeddings).
   DATABASE_URL: z.string().optional(),
   EMBEDDINGS_API_KEY: z.string().optional(),
-  EMBEDDINGS_MODEL: z.string().default("text-embedding-3-small"),
-  EMBEDDINGS_BASE_URL: z.string().url().default("https://api.openai.com/v1"),
+  // Embeddings vía OpenRouter (mismo provider que el chat). Verificar slug en openrouter.ai/models.
+  EMBEDDINGS_MODEL: z.string().default("google/gemini-embedding-2"),
+  EMBEDDINGS_BASE_URL: z.string().url().default("https://openrouter.ai/api/v1"),
 
   // Ingesta.
   GITHUB_TOKEN: z.string().optional(),

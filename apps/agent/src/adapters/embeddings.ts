@@ -7,6 +7,8 @@ export interface EmbeddingsConfig {
   apiKey: string
   model: string
   baseUrl: string
+  /** Trunca la salida a N dims (Matryoshka). Debe coincidir con EMBEDDING_DIM del schema. */
+  dimensions?: number
 }
 
 export function createEmbedder(cfg: EmbeddingsConfig): Embedder {
@@ -19,7 +21,11 @@ export function createEmbedder(cfg: EmbeddingsConfig): Embedder {
           "content-type": "application/json",
           authorization: `Bearer ${cfg.apiKey}`,
         },
-        body: JSON.stringify({ model: cfg.model, input: texts }),
+        body: JSON.stringify({
+          model: cfg.model,
+          input: texts,
+          ...(cfg.dimensions ? { dimensions: cfg.dimensions } : {}),
+        }),
       })
       if (!res.ok) {
         throw new Error(`Embeddings API ${res.status}: ${await res.text()}`)
