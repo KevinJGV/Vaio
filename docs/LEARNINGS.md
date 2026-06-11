@@ -91,15 +91,18 @@ El código typecheckeó sin cambios de API salvo **dos rupturas reales**:
 - **`LOG_PROMPTS` boolean gotcha**: `z.coerce.boolean()` convierte `"false"`→`true` (`Boolean("false")`
   es truthy). Usar transform explícito `v === "true" || v === "1"`.
 
-### Proceso: plan mode vs spec-driven (jun-2026)
+### Proceso: planes durables (plan mode ↔ spec-driven) (jun-2026)
 - **Gotcha**: al construir la observabilidad entré en **plan mode**, cuyo workflow propio **reemplaza
-  los pasos finales del `brainstorming`** (escribir el spec a `docs/` + `writing-plans`). El diseño
-  quedó en el **plan file efímero** (`~/.claude/plans/…`), NO en `docs/SPEC.md`. Hubo que backfillear.
-- **Regla**: `docs/SPEC.md` es el **único destino durable** del diseño, sin importar el motor. Si se
-  usa **plan mode** para una feature grande → al salir, **PROMOVER el plan aprobado a `docs/SPEC.md`**
-  (NO correr `writing-plans` aparte = no duplicar). Si NO se usa plan mode → `writing-plans` →
-  `docs/SPEC.md`. Plan mode = motor de diseño+aprobación; `docs/SPEC.md` = su forma persistida.
-- **Refuerzo determinístico**: un hook `PostToolUse` que matchee `ExitPlanMode` puede inyectar el
-  recordatorio (mismo patrón que los hooks ya existentes). El hook hace determinístico el *disparo y
-  el timing*, NO la *acción* → CLAUDE.md/memoria solos son probabilísticos (pueden fallar por la
-  naturaleza del LLM). Capa recomendada: hook (trigger) + cláusula en CLAUDE.md (guía).
+  los pasos finales del `brainstorming`** (escribir el plan a `docs/` + `writing-plans`). El diseño
+  quedó en el **plan file efímero** (`~/.claude/plans/…`). Hubo que backfillear al proyecto.
+- **Regla (OBLIGATORIA, no opcional)**: un plan aprobado **DEBE** quedar escrito en el proyecto.
+  Destino = **`docs/superpowers/specs/YYYY-MM-DD-<tema>.md`** (un archivo por feature; ahí se promueve
+  el plan de plan mode **o** de `writing-plans` — NO ambos, para no duplicar).
+- **Responsabilidades de `docs/` (no solapar):** `SPEC.md` = norte + diseño **fundacional** (fases,
+  arquitectura macro, stack); `superpowers/specs/` = **plan completo por feature**; `NEXT-STEPS.md` =
+  estado + siguiente paso (+ índice a specs); `LEARNINGS.md` = aprendizajes de dev. (Reemplaza la nota
+  previa "SPEC.md único destino" — quedó obsoleta al diferenciar responsabilidades.)
+- **Refuerzo**: hook `PostToolUse(ExitPlanMode)` (`.claude/hooks/spec-after-plan.sh`) inyecta el
+  recordatorio **obligatorio** vía `additionalContext`. Hace determinístico el *disparo/timing*, NO la
+  *acción* (escribir el archivo sigue siendo del modelo) → es recordatorio fuerte, no un gate que
+  bloquea (evaluado; frágil). CLAUDE.md/memoria solos son probabilísticos.

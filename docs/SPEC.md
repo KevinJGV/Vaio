@@ -7,8 +7,11 @@ Actualizado 2026-06-11
 **Repos:** este spec vive en AMBOS — el portafolio (`KevinJGV`) y el repo del agente
 (`Vaio`). Mantener en sync.
 
-> Feature grande nueva → flujo spec-driven. El agente vive en **repo aparte `Vaio`**; el
-> portafolio solo suma un chat-sheet + un proxy. Implementación: subagent-driven.
+> **Rol de este doc:** norte/visión + diseño **FUNDACIONAL** del agente (fases, arquitectura macro,
+> stack). Los **planes/diseños de cada feature** viven en [`superpowers/specs/`](superpowers/specs/)
+> (un archivo por feature; ahí se promueve el plan aprobado de plan mode / `writing-plans`). Estado
+> real + siguiente paso → [`NEXT-STEPS.md`](NEXT-STEPS.md). El agente vive en **repo aparte `Vaio`**;
+> el portafolio solo suma un chat-sheet + un proxy.
 
 ## Contexto
 
@@ -137,36 +140,13 @@ tokens. Los embeddings son ruido en la factura; el costo real está en el modelo
 4. Imagen → 002 directo (o caption→texto). Audio → STT→texto. Video → 002 nativo (o keyframes+transcripción).
 "A texto plano primero" = default barato; multimodal directo cuando el contenido visual importa.
 
-## Observabilidad (logs estructurados a stdout · 2026-06-11)
+## Observabilidad
 
-**Decisión:** logging estructurado a **stdout** con **pino** (lo captura Railway), instrumentando
-**todo el servicio** — para control/gestión antes del deploy. Se evaluaron Langfuse/Helicone/OTel
-(free tier real / self-host gratis) pero se **difirieron** para minimizar cuentas/deps; la
-instrumentación queda lista para enchufar `experimental_telemetry` del AI SDK si algún día se quiere.
-
-**Arquitectura (ports/adapters, core puro):** dos puertos —
-- `Logger` (logs operativos) → adapter **pino**: json en prod / pretty en dev, `redact` de secrets,
-  child loggers (atan `requestId`).
-- `TraceSink` (eventos de dominio de un turno) → adapter `loggerTraceSink` (única impl hoy).
-
-El `core/agent` depende de los puertos, **nunca de pino ni de la DB**. El wiring (`index.ts`) inyecta.
-
-**Taxonomy de eventos** (`@vaio/contracts/trace.ts`, zod — compartido y **diseñado para PERSISTIR**):
-`turn.start → tool.call → tool.result → reasoning → llm.step → turn.finish | turn.error`,
-correlacionados por `requestId` (+ `conversationId` opcional, hilable desde el proxy). `llm.step`
-trae `modelId` (qué modelo de la cadena respondió) + `usage`/tokens.
-
-**Instrumentación:** boot (features on/off), HTTP (middleware `requestId` + `request.start/finish`),
-agent loop (`onChunk`/`onStepFinish`/`onFinish`/`onError`), `searchMemory` (query/#hits/latencia).
-La degradación a cortesía queda intacta.
-
-**Política de redacción (chat público):** reasoning ("pensamiento") + métricas/usage/nombres de tools
-**siempre**; texto crudo de prompts y args/output de tools **solo con `LOG_PROMPTS=on`** (default off).
-Envs nuevas: `NODE_ENV`, `LOG_LEVEL`, `LOG_FORMAT`, `LOG_PROMPTS`.
-
-**Extensión futura (NO construida):** un `drizzleTraceSink` con el MISMO puerto + tablas
-`conversations/turns/events` + endpoints de lectura → **debug de conversaciones / historial de chats
-(CRUD)** sin tocar el core. Por eso el taxonomy vive en `@vaio/contracts` (reutilizable por `apps/web`).
+Logging estructurado a stdout (pino) instrumentando todo el servicio. **Plan/diseño completo →**
+[`superpowers/specs/2026-06-11-vaio-observability.md`](superpowers/specs/2026-06-11-vaio-observability.md).
+Resumen: puertos `Logger` + `TraceSink` (core puro); taxonomy `TraceEvent` en `@vaio/contracts`
+**diseñado para persistir a futuro** (debug/historial de chats); redacción de contenido tras
+`LOG_PROMPTS`. Implementado y verificado e2e (rama `feat/observabilidad-logs`).
 
 ## Fase 2 — Memoria viva + escalación (el "se nutre")
 - Tabla `facts(id, fact, source, valid_from, embedding)` + extracción de hechos post-conversación

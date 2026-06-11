@@ -18,8 +18,9 @@ Pendiente de embeddings: el **triage multimodal de documentos** (diseño en `SPE
 **🟢 OBSERVABILIDAD** (jun-2026, rama `feat/observabilidad-logs`, **pendiente merge**): logs
 estructurados a stdout con pino (json prod / pretty dev), puertos `Logger`+`TraceSink`, traza de
 cada turno (`turn.start→tool.call→tool.result→reasoning→llm.step→turn.finish`) correlacionada por
-`requestId`, redacción tras `LOG_PROMPTS`. Diseñada para persistir a futuro (debug de chats). Ver
-"Observabilidad" en `SPEC.md`. Verificado e2e (traza completa, redacción on/off, sin secrets).
+`requestId`, redacción tras `LOG_PROMPTS`. Diseñada para persistir a futuro (debug de chats). Plan
+completo → [`superpowers/specs/2026-06-11-vaio-observability.md`](superpowers/specs/2026-06-11-vaio-observability.md).
+Verificado e2e (traza completa, redacción on/off, sin secrets).
 
 **Falta para producción: merge de la rama → deploy a Railway + integración del portafolio**
 (`ChatSheet.tsx` + proxy `/api/agent`). Luego `apps/web`. Diseño: [`SPEC.md`](SPEC.md) ·
