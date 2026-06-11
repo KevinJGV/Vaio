@@ -12,6 +12,16 @@
             "statusMessage": "typecheck (tsc)…"
           }
         ]
+      },
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/spec-after-plan.sh\"",
+            "statusMessage": "recordatorio spec-driven…"
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [

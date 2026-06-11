@@ -5,10 +5,11 @@ GitHub, Spotify y el CV. Se consume desde [vindevsito.dev](https://vindevsito.de
 lateral) y —más adelante— por Telegram y correo. **TypeScript** · **Hono** · **Vercel AI SDK**
 · **OpenRouter** (fallback) · **Neon Postgres + pgvector** · deploy en **Railway**.
 
-> **Spec completo y fuente de verdad del diseño:** [`docs/SPEC.md`](docs/SPEC.md).
-> Léelo antes de cualquier cambio de arquitectura. Está **en sync** con la copia del
-> portafolio (`KevinJGV/docs/superpowers/specs/2026-06-09-vaio-agent-design.md`) — si cambias
-> el diseño, **actualiza ambos**.
+> **Norte y diseño fundacional:** [`docs/SPEC.md`](docs/SPEC.md) (visión, fases, arquitectura macro,
+> stack). Léelo antes de cualquier cambio de arquitectura; está **en sync** con la copia del portafolio
+> (`KevinJGV/docs/superpowers/specs/2026-06-09-vaio-agent-design.md`) — si cambias el diseño **macro**,
+> **actualiza ambos**. Los **planes/diseños por feature** viven en
+> [`docs/superpowers/specs/`](docs/superpowers/specs/) (un archivo por feature; ver "Metodología").
 
 ---
 
@@ -92,7 +93,8 @@ Vaio. Esta es la disciplina establecida para features/cambios no triviales:
 **Ciclo spec-driven (feature grande / cambio creativo):**
 1. **`superpowers:brainstorming`** — ANTES de codear cualquier feature/creatividad (explora
    intención y diseño). No es opcional para algo nuevo.
-2. **`superpowers:writing-plans`** — plan del trabajo multi-paso → reflejalo en `docs/SPEC.md`.
+2. **`superpowers:writing-plans`** — plan del trabajo multi-paso → escribilo en
+   `docs/superpowers/specs/YYYY-MM-DD-<tema>.md` (NO en `docs/SPEC.md`; ver "Planes durables" abajo).
 3. Ejecutar: **`superpowers:subagent-driven-development`** (tareas independientes en esta sesión)
    o **`superpowers:executing-plans`** (con checkpoints de revisión).
 4. **`superpowers:test-driven-development`** — tests antes del código (lógica de `memory`/`ingest`/
@@ -101,6 +103,17 @@ Vaio. Esta es la disciplina establecida para features/cambios no triviales:
 6. **`superpowers:requesting-code-review`** / **`receiving-code-review`** — antes de mergear.
 7. **`superpowers:finishing-a-development-branch`** — para integrar.
 Bugs/comportamiento raro → **`superpowers:systematic-debugging`**. Aislamiento → **`using-git-worktrees`**.
+
+**Planes durables (plan mode ↔ spec-driven) — OBLIGATORIO:** un plan aprobado **DEBE** quedar escrito
+en el proyecto; **no es opcional**. **Destino = `docs/superpowers/specs/YYYY-MM-DD-<tema>.md`** (un
+archivo por feature). Si usás **plan mode** (lo activa Kevin) es el motor de diseño+aprobación, pero
+escribe a un **plan file efímero** (`~/.claude/plans/…`): **al salir (`ExitPlanMode`) PROMOVÉ el plan
+aprobado a `docs/superpowers/specs/…`** ANTES o JUNTO con implementar. Si NO usás plan mode →
+`writing-plans` escribe directo ahí. **Nunca corras los dos** (duplicaría). Reconciliá `NEXT-STEPS.md`.
+**Responsabilidades de `docs/` (no solapar):** `SPEC.md` = norte + diseño **fundacional** (fases,
+arquitectura macro, stack); `superpowers/specs/` = **plan completo por feature**; `NEXT-STEPS.md` =
+estado + siguiente paso (+ índice a specs); `LEARNINGS.md` = aprendizajes de dev. El hook
+`PostToolUse(ExitPlanMode)` (`.claude/hooks/spec-after-plan.sh`) te lo recuerda — red, no reemplazo del criterio.
 
 **Subagents (cuándo desplegarlos):**
 - **`superpowers:dispatching-parallel-agents`** — 2+ tareas independientes sin estado compartido.
