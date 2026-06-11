@@ -15,8 +15,15 @@ TS 6, vitest 4 + vite 8). Fixes aplicados: `declaration:false` en la app (TS4058
 con **RAG real citando CV/portfolio/Last.fm**; **fallback** y **cortesía** en error verificados.
 Pendiente de embeddings: el **triage multimodal de documentos** (diseño en `SPEC.md`) es fase 2.
 
-**Falta para producción: deploy a Railway + integración del portafolio** (`ChatSheet.tsx` + proxy
-`/api/agent`). Luego `apps/web`. Diseño: [`SPEC.md`](SPEC.md) · Workflow: [`../CLAUDE.md`](../CLAUDE.md).
+**🟢 OBSERVABILIDAD** (jun-2026, rama `feat/observabilidad-logs`, **pendiente merge**): logs
+estructurados a stdout con pino (json prod / pretty dev), puertos `Logger`+`TraceSink`, traza de
+cada turno (`turn.start→tool.call→tool.result→reasoning→llm.step→turn.finish`) correlacionada por
+`requestId`, redacción tras `LOG_PROMPTS`. Diseñada para persistir a futuro (debug de chats). Ver
+"Observabilidad" en `SPEC.md`. Verificado e2e (traza completa, redacción on/off, sin secrets).
+
+**Falta para producción: merge de la rama → deploy a Railway + integración del portafolio**
+(`ChatSheet.tsx` + proxy `/api/agent`). Luego `apps/web`. Diseño: [`SPEC.md`](SPEC.md) ·
+Workflow: [`../CLAUDE.md`](../CLAUDE.md).
 
 ---
 

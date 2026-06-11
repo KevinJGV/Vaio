@@ -1,7 +1,9 @@
 # Spec — Agente personal de IA "Vaio"
 
-**Estado:** Fase 1 (MVP) — código completo y verificado (monorepo pnpm + ports/adapters +
-Drizzle + Biome/Vitest, deps al día, Node 24); **pendiente keys + deploy**. Actualizado 2026-06-10
+**Estado:** Fase 1 (MVP) — código completo y **corriendo end-to-end con keys** (migrate+ingest+
+`/chat` RAG real, fallback y cortesía verificados). Sumada **observabilidad** (logs estructurados,
+rama `feat/observabilidad-logs`, pendiente merge). **Siguiente milestone: deploy a Railway.**
+Actualizado 2026-06-11
 **Repos:** este spec vive en AMBOS — el portafolio (`KevinJGV`) y el repo del agente
 (`Vaio`). Mantener en sync.
 
@@ -82,6 +84,7 @@ OpenRouter: models:[barato, fallback, llama-free]  → "siempre responde" + cach
 - **System prompt**: persona "asistente de Kevin" (persona/pro/dev), tono alineado con sus
   quirks (señal cultural deliberada, no neutralizar), responde en el **idioma del usuario**.
 - **Endpoints MVP**: `POST /chat` (stream, requiere header `AGENT_API_KEY`), `GET /health`.
+  Ambos instrumentados con observabilidad (ver "Observabilidad" abajo).
 
 **Integración en el portafolio** (mínima, no rompe `output:'static'`):
 - `src/components/react/ChatSheet.tsx` — isla `client:visible`: botón flotante (bottom-right,
@@ -133,6 +136,37 @@ tokens. Los embeddings son ruido en la factura; el costo real está en el modelo
    visuales (tablas/charts/diagramas) → embeber la página/imagen (002 multimodal) o visión→caption→texto.
 4. Imagen → 002 directo (o caption→texto). Audio → STT→texto. Video → 002 nativo (o keyframes+transcripción).
 "A texto plano primero" = default barato; multimodal directo cuando el contenido visual importa.
+
+## Observabilidad (logs estructurados a stdout · 2026-06-11)
+
+**Decisión:** logging estructurado a **stdout** con **pino** (lo captura Railway), instrumentando
+**todo el servicio** — para control/gestión antes del deploy. Se evaluaron Langfuse/Helicone/OTel
+(free tier real / self-host gratis) pero se **difirieron** para minimizar cuentas/deps; la
+instrumentación queda lista para enchufar `experimental_telemetry` del AI SDK si algún día se quiere.
+
+**Arquitectura (ports/adapters, core puro):** dos puertos —
+- `Logger` (logs operativos) → adapter **pino**: json en prod / pretty en dev, `redact` de secrets,
+  child loggers (atan `requestId`).
+- `TraceSink` (eventos de dominio de un turno) → adapter `loggerTraceSink` (única impl hoy).
+
+El `core/agent` depende de los puertos, **nunca de pino ni de la DB**. El wiring (`index.ts`) inyecta.
+
+**Taxonomy de eventos** (`@vaio/contracts/trace.ts`, zod — compartido y **diseñado para PERSISTIR**):
+`turn.start → tool.call → tool.result → reasoning → llm.step → turn.finish | turn.error`,
+correlacionados por `requestId` (+ `conversationId` opcional, hilable desde el proxy). `llm.step`
+trae `modelId` (qué modelo de la cadena respondió) + `usage`/tokens.
+
+**Instrumentación:** boot (features on/off), HTTP (middleware `requestId` + `request.start/finish`),
+agent loop (`onChunk`/`onStepFinish`/`onFinish`/`onError`), `searchMemory` (query/#hits/latencia).
+La degradación a cortesía queda intacta.
+
+**Política de redacción (chat público):** reasoning ("pensamiento") + métricas/usage/nombres de tools
+**siempre**; texto crudo de prompts y args/output de tools **solo con `LOG_PROMPTS=on`** (default off).
+Envs nuevas: `NODE_ENV`, `LOG_LEVEL`, `LOG_FORMAT`, `LOG_PROMPTS`.
+
+**Extensión futura (NO construida):** un `drizzleTraceSink` con el MISMO puerto + tablas
+`conversations/turns/events` + endpoints de lectura → **debug de conversaciones / historial de chats
+(CRUD)** sin tocar el core. Por eso el taxonomy vive en `@vaio/contracts` (reutilizable por `apps/web`).
 
 ## Fase 2 — Memoria viva + escalación (el "se nutre")
 - Tabla `facts(id, fact, source, valid_from, embedding)` + extracción de hechos post-conversación

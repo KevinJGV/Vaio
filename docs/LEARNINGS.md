@@ -75,3 +75,31 @@ El código typecheckeó sin cambios de API salvo **dos rupturas reales**:
   estándar → se retorna tal cual desde el handler de Hono (passthrough hasta el proxy).
 - **Degradación verificada**: sin `OPENROUTER_API_KEY`/`OPENROUTER_MODELS`, `/chat` (con key)
   responde cortesía 200, nunca 500. `/health` 200, `/chat` sin `x-agent-key` 401.
+
+### Observabilidad (jun-2026)
+- **pino**: json en prod / pretty en dev (transport `pino-pretty`, devDep); `redact` como red de
+  seguridad de secrets; `child({ requestId })` para correlación. La lógica PURA (formato + política
+  de redacción) vive en `core/logging.ts`, separada del backend → testeable sin montar pino.
+- **Trazas del agente con callbacks de streamText v6**: `onChunk` (chunk `tool-call`), `onStepFinish`
+  (`reasoningText`, `toolCalls[].input`, `toolResults[].output`, `model.modelId`, `usage` PLANO),
+  `onFinish` (`steps`/`totalUsage`), `onError`. NO acumular `reasoning-delta`: `onStepFinish.reasoningText`
+  ya trae el texto completo del "pensamiento". (verificado contra los `.d.ts` instalados, no memoria.)
+- **`ai` resuelto = 6.0.200** para `apps/agent` aunque el pnpm store tenga un **leftover `ai@5.0.197`**:
+  verificar lo que la APP resuelve (`require.resolve` desde `apps/agent`), no el primer path del store.
+- **dotenv v17 imprime un banner a stdout** → `config({ quiet: true })` en `load-env.ts` para no
+  romper el stream JSON que lee Railway.
+- **`LOG_PROMPTS` boolean gotcha**: `z.coerce.boolean()` convierte `"false"`→`true` (`Boolean("false")`
+  es truthy). Usar transform explícito `v === "true" || v === "1"`.
+
+### Proceso: plan mode vs spec-driven (jun-2026)
+- **Gotcha**: al construir la observabilidad entré en **plan mode**, cuyo workflow propio **reemplaza
+  los pasos finales del `brainstorming`** (escribir el spec a `docs/` + `writing-plans`). El diseño
+  quedó en el **plan file efímero** (`~/.claude/plans/…`), NO en `docs/SPEC.md`. Hubo que backfillear.
+- **Regla**: `docs/SPEC.md` es el **único destino durable** del diseño, sin importar el motor. Si se
+  usa **plan mode** para una feature grande → al salir, **PROMOVER el plan aprobado a `docs/SPEC.md`**
+  (NO correr `writing-plans` aparte = no duplicar). Si NO se usa plan mode → `writing-plans` →
+  `docs/SPEC.md`. Plan mode = motor de diseño+aprobación; `docs/SPEC.md` = su forma persistida.
+- **Refuerzo determinístico**: un hook `PostToolUse` que matchee `ExitPlanMode` puede inyectar el
+  recordatorio (mismo patrón que los hooks ya existentes). El hook hace determinístico el *disparo y
+  el timing*, NO la *acción* → CLAUDE.md/memoria solos son probabilísticos (pueden fallar por la
+  naturaleza del LLM). Capa recomendada: hook (trigger) + cláusula en CLAUDE.md (guía).
