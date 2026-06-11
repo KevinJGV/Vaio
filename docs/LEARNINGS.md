@@ -55,6 +55,22 @@ El código typecheckeó sin cambios de API salvo **dos rupturas reales**:
   **1536 vía Matryoshka** (sin pérdida, mitad de storage); el adapter pide `dimensions: 1536`. Para 3072
   completos habría que usar `halfvec` (indexable hasta 4000).
 - Ingestar todo el portafolio (~80k palabras) ≈ **3–5 centavos**. El costo real está en el chat, no acá.
+
+### Primer arranque end-to-end (jun-2026) — gotchas reales
+- **`.env` en la raíz no cargaba desde `apps/agent`**: el agente corre con cwd=`apps/agent` (pnpm
+  --filter) y `dotenv` busca `cwd/.env`. Solución: `src/load-env.ts` que resuelve `<root>/.env` por
+  ruta absoluta vía `import.meta.url` (importado por `config.ts` y `migrate.ts`).
+- **Var de entorno vacía (`EMBEDDINGS_API_KEY=`) ≠ ausente**: `??` solo cae en null/undefined, NO en
+  `""`. Para el fallback a `OPENROUTER_API_KEY` hay que usar `||`.
+- **Embeddings de a UNO, no en batch**: con `input` array, OpenRouter→Google tira **429 "monthly
+  spending cap"** (abre el batch en N llamadas y pega contra el cap/rate de su cuenta upstream); el
+  input único pasa. El adapter embebe de a uno (más requests, confiable para ingesta puntual).
+- **OpenRouter: el array `models` (fallback) admite máx 3**. Más → 400. El adapter capea a 3 y avisa.
+- **Cortesía en error de stream**: el error del modelo (400/429) NO se lanza en `result.textStream`
+  (termina vacío); llega por el callback `onError`. Para "siempre responde", el core arma el
+  `ReadableStream`, setea un flag en `onError`, y si erroró sin emitir nada inyecta la cortesía.
+- **OpenRouter sí devuelve HTTP 200 con body `{error:{code,message}}`** (no solo status != 2xx) →
+  el adapter de embeddings detecta `!data` + reintenta 429/5xx con backoff.
 - **Streaming en Hono**: `streamText(...).toTextStreamResponse()` devuelve un `Response` web
   estándar → se retorna tal cual desde el handler de Hono (passthrough hasta el proxy).
 - **Degradación verificada**: sin `OPENROUTER_API_KEY`/`OPENROUTER_MODELS`, `/chat` (con key)

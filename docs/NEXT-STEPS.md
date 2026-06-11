@@ -10,13 +10,13 @@ corre (`/health` 200, `/chat` 401 sin key, 400 body inválido, cortesía 200 sin
 al día y verificadas** (ai 6, zod 4, openrouter-provider 2, hono-node-server 2, drizzle 0.45,
 TS 6, vitest 4 + vite 8). Fixes aplicados: `declaration:false` en la app (TS4058 de ai v6) y `vite@^8`.
 
-**Embeddings decididos + código alineado** (sin correr aún): `gemini-embedding-2` vía OpenRouter,
-un único espacio multimodal, `vector(1536)` (Matryoshka; límite HNSW de pgvector). Pendiente:
-implementar el path RAG real al tener keys, y el **triage multimodal de documentos** (diseño en
-`SPEC.md` → "Embeddings & ingesta multimodal") que es fase 2.
+**🟢 CORRE END-TO-END EN LOCAL** (jun-2026, con keys): `db:migrate` creó el schema en Neon;
+`pnpm ingest` pobló **29 chunks** (`gemini-embedding-2` de a uno, truncado a 1536); `/chat` responde
+con **RAG real citando CV/portfolio/Last.fm**; **fallback** y **cortesía** en error verificados.
+Pendiente de embeddings: el **triage multimodal de documentos** (diseño en `SPEC.md`) es fase 2.
 
-**Falta: keys + deploy + el frontend (`apps/web`) y la integración del portafolio.**
-Diseño completo: [`SPEC.md`](SPEC.md) · Workflow: [`../CLAUDE.md`](../CLAUDE.md).
+**Falta para producción: deploy a Railway + integración del portafolio** (`ChatSheet.tsx` + proxy
+`/api/agent`). Luego `apps/web`. Diseño: [`SPEC.md`](SPEC.md) · Workflow: [`../CLAUDE.md`](../CLAUDE.md).
 
 ---
 

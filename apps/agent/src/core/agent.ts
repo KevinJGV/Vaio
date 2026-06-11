@@ -37,9 +37,17 @@ export function courtesy(locale: Locale): string {
 
 export function createAgent({ model, memory }: AgentDeps) {
   return {
-    /** Devuelve el resultado de streamText; el adapter HTTP lo convierte a Response. */
-    stream(messages: ChatMessage[], locale: Locale) {
-      return streamText({
+    /**
+     * Stream de texto (Uint8Array) listo para una Response. Degradación: el error del
+     * modelo llega por `onError` (no lanza en textStream) → si erroró sin emitir nada,
+     * emitimos la cortesía. El agente nunca devuelve vacío ni 500 al usuario.
+     */
+    respond(
+      messages: ChatMessage[],
+      locale: Locale
+    ): ReadableStream<Uint8Array> {
+      let errored = false
+      const result = streamText({
         model,
         system: systemPrompt(locale),
         messages: messages as ModelMessage[],
@@ -75,7 +83,28 @@ export function createAgent({ model, memory }: AgentDeps) {
           }),
         },
         onError: ({ error }) => {
+          errored = true
           console.error("[agent] streamText error:", error)
+        },
+      })
+
+      const encoder = new TextEncoder()
+      return new ReadableStream<Uint8Array>({
+        async start(controller) {
+          let emitted = false
+          try {
+            for await (const chunk of result.textStream) {
+              emitted = true
+              controller.enqueue(encoder.encode(chunk))
+            }
+          } catch (err) {
+            errored = true
+            console.error("[agent] textStream error:", err)
+          }
+          if (errored && !emitted) {
+            controller.enqueue(encoder.encode(courtesy(locale)))
+          }
+          controller.close()
         },
       })
     },

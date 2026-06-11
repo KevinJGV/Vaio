@@ -37,9 +37,12 @@ export function buildApp({ agentApiKey, agent }: RouteDeps): Hono {
       return c.text(courtesy(locale), 200)
     }
     try {
-      return agent.stream(parsed.data.messages, locale).toTextStreamResponse()
+      // El core arma el stream con degradación incluida (cortesía si el modelo falla).
+      return new Response(agent.respond(parsed.data.messages, locale), {
+        headers: { "content-type": "text/plain; charset=utf-8" },
+      })
     } catch (err) {
-      console.error("[http] /chat error:", err)
+      console.error("[http] /chat setup error:", err)
       return c.text(courtesy(locale), 200)
     }
   })

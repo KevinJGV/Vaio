@@ -20,7 +20,7 @@ let agent: Agent | null = null
 if (env.OPENROUTER_API_KEY && models.length > 0) {
   let memory: MemoryStore | null = null
   // Embeddings comparten provider con el chat → si no hay key propia, usar la de OpenRouter.
-  const embeddingsKey = env.EMBEDDINGS_API_KEY ?? env.OPENROUTER_API_KEY
+  const embeddingsKey = env.EMBEDDINGS_API_KEY || env.OPENROUTER_API_KEY
   if (env.DATABASE_URL && embeddingsKey) {
     const { db } = createDb(env.DATABASE_URL)
     const embedder = createEmbedder({

@@ -4,6 +4,7 @@
 
 import { createDb } from "./adapters/db/client.js"
 import { runMigrations } from "./adapters/db/migrate.js"
+import { EMBEDDING_DIM } from "./adapters/db/schema.js"
 import { createEmbedder } from "./adapters/embeddings.js"
 import { createMemoryStore } from "./adapters/neon-memory.js"
 import { collectCV } from "./adapters/sources/cv.js"
@@ -15,17 +16,22 @@ import type { DocChunk } from "./ports/memory.js"
 
 async function main(): Promise<void> {
   const env = loadConfig()
-  if (!env.DATABASE_URL || !env.EMBEDDINGS_API_KEY) {
-    throw new Error("La ingesta requiere DATABASE_URL + EMBEDDINGS_API_KEY.")
+  // Embeddings comparten provider con el chat → si no hay key propia, usar la de OpenRouter.
+  const embeddingsKey = env.EMBEDDINGS_API_KEY || env.OPENROUTER_API_KEY
+  if (!env.DATABASE_URL || !embeddingsKey) {
+    throw new Error(
+      "La ingesta requiere DATABASE_URL + (EMBEDDINGS_API_KEY u OPENROUTER_API_KEY)."
+    )
   }
 
   await runMigrations(env.DATABASE_URL)
 
   const { db, close } = createDb(env.DATABASE_URL)
   const embedder = createEmbedder({
-    apiKey: env.EMBEDDINGS_API_KEY,
+    apiKey: embeddingsKey,
     model: env.EMBEDDINGS_MODEL,
     baseUrl: env.EMBEDDINGS_BASE_URL,
+    dimensions: EMBEDDING_DIM,
   })
   const memory = createMemoryStore(db, embedder)
 

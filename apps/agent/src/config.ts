@@ -2,7 +2,7 @@
 // valores inválidos). Las claves de servicios son OPCIONALES a propósito: el server debe
 // bootear y servir /health aunque falten; la degradación la maneja el wiring (index.ts).
 
-import "dotenv/config"
+import "./load-env.js"
 import { z } from "zod"
 
 const envSchema = z.object({

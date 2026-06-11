@@ -2,6 +2,7 @@
 // Se puede correr como script (`pnpm --filter @vaio/agent db:migrate`) o importar
 // desde la ingesta para asegurar el schema antes de poblar.
 
+import "../../load-env.js"
 import { drizzle } from "drizzle-orm/node-postgres"
 import { migrate } from "drizzle-orm/node-postgres/migrator"
 import { Pool } from "pg"
