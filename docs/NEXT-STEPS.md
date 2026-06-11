@@ -10,6 +10,11 @@ corre (`/health` 200, `/chat` 401 sin key, 400 body inválido, cortesía 200 sin
 al día y verificadas** (ai 6, zod 4, openrouter-provider 2, hono-node-server 2, drizzle 0.45,
 TS 6, vitest 4 + vite 8). Fixes aplicados: `declaration:false` en la app (TS4058 de ai v6) y `vite@^8`.
 
+**Embeddings decididos + código alineado** (sin correr aún): `gemini-embedding-2` vía OpenRouter,
+un único espacio multimodal, `vector(1536)` (Matryoshka; límite HNSW de pgvector). Pendiente:
+implementar el path RAG real al tener keys, y el **triage multimodal de documentos** (diseño en
+`SPEC.md` → "Embeddings & ingesta multimodal") que es fase 2.
+
 **Falta: keys + deploy + el frontend (`apps/web`) y la integración del portafolio.**
 Diseño completo: [`SPEC.md`](SPEC.md) · Workflow: [`../CLAUDE.md`](../CLAUDE.md).
 

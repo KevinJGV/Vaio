@@ -44,6 +44,17 @@ El código typecheckeó sin cambios de API salvo **dos rupturas reales**:
   `.nvmrc`, CI (`node-version: 24`) y `engines: >=22`. Lección: revisar EOL al fijar la baseline.
 - **Lección de proceso**: tras un merge de Dependabot, correr `pnpm install` + typecheck/build/test
   ANTES de confiar — un major bump puede pasar el merge y romper igual (CI no siempre cubre todo).
+
+### Embeddings (decisión jun-2026)
+- **Modelo único multimodal**: `gemini-embedding-2` vía OpenRouter (una sola key; `EMBEDDINGS_API_KEY`
+  cae a `OPENROUTER_API_KEY`). Un solo espacio → cross-modal gratis, sin fan-out.
+- **NO cadena de embebedores**: distintos modelos = espacios incomparables (misma dim ≠ mismo espacio).
+  La query se embebe con el MISMO modelo que los docs. Fallback de embeddings = reintento mismo modelo
+  + degradar, nunca cross-model (cambiar modelo = re-indexar).
+- **pgvector: índice HNSW limitado a 2000 dims** para el tipo `vector`. Gemini da 3072 → truncamos a
+  **1536 vía Matryoshka** (sin pérdida, mitad de storage); el adapter pide `dimensions: 1536`. Para 3072
+  completos habría que usar `halfvec` (indexable hasta 4000).
+- Ingestar todo el portafolio (~80k palabras) ≈ **3–5 centavos**. El costo real está en el chat, no acá.
 - **Streaming en Hono**: `streamText(...).toTextStreamResponse()` devuelve un `Response` web
   estándar → se retorna tal cual desde el handler de Hono (passthrough hasta el proxy).
 - **Degradación verificada**: sin `OPENROUTER_API_KEY`/`OPENROUTER_MODELS`, `/chat` (con key)

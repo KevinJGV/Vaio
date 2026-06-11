@@ -69,7 +69,8 @@ OpenRouter: models:[barato, fallback, llama-free]  → "siempre responde" + cach
   `streamText({ model, system, messages, tools })`. Cadena de fallback de OpenRouter.
 - **Memoria/RAG**: Neon + `pgvector` vía **Drizzle ORM**. Tabla `documents(id, source, url,
   chunk, embedding vector(1536), updated_at)` + índice HNSW `vector_cosine_ops`; búsqueda con
-  `cosineDistance`. Migraciones con `drizzle-kit` (la inicial antepone `CREATE EXTENSION vector`).
+  `cosineDistance`. Embeddings con **`gemini-embedding-2`** vía OpenRouter (ver "Embeddings & ingesta
+  multimodal"). Migraciones con `drizzle-kit` (la inicial antepone `CREATE EXTENSION vector`).
   Puerto `MemoryStore` (adapter `neon-memory`); tool `searchMemory(query)` → top-k → contexto al system.
 - **Embeddings**: modelo barato hosteado (decidir al construir; p.ej. OpenAI `text-embedding-3-small`).
 - **Ingesta** (`ingest.ts`, a mano y luego cron Railway):
@@ -97,6 +98,41 @@ OpenRouter: models:[barato, fallback, llama-free]  → "siempre responde" + cach
 
 **Seguridad/costo**: el endpoint del agente exige `AGENT_API_KEY` (solo el proxy lo sabe); el
 proxy hace origin-check + rate-limit (anti-abuso/quema de tokens).
+
+## Embeddings & ingesta multimodal (diseño · 2026-06-11)
+
+**Provider:** embeddings vía **OpenRouter** (endpoint `/embeddings`, compatible OpenAI, soporta
+imágenes). **Una sola key**: `EMBEDDINGS_API_KEY` puede ser la misma `OPENROUTER_API_KEY` (el wiring
+hace fallback a `OPENROUTER_API_KEY` si la primera no está).
+
+**Un único modelo / un único espacio:** **`gemini-embedding-2`** (Gemini Embedding 2, multimodal
+nativo: texto+imagen+video+audio+PDF; 3072-dim nativo, **lo guardamos truncado a 1536** vía
+Matryoshka — ver Schema). Todo —texto y multimedia— cae en el MISMO espacio → una query de texto
+recupera también imágenes/docs visuales (cross-modal gratis). Sin discriminadores ni fan-out. (Slug
+exacto y formato de input multimodal del endpoint → verificar con context7 + openrouter.ai/models al implementar.)
+
+**Por qué 002-solo y NO una cadena de varios embebedores:** dos modelos distintos = dos espacios
+vectoriales **incomparables** (misma dimensión ≠ mismo espacio). La query DEBE embeberse con el mismo
+modelo que los documentos. Por eso un "fallback" entre embebedores rompe el RAG. Resiliencia correcta
+= reintento sobre el mismo modelo + degradar (query → sin RAG; ingesta → encolar/reintentar). Cambiar
+el modelo canónico = re-indexar todo. (Optimización futura documentada: sumar `gemini-embedding-001`
+solo-texto como segundo espacio si el costo de texto puro llegara a importar — hoy no aplica.)
+
+**Schema:** `documents(... embedding vector(1536) ...)` + índice HNSW `vector_cosine_ops`.
+pgvector limita el índice **HNSW a 2000 dims** para el tipo `vector` → guardamos **1536** (Matryoshka,
+sin pérdida de calidad y mitad de storage); el adapter pide `dimensions: 1536` al modelo. (Para 3072
+completos: `halfvec(3072)`, indexable hasta 4000 — alternativa documentada, no usada.)
+
+**Costo:** ingestar todo el portafolio (~80k palabras + 9 imágenes) ≈ **3–5 centavos** a $0.20/1M
+tokens. Los embeddings son ruido en la factura; el costo real está en el modelo de chat.
+
+**Triage de documentos (ingesta) — diseño para fase 2 (hoy la ingesta sólo lee HTML/texto público):**
+1. Detectar MIME/tipo.
+2. Texto plano / md / código / HTML / JSON → leer → chunk → embed (texto).
+3. PDF / docx / pptx / xlsx → extraer texto. Limpio y texto-dominante → texto. Escaneado o rico en
+   visuales (tablas/charts/diagramas) → embeber la página/imagen (002 multimodal) o visión→caption→texto.
+4. Imagen → 002 directo (o caption→texto). Audio → STT→texto. Video → 002 nativo (o keyframes+transcripción).
+"A texto plano primero" = default barato; multimodal directo cuando el contenido visual importa.
 
 ## Fase 2 — Memoria viva + escalación (el "se nutre")
 - Tabla `facts(id, fact, source, valid_from, embedding)` + extracción de hechos post-conversación
