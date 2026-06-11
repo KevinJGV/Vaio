@@ -19,6 +19,9 @@ export type ChatMessage = z.infer<typeof chatMessageSchema>
 export const chatBodySchema = z.object({
   messages: z.array(chatMessageSchema).min(1),
   locale: localeSchema.optional(),
+  /** Hilo de conversación (opcional; lo manda el proxy del portafolio para correlacionar
+   * trazas/persistencia a futuro). Hoy solo se propaga a los eventos de traza. */
+  conversationId: z.string().optional(),
 })
 export type ChatBody = z.infer<typeof chatBodySchema>
 
@@ -29,3 +32,6 @@ export const docChunkSchema = z.object({
   chunk: z.string(),
 })
 export type DocChunk = z.infer<typeof docChunkSchema>
+
+// Eventos de observabilidad (trazas de una conversación) — ver ./trace.ts.
+export * from "./trace.js"

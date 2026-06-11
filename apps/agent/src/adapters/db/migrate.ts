@@ -6,6 +6,7 @@ import "../../load-env.js"
 import { drizzle } from "drizzle-orm/node-postgres"
 import { migrate } from "drizzle-orm/node-postgres/migrator"
 import { Pool } from "pg"
+import { createLogger } from "../logger.js"
 
 export async function runMigrations(
   connectionString: string,
@@ -22,18 +23,26 @@ export async function runMigrations(
 
 // Permitir ejecución directa: `tsx src/adapters/db/migrate.ts`
 if (import.meta.url === `file://${process.argv[1]}`) {
+  const logger = createLogger({
+    level: process.env.LOG_LEVEL,
+    format: process.env.LOG_FORMAT,
+    nodeEnv: process.env.NODE_ENV,
+  })
   const url = process.env.DATABASE_URL
   if (!url) {
-    console.error("[migrate] DATABASE_URL no configurada.")
+    logger.error("DATABASE_URL no configurada.")
     process.exit(1)
   }
   runMigrations(url)
     .then(() => {
-      console.log("[migrate] listo.")
+      logger.info("migrate listo")
       process.exit(0)
     })
     .catch((e) => {
-      console.error(e)
+      logger.error(
+        { err: e instanceof Error ? e.message : String(e) },
+        "migrate falló"
+      )
       process.exit(1)
     })
 }

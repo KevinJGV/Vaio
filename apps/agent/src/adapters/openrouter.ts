@@ -4,15 +4,21 @@
 
 import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import type { LanguageModel } from "ai"
+import type { Logger } from "../ports/logger.js"
 
-export function createModel(apiKey: string, models: string[]): LanguageModel {
+export function createModel(
+  apiKey: string,
+  models: string[],
+  logger?: Logger
+): LanguageModel {
   // OpenRouter limita el array `models` (cadena de fallback) a 3 ítems → capamos y avisamos.
   const chain = models.slice(0, 3)
   const [primary] = chain
   if (!primary) throw new Error("createModel requiere al menos un modelo.")
   if (models.length > 3) {
-    console.warn(
-      `[openrouter] OPENROUTER_MODELS tiene ${models.length} modelos; el máx de OpenRouter es 3 → uso: ${chain.join(", ")}`
+    logger?.warn(
+      { provided: models.length, used: chain },
+      "OPENROUTER_MODELS > 3; OpenRouter limita la cadena de fallback a 3"
     )
   }
   const openrouter = createOpenRouter({ apiKey })

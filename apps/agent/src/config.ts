@@ -8,6 +8,22 @@ import { z } from "zod"
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(8787),
 
+  // Entorno + observabilidad (logs estructurados a stdout — los captura Railway).
+  NODE_ENV: z
+    .enum(["development", "production", "test"])
+    .default("development"),
+  LOG_LEVEL: z
+    .enum(["trace", "debug", "info", "warn", "error", "silent"])
+    .default("info"),
+  // pretty (dev) | json (prod) | auto (pretty salvo en producción).
+  LOG_FORMAT: z.enum(["pretty", "json", "auto"]).default("auto"),
+  // Loguear contenido crudo (prompts del usuario, args/output de tools, reasoning completo).
+  // OFF por defecto (privacidad/inyección). Acepta "true"/"1"; cualquier otra cosa = false.
+  LOG_PROMPTS: z
+    .string()
+    .optional()
+    .transform((v) => v === "true" || v === "1"),
+
   // Auth del agente (lo valida el middleware; lo conoce solo el proxy del portafolio).
   AGENT_API_KEY: z.string().optional(),
 

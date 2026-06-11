@@ -7,4 +7,5 @@ import { fileURLToPath } from "node:url"
 import { config } from "dotenv"
 
 const here = dirname(fileURLToPath(import.meta.url))
-config({ path: resolve(here, "../../../.env") })
+// quiet: dotenv v17 imprime un banner a stdout que ensuciaría los logs JSON (Railway).
+config({ path: resolve(here, "../../../.env"), quiet: true })

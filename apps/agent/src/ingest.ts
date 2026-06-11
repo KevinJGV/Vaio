@@ -6,6 +6,7 @@ import { createDb } from "./adapters/db/client.js"
 import { runMigrations } from "./adapters/db/migrate.js"
 import { EMBEDDING_DIM } from "./adapters/db/schema.js"
 import { createEmbedder } from "./adapters/embeddings.js"
+import { createLogger } from "./adapters/logger.js"
 import { createMemoryStore } from "./adapters/neon-memory.js"
 import { collectCV } from "./adapters/sources/cv.js"
 import { collectGithub } from "./adapters/sources/github.js"
@@ -16,6 +17,11 @@ import type { DocChunk } from "./ports/memory.js"
 
 async function main(): Promise<void> {
   const env = loadConfig()
+  const logger = createLogger({
+    level: env.LOG_LEVEL,
+    format: env.LOG_FORMAT,
+    nodeEnv: env.NODE_ENV,
+  })
   // Embeddings comparten provider con el chat → si no hay key propia, usar la de OpenRouter.
   const embeddingsKey = env.EMBEDDINGS_API_KEY || env.OPENROUTER_API_KEY
   if (!env.DATABASE_URL || !embeddingsKey) {
@@ -52,7 +58,7 @@ async function main(): Promise<void> {
       run: () => collectLastfm({ apiKey, user }),
     })
   } else {
-    console.log("[ingest] lastfm: sin LASTFM_API_KEY/USER, salto.")
+    logger.info("lastfm: sin LASTFM_API_KEY/USER, salto.")
   }
 
   for (const col of collectors) {
@@ -67,18 +73,25 @@ async function main(): Promise<void> {
       for (const [source, group] of bySource) {
         await memory.clearSource(source)
         await memory.upsertDocuments(group)
-        console.log(`[ingest] ${source}: ${group.length} chunks`)
+        logger.info({ source, chunks: group.length }, "ingest source")
       }
     } catch (err) {
-      console.error(`[ingest] collector "${col.name}" falló:`, err)
+      logger.error(
+        {
+          collector: col.name,
+          err: err instanceof Error ? err.message : String(err),
+        },
+        "collector falló"
+      )
     }
   }
 
   await close()
-  console.log("[ingest] listo.")
+  logger.info("ingest listo")
 }
 
 main().catch((e) => {
+  // Último recurso: el logger puede no existir si falló loadConfig → console crudo.
   console.error(e)
   process.exit(1)
 })
