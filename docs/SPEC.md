@@ -154,6 +154,17 @@ Resumen: puertos `Logger` + `TraceSink` (core puro); taxonomy `TraceEvent` en `@
 **diseñado para persistir a futuro** (debug/historial de chats); redacción de contenido tras
 `LOG_PROMPTS`. Implementado y verificado e2e (rama `feat/observabilidad-logs`).
 
+## Compresión de contexto (cavemem · 2026-06-12)
+Para **escalar el uso de tokens desde ahora**, se adopta **`@cavemem/compress`** (`JuliusBrussee/cavemem`,
+**MIT**, TS, cero deps) **vendorizado** como `packages/compress` (`@vaio/compress`, licencia preservada +
+atribución). Es un compresor **determinístico y offline** (sin llamada a modelo) que preserva
+código/URLs/números/identificadores byte-a-byte y comprime solo prosa. Memoria de **dos tiers**: Tier 1
+(determinístico) sobre el **contexto que se manda al modelo** — resumen + turnos históricos + chunks de
+RAG; Tier 2 (resumen LLM) solo para acotar hilos largos. **No** comprime la query viva ni la persona;
+comprime **al enviar, no al guardar** (turnos crudos en DB). Es una **primitiva transversal** (puerto
+`Compressor`) reusable luego en facts/ingesta y alineada con el norte "Vaio harness" (cavemem es TS+MCP).
+Diseño/plan → [`superpowers/specs/2026-06-12-cavemem-compression-{design,plan}.md`](superpowers/specs/).
+
 ## Fase 2 — Memoria viva + escalación (el "se nutre")
 - Tabla `facts(id, fact, source, valid_from, embedding)` + extracción de hechos post-conversación
   (LLM) + dedup. Compresión **caveman** antes de guardar.

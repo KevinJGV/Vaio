@@ -39,6 +39,12 @@ plan de alto nivel → [`…-telegram-plan.md`](superpowers/specs/2026-06-12-sta
 `/chat` con mismo `conversationId`; bot real de Telegram vía `setWebhook`); luego review + merge.
 Diferido a iteraciones siguientes (cada una su par design+plan): HITL/escalación, facts semánticos, Graphiti.
 
+**🟡 EN CURSO (misma rama) — Capa de compresión determinística (cavemem):** adopta `@cavemem/compress`
+(MIT, vendorizado) tras un puerto `Compressor`; comprime el contexto al modelo (resumen + turnos históricos
++ chunks de RAG) sin llamar a un modelo. Diseño/plan →
+[`…-cavemem-compression-design.md`](superpowers/specs/2026-06-12-cavemem-compression-design.md) ·
+[`…-cavemem-compression-plan.md`](superpowers/specs/2026-06-12-cavemem-compression-plan.md).
+
 **Después de la iteración 2: integración del portafolio** (`ChatSheet.tsx` + proxy `/api/agent` →
 apuntar al dominio **público** de Railway, no al `.internal`). Luego `apps/web`. Diseño:
 [`SPEC.md`](SPEC.md) · Workflow: [`../CLAUDE.md`](../CLAUDE.md).
