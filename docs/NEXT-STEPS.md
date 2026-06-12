@@ -27,13 +27,17 @@ workspace → `pnpm --filter @vaio/agent --prod --legacy deploy` → runtime mí
 `railway.json` con `builder: DOCKERFILE` + `startCommand: node dist/index.js` (override del custom
 start de la UI). Dominio interno: `vaio.railway.internal`. Gotchas en [`LEARNINGS.md`](LEARNINGS.md).
 
-**🟡 EN CURSO — Iteración 2: núcleo conversacional + arnés + canales + Telegram** (rama
-`feat/conversational-core-telegram`, 2026-06-12). Antes de tocar el portafolio, dejar a Vaio más capaz:
-memoria conversacional persistida + resumen rodante, arnés (system prompt estructurado, capacidades
-por canal, registry de tools gated), y **Telegram** como canal de dogfood. Diseño técnico →
+**🟢 IMPLEMENTADA (rama, falta e2e con keys) — Iteración 2: núcleo conversacional + arnés + canales +
+Telegram** (rama `feat/conversational-core-telegram`, 2026-06-12). Memoria conversacional persistida
+(`conversations`/`messages`, migración `0001`) + resumen rodante; arnés (capacidades por canal,
+registry de tools gated); core stateful (`respond(TurnRequest)→{stream,text}`, persistencia en
+background); canal **Telegram** `/tg`. **58 tests verdes**; typecheck/biome/build limpios; smoke local
+OK (`/health`, `/chat` auth+cortesía, `/tg` secret/allowlist/dedupe). Diseño técnico →
 [`…-telegram-design.md`](superpowers/specs/2026-06-12-stateful-channels-telegram-design.md) ·
 plan de alto nivel → [`…-telegram-plan.md`](superpowers/specs/2026-06-12-stateful-channels-telegram-plan.md).
-Diferido a iteraciones siguientes (cada una su spec): HITL/escalación, facts semánticos, Graphiti.
+**Pendiente (Kevin):** `db:migrate` (aplica `0001` a Neon — muta la DB) + e2e real (multi-turno por
+`/chat` con mismo `conversationId`; bot real de Telegram vía `setWebhook`); luego review + merge.
+Diferido a iteraciones siguientes (cada una su par design+plan): HITL/escalación, facts semánticos, Graphiti.
 
 **Después de la iteración 2: integración del portafolio** (`ChatSheet.tsx` + proxy `/api/agent` →
 apuntar al dominio **público** de Railway, no al `.internal`). Luego `apps/web`. Diseño:

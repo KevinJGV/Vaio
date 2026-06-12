@@ -1,9 +1,11 @@
 # Spec — Agente personal de IA "Vaio"
 
-**Estado:** Fase 1 (MVP) — código completo y **corriendo end-to-end con keys** (migrate+ingest+
-`/chat` RAG real, fallback y cortesía verificados). Sumada **observabilidad** (logs estructurados,
-rama `feat/observabilidad-logs`, pendiente merge). **Siguiente milestone: deploy a Railway.**
-Actualizado 2026-06-11
+**Estado:** Fase 1 (MVP) **en `main` y desplegado en Railway** (Docker). Observabilidad en `main`.
+**Iteración 2 (núcleo conversacional + canales + Telegram)** implementada en rama
+`feat/conversational-core-telegram` (memoria conversacional persistida + resumen rodante, arnés con
+capacidades por canal, canal Telegram `/tg`). Plan/diseño por feature →
+[`superpowers/specs/2026-06-12-stateful-channels-telegram-{design,plan}.md`](superpowers/specs/).
+**Siguiente milestone: integración del portafolio.** Actualizado 2026-06-12
 **Repos:** este spec vive en AMBOS — el portafolio (`KevinJGV`) y el repo del agente
 (`Vaio`). Mantener en sync.
 
@@ -87,6 +89,10 @@ OpenRouter: models:[barato, fallback, llama-free]  → "siempre responde" + cach
 - **System prompt**: persona "asistente de Kevin" (persona/pro/dev), tono alineado con sus
   quirks (señal cultural deliberada, no neutralizar), responde en el **idioma del usuario**.
 - **Endpoints MVP**: `POST /chat` (stream, requiere header `AGENT_API_KEY`), `GET /health`.
+  **Iteración 2 suma** `POST /tg` (webhook Telegram: secret_token + allowlist; canal "pleno") y vuelve
+  el core **stateful** (memoria conversacional `conversations`/`messages` + resumen rodante; capacidades
+  por canal — web capado / Telegram pleno; `searchMemory` gated por capacidad). Diseño:
+  [`superpowers/specs/2026-06-12-stateful-channels-telegram-design.md`](superpowers/specs/2026-06-12-stateful-channels-telegram-design.md).
   Ambos instrumentados con observabilidad (ver "Observabilidad" abajo).
 
 **Integración en el portafolio** (mínima, no rompe `output:'static'`):

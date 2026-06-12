@@ -143,3 +143,26 @@ El código typecheckeó sin cambios de API salvo **dos rupturas reales**:
   cargar ese transport → crash. El Dockerfile fija `NODE_ENV=production` + `LOG_FORMAT=json` (doble red;
   `json` no usa transport y lo captura Railway por stdout). Verificado: boot en JSON, `/health` 200,
   `/chat` sin key 401, 0 `ERR_MODULE_NOT_FOUND` (build+run local con Docker antes de pushear).
+
+### Núcleo conversacional + canales + Telegram (iteración 2, jun-2026)
+- **`ReadableStream.start()` corre EAGER (al construir, no al primer read)** → podemos derivar `{ stream,
+  text }` de UNA sola llamada `streamText`: el `start` consume `result.textStream` una vez, encola al
+  `controller` (para HTTP) **y** acumula `finalText` (resuelve la promesa `text` aunque nadie lea `stream`).
+  Así Telegram (no-streaming) hace `await text` sin un segundo request al modelo. La persistencia corre en
+  el finalizer del `start` como `void persist()` (no bloquea al consumidor; `try/catch` → nunca rompe el turno).
+- **`Number("") === 0`** → parsear el CSV de la allowlist de Telegram con `.filter(Boolean)` ANTES de
+  `Number`, si no un valor vacío mete un id espurio `0` (lo cazó un test TDD).
+- **Mock de streaming del AI SDK v6**: partes `{type:'text-start',id}` → `{type:'text-delta',id,delta}` →
+  `{type:'text-end',id}` → `{type:'finish',finishReason,usage}`, vía `convertArrayToReadableStream` de
+  `ai/test`. Verificado contra el `.d.ts` de `@ai-sdk/provider@2`, no memoria.
+- **Webhook de Telegram**: ACKear **200 rápido** + trabajar en background (Telegram **reintenta** ante
+  respuestas lentas o no-2xx → ack inmediato + dedupe por `update_id` + idempotencia en `appendTurn`).
+  Doble gate de auth: header `X-Telegram-Bot-Api-Secret-Token` (mismatch → 401) **y** allowlist de user id
+  (fuera → 200 sin llamar al modelo). Cliente Bot API = fetch fino (sin dep); sus errores se **loguean, no se
+  lanzan** (si no, Telegram reintentaría). El canal `/tg` NO va detrás de `agentAuth` (boundary distinto).
+- **Migración conversacional `0001`** (conversations/messages, sin pgvector): `db:generate` la appendea y
+  no toca `0000`. Idempotencia del append = unique `(conversation_id, turn_id, role)` + `onConflictDoNothing`.
+- **Arnés = módulos puros en `core/`** (`prompt`/`capabilities`/`tools`/`summary`): el cap por canal vive en
+  `policyText` + `memoryScope.maxK` (mismo tool set hoy; `sources` queda como seam para capar info privada).
+  El registry de tools incluye solo `caps.allowedTools` → sumar una acción futura = nuevo builder + listarla
+  en el perfil, sin tocar el core. `Principal` es el seam para permisos por-usuario (hoy solo trusted/no).
