@@ -15,16 +15,21 @@ TS 6, vitest 4 + vite 8). Fixes aplicados: `declaration:false` en la app (TS4058
 con **RAG real citando CV/portfolio/Last.fm**; **fallback** y **cortesía** en error verificados.
 Pendiente de embeddings: el **triage multimodal de documentos** (diseño en `SPEC.md`) es fase 2.
 
-**🟢 OBSERVABILIDAD** (jun-2026, rama `feat/observabilidad-logs`, **pendiente merge**): logs
-estructurados a stdout con pino (json prod / pretty dev), puertos `Logger`+`TraceSink`, traza de
-cada turno (`turn.start→tool.call→tool.result→reasoning→llm.step→turn.finish`) correlacionada por
-`requestId`, redacción tras `LOG_PROMPTS`. Diseñada para persistir a futuro (debug de chats). Plan
-completo → [`superpowers/specs/2026-06-11-vaio-observability.md`](superpowers/specs/2026-06-11-vaio-observability.md).
+**🟢 OBSERVABILIDAD** (jun-2026, **en `main`**): logs estructurados a stdout con pino (json prod /
+pretty dev), puertos `Logger`+`TraceSink`, traza de cada turno
+(`turn.start→tool.call→tool.result→reasoning→llm.step→turn.finish`) correlacionada por `requestId`,
+redacción tras `LOG_PROMPTS`. Diseñada para persistir a futuro (debug de chats). Plan completo →
+[`superpowers/specs/2026-06-11-vaio-observability.md`](superpowers/specs/2026-06-11-vaio-observability.md).
 Verificado e2e (traza completa, redacción on/off, sin secrets).
 
-**Falta para producción: merge de la rama → deploy a Railway + integración del portafolio**
-(`ChatSheet.tsx` + proxy `/api/agent`). Luego `apps/web`. Diseño: [`SPEC.md`](SPEC.md) ·
-Workflow: [`../CLAUDE.md`](../CLAUDE.md).
+**🟢 DESPLEGADO EN RAILWAY** (2026-06-12): vía **Dockerfile** multi-stage del monorepo (build del
+workspace → `pnpm --filter @vaio/agent --prod --legacy deploy` → runtime mínimo `node dist/index.js`).
+`railway.json` con `builder: DOCKERFILE` + `startCommand: node dist/index.js` (override del custom
+start de la UI). Dominio interno: `vaio.railway.internal`. Gotchas en [`LEARNINGS.md`](LEARNINGS.md).
+
+**Falta para producción: integración del portafolio** (`ChatSheet.tsx` + proxy `/api/agent` →
+apuntar al dominio **público** de Railway, no al `.internal`). Luego `apps/web`. Diseño:
+[`SPEC.md`](SPEC.md) · Workflow: [`../CLAUDE.md`](../CLAUDE.md).
 
 ---
 
@@ -57,7 +62,7 @@ Acciones de Kevin además: crear el **repo de Vaio en GitHub** y **conectarlo a 
   proxy `src/pages/api/agent.ts` (origin-check + rate-limit + stream passthrough).
 - **Sincronizar la copia del SPEC en el portafolio** (`KevinJGV/docs/superpowers/specs/
   2026-06-09-vaio-agent-design.md`) con los cambios de arquitectura de hoy (pendiente).
-- **DX opcional**: `Dockerfile` (Railway autodetecta Node/pnpm, no imprescindible); Turborepo
+- **DX opcional**: ~~`Dockerfile`~~ **HECHO** (es el mecanismo de deploy, no autodetect); Turborepo
   (sumar cuando exista el 2º app).
 
 ---
@@ -76,8 +81,9 @@ fase 2 estén activos a la vez, o aparezcan ≥2 síntomas de que el `SPEC.md` m
 3. `memory.ts` (Neon+pgvector) con context7 → schema + búsqueda.
 4. `ingest.ts` → `npm run ingest` para poblar la memoria. *(necesita Neon+embeddings)*
 5. `agent.ts` + cablear `/chat`. *(necesita OpenRouter)*
-6. Probar local (`/health`, `/chat` real, matar primario→fallback). Deploy a Railway.
-7. Portafolio: `ChatSheet.tsx` + proxy `/api/agent`; conectar a Vaio; smoke test end-to-end.
+6. Probar local (`/health`, `/chat` real, matar primario→fallback). **Deploy a Railway. ✅ HECHO (Docker, 2026-06-12)**
+7. **← SIGUIENTE.** Portafolio: `ChatSheet.tsx` + proxy `/api/agent` (→ dominio público de Railway);
+   conectar a Vaio; smoke test end-to-end.
 
 > Pasos 2 y el *escribir+typecheck* de 3/5 son no-bloqueantes; *correr* (4,6) y el deploy necesitan keys.
 > Definition of Done por tarea y verificación: ver `../CLAUDE.md`.
