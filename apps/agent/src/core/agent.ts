@@ -15,6 +15,7 @@ import {
   stepCountIs,
   streamText,
 } from "ai"
+import type { Compressor, Intensity } from "../ports/compress.js"
 import type {
   ConversationContext,
   ConversationStore,
@@ -31,7 +32,7 @@ import {
 import { buildSystemPrompt } from "./prompt.js"
 import { buildSummaryPrompt, shouldSummarize } from "./summary.js"
 import { buildTools, type TraceIds } from "./tools.js"
-import { errMsg, preview } from "./util.js"
+import { compressOrRaw, errMsg, preview } from "./util.js"
 
 export interface AgentDeps {
   model: LanguageModel
@@ -43,6 +44,12 @@ export interface AgentDeps {
   summarizer: Summarizer | null
   /** Resuelve el perfil de capacidades por canal/principal (puro). */
   capabilities?: CapabilityResolver
+  /** Compresor determinístico (Tier 1) del contexto que se manda al modelo. null = sin comprimir. */
+  compressor?: Compressor | null
+  /** Intensidad de compresión del CONTEXTO conversacional (resumen + turnos históricos). */
+  convIntensity?: Intensity
+  /** Intensidad de compresión de los chunks de RAG (searchMemory). */
+  ragIntensity?: Intensity
   /** Nº de mensajes acumulados que dispara el resumen rodante. */
   summaryThreshold?: number
   /** Cuántos mensajes recientes se pasan verbatim al modelo. */
@@ -99,6 +106,9 @@ export function createAgent(deps: AgentDeps) {
     conversations,
     summarizer,
     capabilities = createCapabilityResolver(),
+    compressor = null,
+    convIntensity = "lite",
+    ragIntensity = "full",
     summaryThreshold = DEFAULT_SUMMARY_THRESHOLD,
     recentLimit = DEFAULT_RECENT_LIMIT,
   } = deps
@@ -148,23 +158,59 @@ export function createAgent(deps: AgentDeps) {
         lastUserPreview: preview(req.userText),
       })
 
+      // Tier 1: comprimir el contexto de MEMORIA (resumen + turnos históricos) que va al modelo.
+      // NO se comprime el mensaje VIVO del usuario ni la persona/policy (voz de Vaio + prompt-caching).
+      const compressedSummary = compressOrRaw(
+        compressor,
+        convCtx.summary,
+        convIntensity
+      )
+      const recent = convCtx.recent.map((m) => ({
+        role: m.role,
+        content: compressOrRaw(compressor, m.content, convIntensity),
+      }))
       const messages: ModelMessage[] = [
-        ...convCtx.recent.map(
+        ...recent.map(
           (m) => ({ role: m.role, content: m.content }) as ModelMessage
         ),
         { role: "user", content: req.userText },
       ]
+      if (compressor) {
+        const before =
+          compressor.countTokens(convCtx.summary) +
+          convCtx.recent.reduce(
+            (n, m) => n + compressor.countTokens(m.content),
+            0
+          )
+        const after =
+          compressor.countTokens(compressedSummary) +
+          recent.reduce((n, m) => n + compressor.countTokens(m.content), 0)
+        if (before > 0) {
+          ctx.logger.debug(
+            { before, after, saved: before - after },
+            "context compressed"
+          )
+        }
+      }
 
       const result = streamText({
         model,
         system: buildSystemPrompt({
           locale,
           policyText: caps.policyText,
-          summary: convCtx.summary,
+          summary: compressedSummary,
         }),
         messages,
         stopWhen: stepCountIs(5),
-        tools: buildTools({ caps, memory, emit, ids, logger: ctx.logger }),
+        tools: buildTools({
+          caps,
+          memory,
+          emit,
+          ids,
+          logger: ctx.logger,
+          compressor,
+          ragIntensity,
+        }),
         onChunk({ chunk }) {
           if (chunk.type === "tool-call") {
             emit({

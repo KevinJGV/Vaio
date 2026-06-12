@@ -92,4 +92,30 @@ describe("buildTools (registry gated por capacidad)", () => {
     const result = events.find((e) => e.type === "tool.result")
     expect(result).toMatchObject({ type: "tool.result", ok: true, hits: 2 })
   })
+
+  it("comprime los chunks de RAG si hay compresor", async () => {
+    const memory: MemoryStore = {
+      searchMemory: async () => [{ source: "cv", url: "", chunk: "chunk-uno" }],
+      upsertDocuments: async () => {},
+      clearSource: async () => {},
+    }
+    const compressor = {
+      compress: (t: string) => `[C]${t}`,
+      expand: (t: string) => t,
+      countTokens: (t: string) => t.length,
+    }
+    const tools = buildTools({
+      caps: caps(["searchMemory"], 6),
+      memory,
+      emit: () => {},
+      ids,
+      logger: noopLogger(),
+      compressor,
+    })
+    const out = await tools.searchMemory?.execute?.(
+      { query: "x" },
+      { toolCallId: "tc", messages: [] }
+    )
+    expect(String(out)).toContain("[C]chunk-uno")
+  })
 })

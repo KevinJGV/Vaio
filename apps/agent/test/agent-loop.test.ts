@@ -2,9 +2,24 @@ import type { TraceEvent, TurnRequest } from "@vaio/contracts"
 import { convertArrayToReadableStream, MockLanguageModelV3 } from "ai/test"
 import { describe, expect, it } from "vitest"
 import { courtesy, createAgent, type TurnContext } from "../src/core/agent.js"
+import type { Compressor } from "../src/ports/compress.js"
 import type { LogFields, Logger } from "../src/ports/logger.js"
 import type { Summarizer } from "../src/ports/summary.js"
 import { createInMemoryConversationStore } from "./fakes/in-memory-conversation.js"
+
+/** Compresor espía: registra qué textos se le pidió comprimir (identidad como salida). */
+function spyCompressor(): { c: Compressor; seen: string[] } {
+  const seen: string[] = []
+  const c: Compressor = {
+    compress: (t) => {
+      seen.push(t)
+      return t
+    },
+    expand: (t) => t,
+    countTokens: (t) => t.length,
+  }
+  return { c, seen }
+}
 
 function noopLogger(): Logger {
   const noop = (_a: LogFields | string, _b?: string): void => {}
@@ -163,5 +178,35 @@ describe("agent.respond (memoria conversacional)", () => {
     await tick()
     expect(summarizeCalls).toBe(1)
     expect((await store.loadContext(id, 2)).summary).toBe("RESUMEN")
+  })
+})
+
+describe("agent.respond (compresión de contexto, Tier 1)", () => {
+  it("comprime resumen + turnos históricos, pero NO el mensaje vivo", async () => {
+    const { ctx } = collectingCtx()
+    const store = createInMemoryConversationStore()
+    const id = await store.ensure("web", "kc", "es")
+    await store.appendTurn(id, "h1", {
+      user: "viejo uno",
+      assistant: "resp uno",
+    })
+    await store.updateSummary(id, "RESUMEN PREVIO", 0)
+    const { c, seen } = spyCompressor()
+    const agent = createAgent({
+      model: okModel(),
+      memory: null,
+      conversations: store,
+      summarizer: null,
+      compressor: c,
+    })
+    const { stream } = await agent.respond(
+      webReq("mensaje vivo nuevo", "kc"),
+      ctx
+    )
+    await drain(stream)
+    expect(seen).toContain("RESUMEN PREVIO")
+    expect(seen).toContain("viejo uno")
+    expect(seen).toContain("resp uno")
+    expect(seen).not.toContain("mensaje vivo nuevo")
   })
 })

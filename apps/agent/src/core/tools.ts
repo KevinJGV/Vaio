@@ -5,10 +5,11 @@
 import type { TraceEvent } from "@vaio/contracts"
 import { type ToolSet, tool } from "ai"
 import { z } from "zod"
+import type { Compressor, Intensity } from "../ports/compress.js"
 import type { Logger } from "../ports/logger.js"
 import type { MemoryStore } from "../ports/memory.js"
 import type { CapabilityProfile } from "./capabilities.js"
-import { errMsg } from "./util.js"
+import { compressOrRaw, errMsg } from "./util.js"
 
 /** Ids base de traza del turno (se esparcen en cada evento emitido por una tool). */
 export interface TraceIds {
@@ -23,10 +24,21 @@ export interface ToolDeps {
   emit: (e: TraceEvent) => void
   ids: TraceIds
   logger: Logger
+  /** Tier 1: comprime los chunks de RAG antes de inyectarlos al modelo. null = sin comprimir. */
+  compressor?: Compressor | null
+  ragIntensity?: Intensity
 }
 
 /** searchMemory: RAG sobre la memoria del producto, con `k` acotado por el perfil del canal. */
-function searchMemoryTool({ caps, memory, emit, ids, logger }: ToolDeps) {
+function searchMemoryTool({
+  caps,
+  memory,
+  emit,
+  ids,
+  logger,
+  compressor = null,
+  ragIntensity = "full",
+}: ToolDeps) {
   const k = caps.memoryScope.maxK
   return tool({
     description:
@@ -60,7 +72,7 @@ function searchMemoryTool({ caps, memory, emit, ids, logger }: ToolDeps) {
             : docs
                 .map(
                   (d) =>
-                    `[${d.source}${d.url ? ` · ${d.url}` : ""}]\n${d.chunk}`
+                    `[${d.source}${d.url ? ` · ${d.url}` : ""}]\n${compressOrRaw(compressor, d.chunk, ragIntensity)}`
                 )
                 .join("\n\n")
         emit({
