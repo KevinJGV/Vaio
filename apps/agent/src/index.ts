@@ -45,7 +45,8 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
     logger.warn("Sin DATABASE_URL/embeddings key → agente sin RAG.")
   }
   const model = createModel(env.OPENROUTER_API_KEY, models, logger)
-  agent = createAgent({ model, memory })
+  // conversations/summarizer se cablean en el wiring de memoria conversacional (Fase 7).
+  agent = createAgent({ model, memory, conversations: null, summarizer: null })
 } else {
   logger.error(
     "Sin OPENROUTER_API_KEY/OPENROUTER_MODELS → /chat degradado a cortesía."

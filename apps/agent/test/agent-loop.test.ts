@@ -1,8 +1,10 @@
-import type { TraceEvent } from "@vaio/contracts"
-import { MockLanguageModelV3 } from "ai/test"
+import type { TraceEvent, TurnRequest } from "@vaio/contracts"
+import { convertArrayToReadableStream, MockLanguageModelV3 } from "ai/test"
 import { describe, expect, it } from "vitest"
 import { courtesy, createAgent, type TurnContext } from "../src/core/agent.js"
 import type { LogFields, Logger } from "../src/ports/logger.js"
+import type { Summarizer } from "../src/ports/summary.js"
+import { createInMemoryConversationStore } from "./fakes/in-memory-conversation.js"
 
 function noopLogger(): Logger {
   const noop = (_a: LogFields | string, _b?: string): void => {}
@@ -27,6 +29,44 @@ function collectingCtx(): { ctx: TurnContext; events: TraceEvent[] } {
   return { ctx, events }
 }
 
+const webReq = (userText: string, conversationKey = "k"): TurnRequest => ({
+  channel: "web",
+  conversationKey,
+  userText,
+  locale: "es",
+  principalId: "web",
+  trusted: false,
+})
+
+/** Modelo mock que streamea "Hola Kevin" exitosamente (stream nuevo en cada llamada). */
+function okModel(): MockLanguageModelV3 {
+  return new MockLanguageModelV3({
+    modelId: "mock/ok",
+    doStream: async () => ({
+      stream: convertArrayToReadableStream([
+        { type: "text-start", id: "0" },
+        { type: "text-delta", id: "0", delta: "Hola" },
+        { type: "text-delta", id: "0", delta: " Kevin" },
+        { type: "text-end", id: "0" },
+        {
+          type: "finish",
+          finishReason: "stop",
+          usage: { inputTokens: 1, outputTokens: 2, totalTokens: 3 },
+        },
+      ]),
+    }),
+  })
+}
+
+function boomModel(): MockLanguageModelV3 {
+  return new MockLanguageModelV3({
+    modelId: "mock/boom",
+    doStream: async () => {
+      throw new Error("modelo caído")
+    },
+  })
+}
+
 async function drain(stream: ReadableStream<Uint8Array>): Promise<string> {
   const reader = stream.getReader()
   const dec = new TextDecoder()
@@ -39,24 +79,21 @@ async function drain(stream: ReadableStream<Uint8Array>): Promise<string> {
   return out
 }
 
+/** Deja correr la persistencia en background (void persist) tras cerrar el stream. */
+const tick = (): Promise<void> => new Promise((r) => setTimeout(r, 10))
+
 describe("agent.respond (instrumentación + degradación)", () => {
   it("emite turn.start con metadata del turno", async () => {
-    const model = new MockLanguageModelV3({
-      modelId: "mock/boom",
-      doStream: async () => {
-        throw new Error("modelo caído")
-      },
-    })
     const { ctx, events } = collectingCtx()
-    await drain(
-      createAgent({ model, memory: null }).respond(
-        [{ role: "user", content: "hola vaio" }],
-        "es",
-        ctx
-      )
-    )
-    const start = events.find((e) => e.type === "turn.start")
-    expect(start).toMatchObject({
+    const agent = createAgent({
+      model: boomModel(),
+      memory: null,
+      conversations: null,
+      summarizer: null,
+    })
+    const { stream } = await agent.respond(webReq("hola vaio"), ctx)
+    await drain(stream)
+    expect(events.find((e) => e.type === "turn.start")).toMatchObject({
       type: "turn.start",
       requestId: "req-test",
       messageCount: 1,
@@ -64,22 +101,67 @@ describe("agent.respond (instrumentación + degradación)", () => {
     })
   })
 
-  it("si el modelo falla: emite turn.error y responde la cortesía (nunca vacío)", async () => {
-    const model = new MockLanguageModelV3({
-      modelId: "mock/boom",
-      doStream: async () => {
-        throw new Error("modelo caído")
-      },
-    })
+  it("si el modelo falla: emite turn.error y responde la cortesía (stream y text)", async () => {
     const { ctx, events } = collectingCtx()
-    const out = await drain(
-      createAgent({ model, memory: null }).respond(
-        [{ role: "user", content: "hola" }],
-        "es",
-        ctx
-      )
-    )
+    const agent = createAgent({
+      model: boomModel(),
+      memory: null,
+      conversations: null,
+      summarizer: null,
+    })
+    const { stream, text } = await agent.respond(webReq("hola"), ctx)
+    const out = await drain(stream)
     expect(events.map((e) => e.type)).toContain("turn.error")
     expect(out).toBe(courtesy("es"))
+    expect(await text).toBe(courtesy("es"))
+  })
+})
+
+describe("agent.respond (memoria conversacional)", () => {
+  it("persiste el turno (user+assistant) tras responder", async () => {
+    const { ctx } = collectingCtx()
+    const store = createInMemoryConversationStore()
+    const agent = createAgent({
+      model: okModel(),
+      memory: null,
+      conversations: store,
+      summarizer: null,
+    })
+    const { stream, text } = await agent.respond(webReq("hola", "k1"), ctx)
+    expect(await drain(stream)).toBe("Hola Kevin")
+    expect(await text).toBe("Hola Kevin")
+    await tick()
+    const id = await store.ensure("web", "k1", "es")
+    const after = await store.loadContext(id, 10)
+    expect(after.messageCount).toBe(2)
+    expect(after.recent.map((m) => m.content)).toEqual(["hola", "Hola Kevin"])
+  })
+
+  it("sobre el threshold: invoca el summarizer y guarda el resumen", async () => {
+    const { ctx } = collectingCtx()
+    const store = createInMemoryConversationStore()
+    const id = await store.ensure("web", "k2", "es")
+    await store.appendTurn(id, "p1", { user: "viejo1", assistant: "r1" })
+    await store.appendTurn(id, "p2", { user: "viejo2", assistant: "r2" })
+    let summarizeCalls = 0
+    const summarizer: Summarizer = {
+      summarize: async () => {
+        summarizeCalls++
+        return "RESUMEN"
+      },
+    }
+    const agent = createAgent({
+      model: okModel(),
+      memory: null,
+      conversations: store,
+      summarizer,
+      summaryThreshold: 2,
+      recentLimit: 2,
+    })
+    const { stream } = await agent.respond(webReq("nuevo", "k2"), ctx)
+    await drain(stream)
+    await tick()
+    expect(summarizeCalls).toBe(1)
+    expect((await store.loadContext(id, 2)).summary).toBe("RESUMEN")
   })
 })

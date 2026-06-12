@@ -4,7 +4,7 @@
 // Fase 2 sumará canales (Telegram/correo) como otros adapters sobre el mismo core.
 
 import { randomUUID } from "node:crypto"
-import { chatBodySchema } from "@vaio/contracts"
+import { chatBodySchema, type TurnRequest } from "@vaio/contracts"
 import { Hono } from "hono"
 import { type Agent, courtesy } from "../../core/agent.js"
 import type { Logger } from "../../ports/logger.js"
@@ -69,18 +69,27 @@ export function buildApp({
     if (!agent) {
       return c.text(courtesy(locale), 200)
     }
+    // El portafolio aún manda el historial completo; el core ahora lo persiste server-side, así
+    // que tomamos solo el último mensaje del usuario y el resto lo reconstruye la memoria por
+    // conversationKey. (Cuando se cablee el portafolio, el contrato se angosta a un solo mensaje.)
+    const userText = parsed.data.messages.at(-1)?.content ?? ""
+    if (!userText) {
+      return c.json({ error: "bad request" }, 400)
+    }
     try {
       // El core arma el stream con degradación incluida (cortesía si el modelo falla) e
       // instrumenta el turno vía el sink (los eventos comparten requestId con estos logs).
-      const ctx = {
-        logger: log,
-        sink,
-        requestId: c.get("requestId"),
-        ...(parsed.data.conversationId
-          ? { conversationId: parsed.data.conversationId }
-          : {}),
+      const req: TurnRequest = {
+        channel: "web",
+        conversationKey: parsed.data.conversationId ?? randomUUID(),
+        userText,
+        locale,
+        principalId: "web",
+        trusted: false,
       }
-      return new Response(agent.respond(parsed.data.messages, locale, ctx), {
+      const ctx = { logger: log, sink, requestId: c.get("requestId") }
+      const { stream } = await agent.respond(req, ctx)
+      return new Response(stream, {
         headers: { "content-type": "text/plain; charset=utf-8" },
       })
     } catch (err) {
