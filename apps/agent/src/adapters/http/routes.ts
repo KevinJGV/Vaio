@@ -9,7 +9,9 @@ import { Hono } from "hono"
 import { type Agent, courtesy } from "../../core/agent.js"
 import type { Logger } from "../../ports/logger.js"
 import type { TraceSink } from "../../ports/trace.js"
+import { mountTelegram, type TelegramDeps } from "../telegram/routes.js"
 import { agentAuth } from "./auth.js"
+import type { Variables } from "./types.js"
 
 export interface RouteDeps {
   agentApiKey: string | undefined
@@ -17,15 +19,16 @@ export interface RouteDeps {
   agent: Agent | null
   logger: Logger
   sink: TraceSink
+  /** Presente → se monta el webhook /tg del canal Telegram (ausente → no se monta). */
+  telegram?: TelegramDeps
 }
-
-type Variables = { requestId: string; log: Logger }
 
 export function buildApp({
   agentApiKey,
   agent,
   logger,
   sink,
+  telegram,
 }: RouteDeps): Hono<{ Variables: Variables }> {
   const app = new Hono<{ Variables: Variables }>()
 
@@ -100,6 +103,11 @@ export function buildApp({
       return c.text(courtesy(locale), 200)
     }
   })
+
+  // Canal Telegram (webhook /tg) — solo si el wiring lo proveyó (token+secret+allowlist presentes).
+  if (telegram) {
+    mountTelegram(app, telegram)
+  }
 
   return app
 }
