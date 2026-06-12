@@ -113,11 +113,24 @@ El código typecheckeó sin cambios de API salvo **dos rupturas reales**:
 ### Deploy a Railway (jun-2026) — gotchas
 - **Monorepo pnpm: el agente NO bootea sin `@vaio/contracts` compilado**. `routes.js` importa
   `chatBodySchema` (objeto **zod**, valor en runtime, no solo tipo) → necesita
-  `packages/contracts/dist/index.js`. Railway/nixpacks autodetectado compila solo `apps/agent` (`tsc`)
-  y NO corre `pnpm -r build` → `ERR_MODULE_NOT_FOUND` en loop. **Fix**: `railway.json` en la raíz con
-  `build.buildCommand: "pnpm -r build"` + `deploy.startCommand: "pnpm --filter @vaio/agent start"`
-  (+ `healthcheckPath: /health`). Cambiar el Root Directory NO alcanza: el problema es el build command.
-  Defensa extra: `apps/agent` `build` = `pnpm --filter @vaio/contracts build && tsc`.
-- **`LOG_FORMAT=json` (o `NODE_ENV=production`) en prod**: `pino-pretty` es **devDependency**; el
-  formato `pretty` por defecto (cuando `NODE_ENV !== production`) intenta cargar ese transport → si el
-  runtime podó devDeps, crashea. `json` no usa transport y es lo correcto para Railway (captura stdout).
+  `packages/contracts/dist/index.js`. El autodetect de Railway (Railpack/Nixpacks) compila solo
+  `apps/agent` (`tsc`) y NO corre `pnpm -r build` → `ERR_MODULE_NOT_FOUND` en loop.
+- **Solución actual = `Dockerfile` versionado** (Nixpacks quedó deprecado; el autodetect no alcanza).
+  Multi-stage: `base` (node:24-slim + `corepack enable`) → `workspace` (`pnpm install --frozen-lockfile`
+  + `pnpm -r build`, manifests copiados primero para cachear) → `pruned` (`pnpm --filter @vaio/agent
+  --prod --legacy deploy /prod/agent`) → `runtime` (copia solo `/prod/agent`, `CMD node dist/index.js`).
+  `railway.json` = `build.builder: "DOCKERFILE"` (sin buildCommand/startCommand: los maneja el Dockerfile).
+  Imagen ~259 MB, prod-only. (Antes: `railway.json` con `buildCommand: pnpm -r build` sobre nixpacks —
+  funcionaba pero nixpacks está deprecado.)
+- **`pnpm deploy` en pnpm 10 exige `--legacy`** (o `inject-workspace-packages=true`): por defecto tira
+  `ERR_PNPM_DEPLOY_NONINJECTED_WORKSPACE`. Usamos `--legacy` (contenido al paso de deploy) en vez de
+  cambiar el linker del workspace, que alteraría el dev local (deps inyectadas = copia dura, no symlink).
+  `--prod deploy` copia `@vaio/contracts` con su `dist/` ya compilado como **dir real** (no symlink) →
+  el bundle corre sin el resto del monorepo, y excluye devDeps (`pino-pretty`, `tsx`, `vitest`…).
+- **`.dockerignore` OBLIGATORIO**: sin él, `COPY . .` mete el `.env` real (secreto) y el `node_modules`
+  local en la imagen. Ignora `node_modules`, `dist`, `.env*` (menos `.env.example`), `.git`, `docs`.
+- **`LOG_FORMAT=json` (o `NODE_ENV=production`) en prod**: `pino-pretty` es **devDependency** y el bundle
+  prod-only NO lo incluye; el formato `pretty` (default cuando `NODE_ENV !== production`) intentaría
+  cargar ese transport → crash. El Dockerfile fija `NODE_ENV=production` + `LOG_FORMAT=json` (doble red;
+  `json` no usa transport y lo captura Railway por stdout). Verificado: boot en JSON, `/health` 200,
+  `/chat` sin key 401, 0 `ERR_MODULE_NOT_FOUND` (build+run local con Docker antes de pushear).

@@ -1,0 +1,14 @@
+# Contexto de build mínimo: nada de node_modules/dist locales (se instalan/compilan dentro),
+# ningún secreto (.env), ni metadatos de git/CI.
+node_modules
+**/node_modules
+dist
+**/dist
+.env
+.env.*
+!.env.example
+.git
+.github
+.claude
+*.log
+docs
