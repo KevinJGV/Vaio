@@ -18,24 +18,25 @@ describe("buildSummaryPrompt", () => {
     { role: "assistant", content: "¡hola Kevin!" },
   ]
 
-  it("integra el resumen previo y los mensajes nuevos, en el idioma del locale", () => {
+  it("es → instrucciones en español; integra resumen previo + mensajes", () => {
     const { system, prompt } = buildSummaryPrompt({
       priorSummary: "El usuario es dev.",
       olderMessages: older,
       locale: "es",
     })
-    expect(system).toContain("Spanish")
+    expect(system).toContain("español")
     expect(prompt).toContain("El usuario es dev.")
     expect(prompt).toContain("me llamo Kevin")
     expect(prompt).toContain("¡hola Kevin!")
   })
 
-  it("marca el resumen previo vacío explícitamente", () => {
-    const { prompt } = buildSummaryPrompt({
+  it("en → instrucciones en inglés y resumen previo vacío como '(empty)'", () => {
+    const { system, prompt } = buildSummaryPrompt({
       priorSummary: "",
       olderMessages: older,
       locale: "en",
     })
-    expect(prompt.toLowerCase()).toContain("(vacío)")
+    expect(system).toContain("English")
+    expect(prompt.toLowerCase()).toContain("(empty)")
   })
 })

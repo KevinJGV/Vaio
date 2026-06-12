@@ -21,16 +21,38 @@ export function buildSummaryPrompt(args: {
   olderMessages: StoredMessage[]
   locale: Locale
 }): { system: string; prompt: string } {
-  const lang = args.locale === "en" ? "English" : "Spanish"
+  const en = args.locale === "en"
+  const transcript = args.olderMessages
+    .map(
+      (m) =>
+        `${m.role === "user" ? (en ? "User" : "Usuario") : "Vaio"}: ${m.content}`
+    )
+    .join("\n")
+  if (en) {
+    const system = [
+      "You are a conversational-memory compressor. You write in English.",
+      "You produce a ROLLING SUMMARY: dense, in bullets or short phrases, only durable facts and context",
+      "(who the user is, what they asked, decisions, preferences, open threads). No greetings or filler.",
+      "You integrate the prior summary with the new messages into ONE concise, updated summary.",
+    ].join(" ")
+    const prompt = [
+      args.priorSummary.trim()
+        ? `Prior summary:\n${args.priorSummary.trim()}`
+        : "Prior summary: (empty)",
+      "",
+      "New messages to integrate:",
+      transcript,
+      "",
+      "Return ONLY the updated summary.",
+    ].join("\n")
+    return { system, prompt }
+  }
   const system = [
-    `Sos un compresor de memoria conversacional. Escribís en ${lang}.`,
-    "Produces un RESUMEN RODANTE: denso, en bullets o frases cortas, solo hechos y contexto durables",
+    "Sos un compresor de memoria conversacional. Escribís en español.",
+    "Producís un RESUMEN RODANTE: denso, en bullets o frases cortas, solo hechos y contexto durables",
     "(quién es el usuario, qué pidió, decisiones, preferencias, hilos abiertos). Sin saludos ni relleno.",
     "Integrás el resumen previo con los mensajes nuevos en UN solo resumen actualizado y conciso.",
   ].join(" ")
-  const transcript = args.olderMessages
-    .map((m) => `${m.role === "user" ? "Usuario" : "Vaio"}: ${m.content}`)
-    .join("\n")
   const prompt = [
     args.priorSummary.trim()
       ? `Resumen previo:\n${args.priorSummary.trim()}`
