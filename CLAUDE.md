@@ -92,9 +92,12 @@ Vaio. Esta es la disciplina establecida para features/cambios no triviales:
 
 **Ciclo spec-driven (feature grande / cambio creativo):**
 1. **`superpowers:brainstorming`** — ANTES de codear cualquier feature/creatividad (explora
-   intención y diseño). No es opcional para algo nuevo.
-2. **`superpowers:writing-plans`** — plan del trabajo multi-paso → escribilo en
-   `docs/superpowers/specs/YYYY-MM-DD-<tema>.md` (NO en `docs/SPEC.md`; ver "Planes durables" abajo).
+   intención y diseño). No es opcional para algo nuevo. Su salida = el **spec técnico**
+   `docs/superpowers/specs/YYYY-MM-DD-<tema>-design.md` (bajo nivel: arquitectura, firmas, DDL, edge-cases).
+2. **`superpowers:writing-plans`** — el **plan de ALTO NIVEL** (qué hacer: fases, entregables, secuencia,
+   dependencias, verificación macro) → `docs/superpowers/specs/YYYY-MM-DD-<tema>-plan.md` (NO en `docs/SPEC.md`).
+   **NO** repite los reqs técnicos del design (referencialo). **DEBE** incluir la sección **"Estrategia de
+   ejecución"** (subagentes vs orquestador; ver "Planes durables" abajo). Distinta altitud que el design, no duplicado.
 3. Ejecutar: **`superpowers:subagent-driven-development`** (tareas independientes en esta sesión)
    o **`superpowers:executing-plans`** (con checkpoints de revisión).
 4. **`superpowers:test-driven-development`** — tests antes del código (lógica de `memory`/`ingest`/
@@ -104,14 +107,25 @@ Vaio. Esta es la disciplina establecida para features/cambios no triviales:
 7. **`superpowers:finishing-a-development-branch`** — para integrar.
 Bugs/comportamiento raro → **`superpowers:systematic-debugging`**. Aislamiento → **`using-git-worktrees`**.
 
-**Planes durables (plan mode ↔ spec-driven) — OBLIGATORIO:** un plan aprobado **DEBE** quedar escrito
-en el proyecto; **no es opcional**. **Destino = `docs/superpowers/specs/YYYY-MM-DD-<tema>.md`** (un
-archivo por feature). Si usás **plan mode** (lo activa Kevin) es el motor de diseño+aprobación, pero
-escribe a un **plan file efímero** (`~/.claude/plans/…`): **al salir (`ExitPlanMode`) PROMOVÉ el plan
-aprobado a `docs/superpowers/specs/…`** ANTES o JUNTO con implementar. Si NO usás plan mode →
-`writing-plans` escribe directo ahí. **Nunca corras los dos** (duplicaría). Reconciliá `NEXT-STEPS.md`.
+**Planes durables (plan mode ↔ spec-driven) — OBLIGATORIO:** todo trabajo aprobado **DEBE** quedar
+escrito en el proyecto; **no es opcional**. Cada feature no trivial produce **DOS artefactos durables**
+en `docs/superpowers/specs/` (un par por feature, **misma `YYYY-MM-DD-<tema>`**):
+- **`<tema>-design.md`** — **spec técnico** (bajo nivel: arquitectura, firmas, DDL, edge-cases). Sale de `brainstorming`.
+- **`<tema>-plan.md`** — **plan de alto nivel** (fases, entregables, secuencia, dependencias, verificación
+  macro) **+ sección obligatoria "Estrategia de ejecución"**: evaluá y **sugerí** ejecutar con
+  **subagentes** vs **vos-orquestador-directo**, justificado por **tamaño + complejidad** de las
+  (sub)tareas (subagentes rinden en trabajo **grande/independiente/paralelo**; secuencial/acoplado →
+  directo). Sale de `writing-plans`. **No** repite los reqs técnicos del design (referencialo).
+
+Si usás **plan mode** (lo activa Kevin) es el motor de diseño+aprobación y escribe a un **plan file
+efímero** (`~/.claude/plans/…`): **al salir (`ExitPlanMode`) PROMOVÉ lo aprobado a AMBOS archivos según
+su altitud** (detalle técnico → `-design.md`; qué-hacer + estrategia → `-plan.md`) ANTES o JUNTO con
+implementar. (Antes la regla decía "nunca corras los dos"; **se refinó**: design y plan son artefactos
+**distintos y complementarios** — los dos van; lo prohibido es *duplicar* contenido entre ellos.)
+Reconciliá `NEXT-STEPS.md`.
 **Responsabilidades de `docs/` (no solapar):** `SPEC.md` = norte + diseño **fundacional** (fases,
-arquitectura macro, stack); `superpowers/specs/` = **plan completo por feature**; `NEXT-STEPS.md` =
+arquitectura macro, stack); `superpowers/specs/<tema>-design.md` = **diseño técnico por feature**;
+`superpowers/specs/<tema>-plan.md` = **plan de alto nivel + estrategia de ejecución**; `NEXT-STEPS.md` =
 estado + siguiente paso (+ índice a specs); `LEARNINGS.md` = aprendizajes de dev. El hook
 `PostToolUse(ExitPlanMode)` (`.claude/hooks/spec-after-plan.sh`) te lo recuerda — red, no reemplazo del criterio.
 
