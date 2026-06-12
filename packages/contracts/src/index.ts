@@ -25,6 +25,29 @@ export const chatBodySchema = z.object({
 })
 export type ChatBody = z.infer<typeof chatBodySchema>
 
+/** Canal de entrada por el que llega un turno. Cada canal tiene su perfil de capacidades
+ *  (ver apps/agent core/capabilities). "email" se sumará en una iteración futura. */
+export const channelSchema = z.enum(["web", "telegram"])
+export type Channel = z.infer<typeof channelSchema>
+
+/** Turno normalizado que cualquier canal entrega al core. Boundary compartido web↔agent:
+ *  el core carga el historial server-side por `conversationKey` (el caller NO manda todo el
+ *  historial). `principalId`/`trusted` identifican al actor del canal (seam para permisos
+ *  por-usuario a futuro; hoy `trusted` distingue Telegram-de-Kevin del chat público). */
+export const turnRequestSchema = z.object({
+  channel: channelSchema,
+  /** Clave estable del hilo dentro del canal (web: conversationId; telegram: chat_id). */
+  conversationKey: z.string(),
+  /** Texto del nuevo mensaje del usuario. */
+  userText: z.string().min(1),
+  locale: localeSchema.optional(),
+  /** Id del actor en el canal (telegram user id; "web" para el chat público anónimo). */
+  principalId: z.string(),
+  /** allowlisted (p.ej. Kevin en Telegram) → perfil pleno; default capado. */
+  trusted: z.boolean().default(false),
+})
+export type TurnRequest = z.infer<typeof turnRequestSchema>
+
 /** Fragmento de memoria recuperado (RAG). */
 export const docChunkSchema = z.object({
   source: z.string(),
