@@ -16,7 +16,7 @@ FROM base AS workspace
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY packages/contracts/package.json packages/contracts/package.json
 COPY apps/agent/package.json apps/agent/package.json
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=s/88d92a9f-f4d6-42c0-a221-b7f5a6ed1a3c-/pnpm/store,target=/pnpm/store pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm -r build
 
