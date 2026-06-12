@@ -23,6 +23,9 @@ importers:
       '@openrouter/ai-sdk-provider':
         specifier: ^2
         version: 2.9.0(ai@6.0.200(zod@4.4.3))(zod@4.4.3)
+      '@vaio/compress':
+        specifier: workspace:*
+        version: link:../../packages/compress
       '@vaio/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
