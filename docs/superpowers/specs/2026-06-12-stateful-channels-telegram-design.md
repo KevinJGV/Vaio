@@ -19,7 +19,8 @@ reescribir el core.
 1. **Iteración 1** = núcleo conversacional + arnés + abstracción canal/capacidades + **Telegram**.
    **Diferido** (cada uno su propio spec luego): HITL/escalación, `facts` semánticos, Graphiti, y la
    **integración del portafolio** (se mantiene `/chat` como canal web para pruebas locales).
-2. **Memoria** = historial persistido + **resumen rodante** ("caveman"). Sigue el RAG sobre
+2. **Memoria** = historial persistido + **resumen rodante** (LLM, lossy; la compresión determinística
+   "cavemem" se sumó aparte → `2026-06-12-cavemem-compression-design.md`). Sigue el RAG sobre
    `documents`. **Sin** tabla `facts` ni Graphiti.
 3. **Capacidades** = **perfil por canal** (Telegram = pleno; web/portafolio = capado en info y
    acciones). Permisos **por-usuario** = **seam documentado**, sin RBAC. Telegram: identidad =
@@ -92,7 +93,7 @@ Adapter `apps/agent/src/adapters/neon-conversation.ts` (Drizzle, espejo de `neon
 ## 4. Resumen rodante — `core/summary.ts` (puro) + puerto `Summarizer`
 - `shouldSummarize({messageCount, threshold}): boolean` (count-based, determinista/testeable;
   token-based = refinamiento futuro). `buildSummaryPrompt({priorSummary, olderMessages, locale})`
-  ("caveman": comprime summary previo + turnos que salen de la ventana en un running summary terso).
+  (LLM: condensa summary previo + turnos que salen de la ventana en un running summary terso de hechos).
 - Puerto `apps/agent/src/ports/summary.ts` `Summarizer.summarize(input): Promise<string>`; adapter
   `adapters/summarizer.ts` usa `generateText` (no-streaming) con **modelo barato** (`SUMMARY_MODEL` o
   la cola de la cadena), sobre el provider OpenRouter (con su fallback array). Falla → log + mantener

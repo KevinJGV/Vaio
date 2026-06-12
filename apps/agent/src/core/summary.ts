@@ -1,7 +1,8 @@
-// Arnés — resumen rodante "caveman" (PURO, testeable). Decide CUÁNDO resumir y arma el prompt;
-// la llamada al modelo la hace el puerto Summarizer (adapters/summarizer.ts). Comprime el resumen
-// previo + los mensajes que salieron de la ventana reciente en un running summary terso de hechos
-// y contexto durable. Determinista por count (token-based = refinamiento futuro).
+// Arnés — resumen rodante LLM (Tier 2, lossy; PURO, testeable). Decide CUÁNDO resumir y arma el
+// prompt; la llamada al modelo la hace el puerto Summarizer (adapters/summarizer.ts). Condensa el
+// resumen previo + los mensajes que salieron de la ventana reciente en un running summary terso de
+// hechos y contexto durable. Determinista por count (token-based = refinamiento futuro).
+// (La compresión determinística sin LLM = Tier 1, @vaio/compress — no confundir.)
 
 import type { Locale } from "@vaio/contracts"
 import type { StoredMessage } from "../ports/conversation.js"
