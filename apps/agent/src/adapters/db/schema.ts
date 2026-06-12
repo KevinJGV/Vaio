@@ -1,12 +1,17 @@
-// Schema Drizzle de la memoria del producto. La tabla `facts` llega en fase 2.
+// Schema Drizzle de la memoria del producto: `documents` (RAG) + memoria CONVERSACIONAL
+// (`conversations` + `messages`). La tabla `facts` (extracción semántica) llega en otra iteración.
 // El índice HNSW con `vector_cosine_ops` acelera la búsqueda por distancia coseno (<=>).
 
 import {
+  bigint,
   bigserial,
   index,
+  integer,
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
+  uuid,
   vector,
 } from "drizzle-orm/pg-core"
 
@@ -33,5 +38,49 @@ export const documents = pgTable(
       t.embedding.op("vector_cosine_ops")
     ),
     index("documents_source_idx").on(t.source),
+  ]
+)
+
+/** Memoria conversacional: un hilo por (channel, threadKey). `summary` = resumen rodante de los
+ *  turnos viejos; `summarizedUpToMessageId` marca hasta qué mensaje se resumió. */
+export const conversations = pgTable(
+  "conversations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    channel: text("channel").notNull(), // 'web' | 'telegram'
+    threadKey: text("thread_key").notNull(), // web: conversationId | telegram: chat_id
+    locale: text("locale").notNull().default("es"),
+    summary: text("summary").notNull().default(""),
+    summarizedUpToMessageId: bigint("summarized_up_to_message_id", {
+      mode: "number",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("conversations_channel_thread_uq").on(t.channel, t.threadKey),
+  ]
+)
+
+/** Mensajes de una conversación. `turnId` correlaciona con las trazas y da idempotencia al append
+ *  (unique (conversation_id, turn_id, role)). Orden cronológico = por `id` ascendente. */
+export const messages = pgTable(
+  "messages",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    turnId: text("turn_id").notNull(),
+    role: text("role").notNull(), // 'user' | 'assistant'
+    content: text("content").notNull(),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    totalTokens: integer("total_tokens"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (t) => [
+    index("messages_conversation_idx").on(t.conversationId, t.id),
+    uniqueIndex("messages_turn_role_uq").on(t.conversationId, t.turnId, t.role),
   ]
 )
