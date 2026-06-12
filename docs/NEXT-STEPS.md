@@ -47,7 +47,17 @@ resumen LLM). **84 tests verdes** (18 del paquete + 66 del agente); typecheck/bi
 [`…-cavemem-compression-design.md`](superpowers/specs/2026-06-12-cavemem-compression-design.md) ·
 [`…-cavemem-compression-plan.md`](superpowers/specs/2026-06-12-cavemem-compression-plan.md).
 **Pendiente (Kevin):** e2e real con keys (ver el ahorro de tokens en logs + calidad/persona intacta);
-luego review + merge de toda la rama. **Seam transversal** dejado para facts/ingesta y el norte "Vaio harness".
+luego review + merge de toda la rama.
+
+### 🔵 Pendiente FUTURO — Compresión transversal (`Compressor`) + Vaio como harness
+El puerto `Compressor` (Tier 1, determinístico) hoy se aplica a **conversación + RAG**. Queda como
+**seam transversal** para extenderlo, cuando aplique (cada uno su par design+plan):
+- **Ingesta**: comprimir la prosa de los chunks antes de almacenar/servir como contexto (ojo: **embeber
+  el original**, comprimir solo para el contexto; cuidar que no degrade el retrieval).
+- **Facts** (Fase 2): los facts ya son densos; la compresión es su formato natural de almacenamiento.
+- **Vaio como harness personal** (norte): exponer/consumir memoria por **MCP** (cavemem es TS+MCP) para
+  que Vaio participe del desarrollo (Claude Code u otros arneses) llevando prácticas/contexto de Kevin;
+  ahí también cabría el **caveman de salida** (respuestas terse agente→agente, donde la persona no importa).
 
 **Después de la iteración 2: integración del portafolio** (`ChatSheet.tsx` + proxy `/api/agent` →
 apuntar al dominio **público** de Railway, no al `.internal`). Luego `apps/web`. Diseño:
