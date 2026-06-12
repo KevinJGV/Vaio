@@ -2,18 +2,16 @@ import { describe, expect, it } from "vitest"
 import { buildSystemPrompt, personaPrompt } from "../src/core/prompt.js"
 
 describe("personaPrompt", () => {
-  it("es → persona en español (no en inglés)", () => {
+  it("es → persona escrita en español (no en inglés)", () => {
     const p = personaPrompt("es")
-    expect(p).toContain("Vaio")
+    expect(p).toContain("Sos Vaio")
     expect(p).toContain("searchMemory")
-    expect(p).toContain("español")
     expect(p).not.toContain("You are")
   })
-  it("en → persona en inglés (no en español)", () => {
+  it("en → persona escrita en inglés (no en español)", () => {
     const p = personaPrompt("en")
-    expect(p).toContain("Vaio")
+    expect(p).toContain("You are Vaio")
     expect(p).toContain("searchMemory")
-    expect(p.toLowerCase()).toContain("english")
     expect(p).not.toContain("Sos Vaio")
   })
 })
