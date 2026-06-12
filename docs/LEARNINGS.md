@@ -129,6 +129,15 @@ El código typecheckeó sin cambios de API salvo **dos rupturas reales**:
   el bundle corre sin el resto del monorepo, y excluye devDeps (`pino-pretty`, `tsx`, `vitest`…).
 - **`.dockerignore` OBLIGATORIO**: sin él, `COPY . .` mete el `.env` real (secreto) y el `node_modules`
   local en la imagen. Ignora `node_modules`, `dist`, `.env*` (menos `.env.example`), `.git`, `docs`.
+- **El "Custom Start Command" del dashboard sobreescribe el `CMD` del Dockerfile → crash en runtime**.
+  Quedó un leftover de nixpacks (`pnpm --filter @vaio/agent start`). Correr **cualquier `pnpm`** dentro
+  del bundle prod crashea: el bundle (`/app`) NO tiene el campo `packageManager` (solo lo tiene el root)
+  → corepack baja **pnpm 11 (latest)**, y el `runDepsStatusCheck` intenta **purgar `node_modules`** y
+  aborta sin TTY → `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY` en loop. **Fix**: `railway.json`
+  `deploy.startCommand: "node dist/index.js"` — config-as-code **siempre gana** sobre el dashboard
+  ("Configuration defined in code will always override values from the dashboard"), así que el start
+  vuelve a ser node directo (sin pnpm/corepack) sin tocar la UI. Regla general: **el runtime del bundle
+  prod NO debe invocar pnpm** (no lo necesita; `node dist/index.js` y listo).
 - **`LOG_FORMAT=json` (o `NODE_ENV=production`) en prod**: `pino-pretty` es **devDependency** y el bundle
   prod-only NO lo incluye; el formato `pretty` (default cuando `NODE_ENV !== production`) intentaría
   cargar ese transport → crash. El Dockerfile fija `NODE_ENV=production` + `LOG_FORMAT=json` (doble red;
