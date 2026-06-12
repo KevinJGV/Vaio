@@ -35,4 +35,18 @@ describe("compresión en español (extensión @vaio)", () => {
     expect(out).toContain("programación")
     expect(out).toContain("español")
   })
+
+  it("quita hedges ES (full)", () => {
+    const out = compress("te recomendaría usar Drizzle", { intensity: "full" })
+    expect(out).not.toMatch(/\bte recomendaría\b/i)
+    expect(out).toContain("Drizzle")
+  })
+
+  it("abrevia agresivo en ultra (que→q, por→x)", () => {
+    const out = compress("revisá que el deploy funcione por ahora", {
+      intensity: "ultra",
+    })
+    expect(out).toMatch(/\bq\b/)
+    expect(out).toContain("deploy")
+  })
 })
