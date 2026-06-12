@@ -9,12 +9,23 @@ import { EMBEDDING_DIM } from "./adapters/db/schema.js"
 import { createEmbedder } from "./adapters/embeddings.js"
 import { buildApp } from "./adapters/http/routes.js"
 import { createLogger } from "./adapters/logger.js"
+import { createConversationStore } from "./adapters/neon-conversation.js"
 import { createMemoryStore } from "./adapters/neon-memory.js"
 import { createModel } from "./adapters/openrouter.js"
+import { createSummarizer } from "./adapters/summarizer.js"
+import { createTelegramClient } from "./adapters/telegram/client.js"
+import type { TelegramDeps } from "./adapters/telegram/routes.js"
 import { createLoggerTraceSink } from "./adapters/trace-logger.js"
-import { loadConfig, modelChain } from "./config.js"
+import {
+  loadConfig,
+  modelChain,
+  telegramAllowedIds,
+  telegramEnabled,
+} from "./config.js"
 import { type Agent, createAgent } from "./core/agent.js"
+import type { ConversationStore } from "./ports/conversation.js"
 import type { MemoryStore } from "./ports/memory.js"
+import type { Summarizer } from "./ports/summary.js"
 
 const env = loadConfig()
 const logger = createLogger({
@@ -27,33 +38,79 @@ const models = modelChain(env)
 
 let agent: Agent | null = null
 let ragEnabled = false
+let conversations: ConversationStore | null = null
+let summarizer: Summarizer | null = null
 if (env.OPENROUTER_API_KEY && models.length > 0) {
   let memory: MemoryStore | null = null
-  // Embeddings comparten provider con el chat → si no hay key propia, usar la de OpenRouter.
+  // La memoria conversacional (conversations/messages) solo necesita DB; el RAG necesita además
+  // la key de embeddings (comparte provider con el chat → si no hay propia, usa la de OpenRouter).
   const embeddingsKey = env.EMBEDDINGS_API_KEY || env.OPENROUTER_API_KEY
-  if (env.DATABASE_URL && embeddingsKey) {
+  if (env.DATABASE_URL) {
     const { db } = createDb(env.DATABASE_URL)
-    const embedder = createEmbedder({
-      apiKey: embeddingsKey,
-      model: env.EMBEDDINGS_MODEL,
-      baseUrl: env.EMBEDDINGS_BASE_URL,
-      dimensions: EMBEDDING_DIM,
-    })
-    memory = createMemoryStore(db, embedder)
-    ragEnabled = true
+    conversations = createConversationStore(db)
+    if (embeddingsKey) {
+      const embedder = createEmbedder({
+        apiKey: embeddingsKey,
+        model: env.EMBEDDINGS_MODEL,
+        baseUrl: env.EMBEDDINGS_BASE_URL,
+        dimensions: EMBEDDING_DIM,
+      })
+      memory = createMemoryStore(db, embedder)
+      ragEnabled = true
+    } else {
+      logger.warn(
+        "Sin embeddings key → memoria conversacional ON pero sin RAG."
+      )
+    }
   } else {
-    logger.warn("Sin DATABASE_URL/embeddings key → agente sin RAG.")
+    logger.warn("Sin DATABASE_URL → sin memoria conversacional ni RAG.")
   }
   const model = createModel(env.OPENROUTER_API_KEY, models, logger)
-  // conversations/summarizer se cablean en el wiring de memoria conversacional (Fase 7).
-  agent = createAgent({ model, memory, conversations: null, summarizer: null })
+  // Resumidor: modelo barato. SUMMARY_MODEL o la cola de la cadena (el más barato/de respaldo).
+  const summaryModel =
+    env.SUMMARY_MODEL ?? models[models.length - 1] ?? models[0]
+  if (summaryModel) {
+    summarizer = createSummarizer(
+      createModel(env.OPENROUTER_API_KEY, [summaryModel], logger)
+    )
+  }
+  agent = createAgent({
+    model,
+    memory,
+    conversations,
+    summarizer,
+    summaryThreshold: env.SUMMARY_THRESHOLD,
+    recentLimit: env.CONVERSATION_RECENT_LIMIT,
+  })
 } else {
   logger.error(
     "Sin OPENROUTER_API_KEY/OPENROUTER_MODELS → /chat degradado a cortesía."
   )
 }
 
-const app = buildApp({ agentApiKey: env.AGENT_API_KEY, agent, logger, sink })
+// Canal Telegram: solo si hay token + secret + allowlist. El agente puede ser null (degrada a cortesía).
+let telegram: TelegramDeps | undefined
+if (
+  telegramEnabled(env) &&
+  env.TELEGRAM_BOT_TOKEN &&
+  env.TELEGRAM_WEBHOOK_SECRET
+) {
+  telegram = {
+    agent,
+    client: createTelegramClient(env.TELEGRAM_BOT_TOKEN, logger),
+    allowedIds: telegramAllowedIds(env),
+    webhookSecret: env.TELEGRAM_WEBHOOK_SECRET,
+    sink,
+  }
+}
+
+const app = buildApp({
+  agentApiKey: env.AGENT_API_KEY,
+  agent,
+  logger,
+  sink,
+  telegram,
+})
 
 serve({ fetch: app.fetch, port: env.PORT })
 logger.info(
@@ -61,6 +118,9 @@ logger.info(
     port: env.PORT,
     chat: agent !== null,
     rag: ragEnabled,
+    conversations: conversations !== null,
+    summarizer: summarizer !== null,
+    telegram: telegram !== undefined,
     models,
     logLevel: env.LOG_LEVEL,
     logFormat: env.LOG_FORMAT,

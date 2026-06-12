@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest"
 import type { Env } from "../src/config.js"
-import { modelChain } from "../src/config.js"
+import {
+  modelChain,
+  telegramAllowedIds,
+  telegramEnabled,
+} from "../src/config.js"
 
 function envWith(models: string | undefined): Env {
   return { OPENROUTER_MODELS: models } as Env
@@ -23,5 +27,43 @@ describe("modelChain", () => {
     const chain = modelChain(envWith("primary,fallback,free"))
     expect(chain[0]).toBe("primary")
     expect(chain.at(-1)).toBe("free")
+  })
+})
+
+describe("telegramAllowedIds", () => {
+  it("parsea csv a Set<number>, descarta no-numéricos", () => {
+    const env = { TELEGRAM_ALLOWED_USER_IDS: "42, 7 , x, 100" } as Env
+    expect([...telegramAllowedIds(env)].sort((a, b) => a - b)).toEqual([
+      7, 42, 100,
+    ])
+  })
+  it("vacío → set vacío", () => {
+    expect(telegramAllowedIds({} as Env).size).toBe(0)
+  })
+})
+
+describe("telegramEnabled", () => {
+  it("true solo con token + secret + al menos un id", () => {
+    const env = {
+      TELEGRAM_BOT_TOKEN: "t",
+      TELEGRAM_WEBHOOK_SECRET: "s",
+      TELEGRAM_ALLOWED_USER_IDS: "42",
+    } as Env
+    expect(telegramEnabled(env)).toBe(true)
+  })
+  it("false si falta token, secret o allowlist", () => {
+    expect(
+      telegramEnabled({
+        TELEGRAM_BOT_TOKEN: "t",
+        TELEGRAM_WEBHOOK_SECRET: "s",
+      } as Env)
+    ).toBe(false)
+    expect(
+      telegramEnabled({
+        TELEGRAM_BOT_TOKEN: "t",
+        TELEGRAM_ALLOWED_USER_IDS: "42",
+      } as Env)
+    ).toBe(false)
+    expect(telegramEnabled({} as Env)).toBe(false)
   })
 })

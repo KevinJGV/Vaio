@@ -43,6 +43,16 @@ const envSchema = z.object({
   GITHUB_USER: z.string().default("KevinJGV"),
   LASTFM_API_KEY: z.string().optional(),
   LASTFM_USER: z.string().optional(),
+
+  // Memoria conversacional.
+  SUMMARY_MODEL: z.string().optional(), // modelo barato del resumen; default = cola de la cadena.
+  SUMMARY_THRESHOLD: z.coerce.number().int().positive().default(12),
+  CONVERSATION_RECENT_LIMIT: z.coerce.number().int().positive().default(10),
+
+  // Canal Telegram (todo opcional → si falta algo, el webhook /tg no se monta).
+  TELEGRAM_BOT_TOKEN: z.string().optional(),
+  TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
+  TELEGRAM_ALLOWED_USER_IDS: z.string().optional(), // csv de telegram user ids
 })
 
 export type Env = z.infer<typeof envSchema>
@@ -66,4 +76,24 @@ export function modelChain(env: Env): string[] {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean)
+}
+
+/** Telegram user ids permitidos (csv → Set<number>, descarta vacíos y no-numéricos). */
+export function telegramAllowedIds(env: Env): Set<number> {
+  const ids = (env.TELEGRAM_ALLOWED_USER_IDS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean) // sin esto, Number("") === 0 metería un id espurio
+    .map(Number)
+    .filter((n) => Number.isInteger(n))
+  return new Set(ids)
+}
+
+/** El canal Telegram está habilitado solo si hay token + secret + al menos un id permitido. */
+export function telegramEnabled(env: Env): boolean {
+  return Boolean(
+    env.TELEGRAM_BOT_TOKEN &&
+      env.TELEGRAM_WEBHOOK_SECRET &&
+      telegramAllowedIds(env).size > 0
+  )
 }
