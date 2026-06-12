@@ -49,6 +49,14 @@ const envSchema = z.object({
   SUMMARY_THRESHOLD: z.coerce.number().int().positive().default(12),
   CONVERSATION_RECENT_LIMIT: z.coerce.number().int().positive().default(10),
 
+  // Compresión de contexto (Tier 1, determinístico — @vaio/compress). ON salvo "false"/"0".
+  COMPRESS_ENABLED: z
+    .string()
+    .optional()
+    .transform((v) => v !== "false" && v !== "0"),
+  COMPRESS_INTENSITY_CONV: z.enum(["lite", "full", "ultra"]).default("lite"),
+  COMPRESS_INTENSITY_RAG: z.enum(["lite", "full", "ultra"]).default("full"),
+
   // Canal Telegram (todo opcional → si falta algo, el webhook /tg no se monta).
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   TELEGRAM_WEBHOOK_SECRET: z.string().optional(),

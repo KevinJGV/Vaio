@@ -4,6 +4,7 @@
 // quedó on/off (sin secrets) para tener visibilidad del estado real del servicio.
 
 import { serve } from "@hono/node-server"
+import { createCompressor } from "./adapters/compress.js"
 import { createDb } from "./adapters/db/client.js"
 import { EMBEDDING_DIM } from "./adapters/db/schema.js"
 import { createEmbedder } from "./adapters/embeddings.js"
@@ -35,6 +36,8 @@ const logger = createLogger({
 })
 const sink = createLoggerTraceSink(logger, { logPrompts: env.LOG_PROMPTS })
 const models = modelChain(env)
+// Compresor de contexto (Tier 1, determinístico). Independiente de OpenRouter/DB.
+const compressor = env.COMPRESS_ENABLED ? createCompressor() : null
 
 let agent: Agent | null = null
 let ragEnabled = false
@@ -79,6 +82,9 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
     memory,
     conversations,
     summarizer,
+    compressor,
+    convIntensity: env.COMPRESS_INTENSITY_CONV,
+    ragIntensity: env.COMPRESS_INTENSITY_RAG,
     summaryThreshold: env.SUMMARY_THRESHOLD,
     recentLimit: env.CONVERSATION_RECENT_LIMIT,
   })
@@ -120,6 +126,7 @@ logger.info(
     rag: ragEnabled,
     conversations: conversations !== null,
     summarizer: summarizer !== null,
+    compress: compressor !== null,
     telegram: telegram !== undefined,
     models,
     logLevel: env.LOG_LEVEL,
