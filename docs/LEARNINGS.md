@@ -166,3 +166,24 @@ El código typecheckeó sin cambios de API salvo **dos rupturas reales**:
   `policyText` + `memoryScope.maxK` (mismo tool set hoy; `sources` queda como seam para capar info privada).
   El registry de tools incluye solo `caps.allowedTools` → sumar una acción futura = nuevo builder + listarla
   en el perfil, sin tocar el core. `Principal` es el seam para permisos por-usuario (hoy solo trusted/no).
+
+### Compresión de contexto (cavemem · iteración 2.1, jun-2026)
+- **Adoptar > reinventar (cuando la pieza es chica y MIT):** `@cavemem/compress` (`JuliusBrussee/cavemem`)
+  es MIT · TS · **cero deps** y un paquete **aislado** del SQLite/MCP/CLI → se **vendoriza** como
+  `packages/compress` (`@vaio/compress`) preservando `LICENSE`+`NOTICE`. La "memoria" sigue siendo la nuestra
+  (Neon); solo se adopta el **compresor**.
+- **Gotcha de vendoring con tsc (no tsup):** su `lexicon.ts` hacía `import lex from './lexicon.json' with
+  { type:'json' }` (import attributes) → con `tsc` plano hay que copiar el JSON a `dist` o, mejor, **convertir
+  el JSON a un módulo TS** (`lexicon.data.ts`). Elegimos lo segundo (más limpio para el fork + para extender).
+- **Léxico ES y el `\b` ASCII:** las regex de compresión usan `\b` (ASCII). Una entrada que **empieza o
+  termina en letra acentuada NO matchea** ("quizá" no; "quizás" sí; "perdón" sí). Acentos **en medio** sí
+  (configuración→config matchea: bordes c…n). El ES vive en `lexicon.es.ts` (aislado) y se mergea por
+  intensidad con el EN upstream en `lexicon.ts` → el upstream queda prístino.
+- **Dos tiers:** Tier 1 = `@vaio/compress` **determinístico, costo cero** sobre lo que va al modelo
+  (resumen + turnos históricos + chunks de RAG); Tier 2 = resumen LLM (lossy) solo para **acotar** hilos
+  largos. **Comprimir al ENVIAR, no al guardar** (turnos crudos en DB). **NO** comprimir la **query viva**
+  (intención) ni la **persona/policy** (voz de Vaio + prompt-caching). Degradación: `Compressor|null`
+  (`compressOrRaw`) → texto crudo; `COMPRESS_ENABLED=false` lo apaga.
+- **Resolución del paquete:** `@vaio/compress` expone `types`→src (typecheck sin build) y `default`→dist
+  (runtime/tests) → su `dist` debe existir para correr/test del agente (lo cubre `pnpm -r build`). 0
+  `ERR_MODULE_NOT_FOUND` verificado en boot.
