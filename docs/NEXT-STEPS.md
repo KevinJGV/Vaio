@@ -27,7 +27,14 @@ workspace → `pnpm --filter @vaio/agent --prod --legacy deploy` → runtime mí
 `railway.json` con `builder: DOCKERFILE` + `startCommand: node dist/index.js` (override del custom
 start de la UI). Dominio interno: `vaio.railway.internal`. Gotchas en [`LEARNINGS.md`](LEARNINGS.md).
 
-**Falta para producción: integración del portafolio** (`ChatSheet.tsx` + proxy `/api/agent` →
+**🟡 EN CURSO — Iteración 2: núcleo conversacional + arnés + canales + Telegram** (rama
+`feat/conversational-core-telegram`, 2026-06-12). Antes de tocar el portafolio, dejar a Vaio más capaz:
+memoria conversacional persistida + resumen rodante, arnés (system prompt estructurado, capacidades
+por canal, registry de tools gated), y **Telegram** como canal de dogfood. Plan/diseño completo →
+[`superpowers/specs/2026-06-12-stateful-channels-telegram.md`](superpowers/specs/2026-06-12-stateful-channels-telegram.md).
+Diferido a iteraciones siguientes (cada una su spec): HITL/escalación, facts semánticos, Graphiti.
+
+**Después de la iteración 2: integración del portafolio** (`ChatSheet.tsx` + proxy `/api/agent` →
 apuntar al dominio **público** de Railway, no al `.internal`). Luego `apps/web`. Diseño:
 [`SPEC.md`](SPEC.md) · Workflow: [`../CLAUDE.md`](../CLAUDE.md).
 
