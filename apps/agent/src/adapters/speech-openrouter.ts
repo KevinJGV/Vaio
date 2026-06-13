@@ -21,6 +21,7 @@ export function createSpeechSynthesizer(args: {
       const input = text.trim()
       if (!input || chain.length === 0) return null
       for (const entry of chain) {
+        const t0 = Date.now()
         try {
           const res = await fetch(`${baseURL}/audio/speech`, {
             method: "POST",
@@ -44,6 +45,15 @@ export function createSpeechSynthesizer(args: {
           }
           const raw = new Uint8Array(await res.arrayBuffer())
           if (raw.byteLength === 0) continue
+          // Observabilidad: qué entrada de la cadena sirvió + latencia.
+          logger.info(
+            {
+              model: entry.model,
+              format: entry.format,
+              latencyMs: Date.now() - t0,
+            },
+            "media.speak"
+          )
           // pcm → WAV reproducible; mp3 va tal cual.
           if (entry.format === "pcm") {
             return { audio: pcmToWav(raw), mediaType: "audio/wav" }

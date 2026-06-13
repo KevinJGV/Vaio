@@ -4,7 +4,17 @@ import {
   createMediaUnderstanding,
   createTranscriber,
 } from "../src/adapters/media-openrouter.js"
+import type { Logger } from "../src/ports/logger.js"
 
+const noop = (() => {}) as unknown as Logger["info"]
+const log: Logger = {
+  trace: noop,
+  debug: noop,
+  info: noop,
+  warn: noop,
+  error: noop,
+  child: () => log,
+}
 const data = new TextEncoder().encode("fake-bytes")
 const realFetch = globalThis.fetch
 afterEach(() => {
@@ -24,7 +34,8 @@ describe("createTranscriber (REST /audio/transcriptions)", () => {
     const t = createTranscriber(
       "SECRET-KEY",
       "https://openrouter.ai/api/v1",
-      "stt/model"
+      "stt/model",
+      log
     )
     const out = await t.transcribe({
       data,
@@ -49,7 +60,7 @@ describe("createTranscriber (REST /audio/transcriptions)", () => {
         .format
       return new Response(JSON.stringify({ text: "x" }), { status: 200 })
     }) as typeof fetch
-    await createTranscriber("k", "https://or/api/v1", "m").transcribe({
+    await createTranscriber("k", "https://or/api/v1", "m", log).transcribe({
       data,
       mediaType: "audio/mpeg",
     })
@@ -60,7 +71,7 @@ describe("createTranscriber (REST /audio/transcriptions)", () => {
     globalThis.fetch = (async () =>
       new Response("nope", { status: 401 })) as typeof fetch
     await expect(
-      createTranscriber("k", "https://or/api/v1", "m").transcribe({
+      createTranscriber("k", "https://or/api/v1", "m", log).transcribe({
         data,
         mediaType: "audio/ogg",
       })
@@ -91,7 +102,7 @@ describe("createMediaUnderstanding (visión, chat+file-part)", () => {
 
   it("manda un file part de imagen con el mediaType correcto", async () => {
     const { model, captured } = captureModel("una foto de un gato")
-    const out = await createMediaUnderstanding(model).describe({
+    const out = await createMediaUnderstanding(model, log).describe({
       data,
       mediaType: "image/jpeg",
       caption: "mi gato",

@@ -99,7 +99,8 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
     transcriber = createTranscriber(
       env.OPENROUTER_API_KEY,
       env.OPENROUTER_BASE_URL,
-      sttModel
+      sttModel,
+      logger
     )
   } else {
     logger.warn("Sin TRANSCRIBE_MODEL → STT OFF.")
@@ -107,7 +108,8 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
   const visChain = visionChain(env)
   if (visChain.length > 0) {
     mediaUnderstanding = createMediaUnderstanding(
-      createModel(env.OPENROUTER_API_KEY, visChain, logger)
+      createModel(env.OPENROUTER_API_KEY, visChain, logger),
+      logger
     )
   } else {
     logger.warn("Sin VISION_MODELS → visión OFF.")

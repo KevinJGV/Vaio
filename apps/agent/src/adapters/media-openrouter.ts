@@ -9,6 +9,7 @@
 
 import type { Locale } from "@vaio/contracts"
 import { generateText, type LanguageModel } from "ai"
+import type { Logger } from "../ports/logger.js"
 import type { MediaUnderstanding, Transcriber } from "../ports/media.js"
 
 const DESCRIBE_ASK: Record<Locale, string> = {
@@ -28,10 +29,12 @@ function audioFormat(mediaType: string): string {
 export function createTranscriber(
   apiKey: string,
   baseURL: string,
-  model: string
+  model: string,
+  logger: Logger
 ): Transcriber {
   return {
     async transcribe({ data, mediaType, locale = "es" }) {
+      const t0 = Date.now()
       const res = await fetch(`${baseURL}/audio/transcriptions`, {
         method: "POST",
         headers: {
@@ -51,20 +54,24 @@ export function createTranscriber(
         throw new Error(`transcriptions ${res.status}`)
       }
       const json = (await res.json()) as { text?: string }
+      // Observabilidad: STT usa un modelo fijo (TRANSCRIBE_MODEL), sin fallback → sabemos cuál fue.
+      logger.info({ model, latencyMs: Date.now() - t0 }, "media.transcribe")
       return (json.text ?? "").trim()
     },
   }
 }
 
 export function createMediaUnderstanding(
-  model: LanguageModel
+  model: LanguageModel,
+  logger: Logger
 ): MediaUnderstanding {
   return {
     async describe({ data, mediaType, caption, locale = "es" }) {
       const ask = caption
         ? `${DESCRIBE_ASK[locale]}\n${locale === "en" ? "User context" : "Contexto del usuario"}: ${caption}`
         : DESCRIBE_ASK[locale]
-      const { text } = await generateText({
+      const t0 = Date.now()
+      const { text, response } = await generateText({
         model,
         messages: [
           {
@@ -76,6 +83,12 @@ export function createMediaUnderstanding(
           },
         ],
       })
+      // `response.modelId` = el modelo que OpenRouter REALMENTE usó (resuelto del fallback server-side
+      // de VISION_MODELS) → así se ve cuál sirvió, no solo el primario configurado.
+      logger.info(
+        { modelId: response.modelId, latencyMs: Date.now() - t0 },
+        "media.vision"
+      )
       return text.trim()
     },
   }

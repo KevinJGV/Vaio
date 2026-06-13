@@ -26,9 +26,10 @@
   ("rojo"); degradación con modelo multimodal roto → `[imagen no procesable]` + HTTP 200 (nunca 500). Diseño →
   [`…-multimodal-input-design.md`](superpowers/specs/2026-06-13-multimodal-input-design.md) · plan →
   [`…-multimodal-input-plan.md`](superpowers/specs/2026-06-13-multimodal-input-plan.md).
-  **Pendiente de Kevin:** (1) aplicar la migración `0002` (`messages.attachments`) a Neon — `db:push` (dev) o
-  `db:migrate` (el e2e mostró que sin la columna el turno responde igual, solo falla la persistencia en
-  background); (2) e2e Telegram real (nota de voz + foto + voz→audio) tras deploy; (3) review + merge de la rama.
+  **e2e Telegram real ✅ (Kevin, 2026-06-13):** recibe imágenes y notas de voz; responde en voz si el turno
+  entró por voz o si se lo pide; texto si no. **Pendiente:** (1) aplicar la migración `0002`
+  (`messages.attachments`) a Neon — `db:push` (dev) o `db:migrate` (sin la columna el turno responde igual,
+  solo falla la persistencia en background); (2) review + merge de la rama.
 - [?] **Multimodal Fase 2** (misma rama) — **IMPLEMENTADO**: envs por modalidad (`TRANSCRIBE_MODEL`/
   `VISION_MODELS`/`SPEECH_MODELS`, cada uno explícito o OFF; sin `MULTIMODAL_MODELS`); **STT dedicado** `POST /audio/transcriptions`;
   **salida de voz (TTS)** `POST /audio/speech` → Telegram `sendAudio` con policy `shouldSpeak` (default texto;
@@ -38,10 +39,12 @@
   **142 tests** (122 agente + 20 compress); typecheck/biome/build limpios. **e2e ✅:** boot
   `transcribe/vision/speech` on; `/chat` imagen → "Rojo"; **round-trips reales** contra OpenRouter:
   `kokoro-82m`/`af_bella`→mp3→`whisper-large-v3`, y `gemini-3.1-flash-tts-preview`/`Zephyr`→pcm→WAV@24k→whisper. **Rerank** = pendiente futuro (diseño en el design, no se codea: ~29 chunks no
-  aporta). Specs actualizados (`§ Fase 2`).
-  **Pendiente de Kevin:** (1) e2e Telegram real (nota de voz → STT → respuesta; voz→audio espejo; "respondeme
-  con voz") tras deploy + secrets `SPEECH_MODELS`/`TRANSCRIBE_MODEL`/`VISION_MODELS`; (2) sigue pendiente la
-  migración `0002` de fase 1; (3) review + merge.
+  aporta). **Observabilidad de media** (2026-06-13): cada llamada loguea el modelo real + latencia
+  (`media.vision` con `response.modelId` del fallback server-side, `media.transcribe`, `media.speak`) →
+  destapa qué modelo sirvió (antes caja negra). Specs actualizados (`§ Fase 2`).
+  **e2e Telegram real ✅ (Kevin, 2026-06-13):** imágenes + notas de voz; responde en voz (espejo / a pedido);
+  `openrouter/free` en visión resuelve a un modelo gratis vision-capaz (visto en `media.vision`).
+  **Pendiente:** review + merge (la migración `0002` de fase 1 sigue abierta).
 > Cerrados el 2026-06-13 (→ Historial): `OWNER_TELEGRAM_ID` (local+Railway) · e2e Telegram (owner/visitante + 2
 > topics aislados) · **merge de `feat/conversational-core-telegram` a `main`** · **ahorro de tokens de compresión
 > verificado en logs** (RAG ~3.5% / conv ~0.6%; persona intacta).
