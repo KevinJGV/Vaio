@@ -1,5 +1,6 @@
 // Normalizador PURO de updates de Telegram → resultado accionable. Filtra (ignore) lo que no es un
-// mensaje de texto, sin `from`, o de un user fuera de la allowlist (el gating vive acá para testearse).
+// mensaje de texto, sin `from`, o —solo si la allowlist NO está vacía— de un user fuera de ella (el
+// gating vive acá para testearse). Allowlist vacía = acceso abierto (control delegado al propio bot).
 // El locale se deriva del language_code del usuario (default "es", el de Kevin).
 
 import type { Locale } from "@vaio/contracts"
@@ -43,7 +44,8 @@ export function normalizeUpdate(
   if (!from || typeof from.id !== "number") {
     return { kind: "ignore", reason: "no-from" }
   }
-  if (!allowed.has(from.id)) {
+  // Allowlist vacía = acceso abierto (gating delegado a la config del bot). Con ids = whitelist.
+  if (allowed.size > 0 && !allowed.has(from.id)) {
     return { kind: "ignore", reason: "not-allowlisted" }
   }
   return {

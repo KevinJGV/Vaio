@@ -43,27 +43,26 @@ describe("telegramAllowedIds", () => {
 })
 
 describe("telegramEnabled", () => {
-  it("true solo con token + secret + al menos un id", () => {
-    const env = {
-      TELEGRAM_BOT_TOKEN: "t",
-      TELEGRAM_WEBHOOK_SECRET: "s",
-      TELEGRAM_ALLOWED_USER_IDS: "42",
-    } as Env
-    expect(telegramEnabled(env)).toBe(true)
-  })
-  it("false si falta token, secret o allowlist", () => {
+  it("true con token + secret (allowlist opcional)", () => {
+    // sin allowlist → habilitado igual (acceso abierto, control en el bot)
     expect(
       telegramEnabled({
         TELEGRAM_BOT_TOKEN: "t",
         TELEGRAM_WEBHOOK_SECRET: "s",
       } as Env)
-    ).toBe(false)
+    ).toBe(true)
+    // con allowlist → también habilitado (modo whitelist)
     expect(
       telegramEnabled({
         TELEGRAM_BOT_TOKEN: "t",
+        TELEGRAM_WEBHOOK_SECRET: "s",
         TELEGRAM_ALLOWED_USER_IDS: "42",
       } as Env)
-    ).toBe(false)
+    ).toBe(true)
+  })
+  it("false si falta token o secret", () => {
+    expect(telegramEnabled({ TELEGRAM_BOT_TOKEN: "t" } as Env)).toBe(false)
+    expect(telegramEnabled({ TELEGRAM_WEBHOOK_SECRET: "s" } as Env)).toBe(false)
     expect(telegramEnabled({} as Env)).toBe(false)
   })
 })

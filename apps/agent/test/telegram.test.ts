@@ -52,12 +52,20 @@ describe("normalizeUpdate", () => {
     expect(r).toMatchObject({ kind: "ignore", reason: "no-from" })
   })
 
-  it("user fuera de la allowlist → ignore(not-allowlisted)", () => {
+  it("user fuera de la allowlist (no vacía) → ignore(not-allowlisted)", () => {
     const r = normalizeUpdate(
       update({ from: { id: 7, language_code: "es" } }),
       allowed
     )
     expect(r).toMatchObject({ kind: "ignore", reason: "not-allowlisted" })
+  })
+
+  it("allowlist vacía → cualquier user pasa (acceso abierto, gating en el bot)", () => {
+    const r = normalizeUpdate(
+      update({ from: { id: 7, language_code: "es" } }),
+      new Set<number>()
+    )
+    expect(r).toMatchObject({ kind: "turn", fromId: 7 })
   })
 
   it("input basura no rompe → ignore", () => {

@@ -94,7 +94,8 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
   )
 }
 
-// Canal Telegram: solo si hay token + secret + allowlist. El agente puede ser null (degrada a cortesía).
+// Canal Telegram: con token + secret (allowlist opcional → vacía = abierto). El agente puede ser null
+// (degrada a cortesía). Los `&&` extra son para el narrowing de TS de las env opcionales.
 let telegram: TelegramDeps | undefined
 if (
   telegramEnabled(env) &&

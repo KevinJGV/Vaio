@@ -97,11 +97,10 @@ export function telegramAllowedIds(env: Env): Set<number> {
   return new Set(ids)
 }
 
-/** El canal Telegram está habilitado solo si hay token + secret + al menos un id permitido. */
+/**
+ * El canal Telegram se habilita con token + secret. El allowlist es OPCIONAL: vacío = acceso
+ * abierto (el gating queda en la config del propio bot); con ids = whitelist estricta por user.
+ */
 export function telegramEnabled(env: Env): boolean {
-  return Boolean(
-    env.TELEGRAM_BOT_TOKEN &&
-      env.TELEGRAM_WEBHOOK_SECRET &&
-      telegramAllowedIds(env).size > 0
-  )
+  return Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_WEBHOOK_SECRET)
 }
