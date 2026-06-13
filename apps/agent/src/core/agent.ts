@@ -240,7 +240,7 @@ export function createAgent(deps: AgentDeps) {
           summary: compressedSummary,
         }),
         messages,
-        stopWhen: stepCountIs(5),
+        stopWhen: stepCountIs(10),
         tools: buildTools({
           caps,
           memory,
