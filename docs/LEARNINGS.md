@@ -241,3 +241,20 @@ El código typecheckeó sin cambios de API salvo **dos rupturas reales**:
 - **Resolución del paquete:** `@vaio/compress` expone `types`→src (typecheck sin build) y `default`→dist
   (runtime/tests) → su `dist` debe existir para correr/test del agente (lo cubre `pnpm -r build`). 0
   `ERR_MODULE_NOT_FOUND` verificado en boot.
+
+### Integridad documental — workflow anti-drift (jun-2026)
+- **Por qué los docs se pudren**: mezclar historia+estado+futuro en un mismo lugar (las frases "a futuro"
+  caducan), duplicar el mismo hecho en varios docs, hardcodear lo derivable (conteos de tests), y depender
+  de que el agente "se acuerde" de reconciliar. Pasó de verdad (CLAUDE.md decía "Fase 1 en scaffold" y
+  NEXT-STEPS marcaba "← SIGUIENTE = Portafolio", ambos falsos).
+- **Cura estructural (el 80%)**: **una sola fuente de verdad del estado = `NEXT-STEPS.md`** (bloque
+  "ESTADO ACTUAL (fecha)" + lista WIP "🚧 En proceso/verificación" con estados `[ ]/[~]/[?]/[x]` +
+  "Historial" inmutable). `SPEC`/`CLAUDE.md` no llevan estado volátil → apuntan a NEXT-STEPS. **Gate al
+  cambiar de foco**: reconciliar el WIP ANTES de arrancar lo nuevo (que nada quede suelto).
+- **Red automática (subconjunto verificable)**: `scripts/check-docs.sh` (en CI) caza links de specs rotos
+  + contradicción "Fase 1 scaffold con core existente" (FALLA) y avisa staleness de la fecha + WIP abierto.
+- **Hooks = timing, no contenido**: `SessionStart` (ritual de reconciliación) + `UserPromptSubmit`
+  (`wip-reconcile.sh`: avisa SOLO si hay WIP abierto → no ruidoso). Gotcha bash: `grep -c` imprime `0` y
+  sale 1 → NO uses `|| echo 0` (duplica); capturá `open=$(grep -c …)` y `open=${open:-0}`.
+- **Límite honesto**: ninguna automatización valida si "el próximo paso es correcto" o si la prosa refleja
+  la intención. Eso es criterio + minimizar la superficie que puede pudrirse. Hooks/CI = red fina, no la cura.

@@ -12,6 +12,14 @@
 > **Foco / "go" pendiente:** followups de grounding (§ "Hallazgos del bot real") + **próximo paso mayor**
 > (entrada multimodal + framework de tools/harness). **El portafolio va DESPUÉS — NO es el próximo paso.**
 
+## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
+> Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
+> **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
+- [ ] (Kevin) `OWNER_TELEGRAM_ID` en `.env` local + secrets de Railway.
+- [?] e2e Telegram real: 2 topics (contexto aislado) + owner-vs-visitante.
+- [?] Compresión: confirmar ahorro de tokens en logs + persona/calidad intacta.
+- [ ] Review + merge de `feat/conversational-core-telegram` (al validar lo de arriba).
+
 ---
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)

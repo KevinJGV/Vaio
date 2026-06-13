@@ -89,6 +89,22 @@ retroceda entre sesiones. Si saltás uno, podés construir sobre un supuesto fal
 mandan **código/git** → reconciliá los docs ANTES de actuar (no construyas sobre un doc rancio). Y cuando
 Kevin diga que algo está hecho / en `main` / desplegado, reconciliá **siempre** docs + memoria al estado real.
 
+**Integridad documental (anti-drift) — OBLIGATORIO.** Que los docs queden reales-y-al-día es parte del
+flujo, no un extra:
+- **Una sola fuente de verdad del ESTADO = `docs/NEXT-STEPS.md`** (bloque "ESTADO ACTUAL (fecha)" + lista
+  "🚧 En proceso / verificación" + "Historial" inmutable). `SPEC.md` (norte/diseño) y este `CLAUDE.md`
+  (invariantes/ritual) **NO llevan estado volátil** → apuntan a NEXT-STEPS. **No hardcodees lo derivable**
+  (conteos de tests, etc.) en prosa: caduca solo.
+- **Estados de la lista WIP** (greppables): `- [ ]` pendiente · `- [~]` parcial/en progreso · `- [?]`
+  hecho, **pendiente de verificación de Kevin** · `- [x]` verificado → al cerrarse se **mueve al Historial**.
+- **Gate al cambiar de foco (CLAVE — que nada quede suelto):** ANTES de arrancar un paso nuevo —sobre todo
+  si Kevin pivotea ("listo, en prod; ahora …")— **primero reconciliá `NEXT-STEPS`**: marcá el estado real
+  de lo anterior, **surface cualquier WIP abierto que quede** (no lo descartes en silencio) y mové lo
+  cerrado al Historial. Recién entonces seguí con lo nuevo. Sin deuda documental.
+- Refuerzos (red, no reemplazo del criterio): hooks `SessionStart` (ritual) + `UserPromptSubmit`
+  (avisa si hay WIP abierto) + `scripts/check-docs.sh` en CI (links rotos/contradicciones/staleness). Los
+  hooks dan **timing**, no corrigen contenido → la integridad real es tuya.
+
 **Por cada tarea (loop):**
 1. **Entender la intención**, no solo la instrucción literal. Si es algo creativo/nuevo grande
    → diseña/actualiza el spec ANTES de codear (spec-driven). Tareas chicas → directo.
@@ -113,6 +129,7 @@ Kevin diga que algo está hecho / en `main` / desplegado, reconciliá **siempre*
 - [ ] Si tocaste el modelo/agente: respuesta real OK **y** fallback OK (matar el primario).
 - [ ] Sin secrets en el diff; `.env.example` actualizado si agregaste una var.
 - [ ] Spec en sync si cambió el diseño.
+- [ ] **Estado de docs reconciliado**: `NEXT-STEPS` (ESTADO ACTUAL + WIP) refleja completado/parcial/pendiente; nada quedó suelto.
 - [ ] Commit atómico y descriptivo.
 
 **Disciplina de iteración:** incrementos chicos y verificados; no rompas `/health`; el agente
