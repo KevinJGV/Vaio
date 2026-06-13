@@ -51,6 +51,28 @@ para no repetirlas en próximas sesiones. Una línea por aprendizaje, concreta.
   (`isOwnerId`) para setear `trusted`; el core sólo interpreta `trusted`/`channel` → deriva `audience`
   (owner/visitor/public) para el system prompt. Mantiene el core puro (sin env). El perfil **visitante**
   de Telegram NO es mudo: presenta a Kevin con memoria pública (searchMemory + `PUBLIC_SOURCES`).
+- **System prompt: VOZ ≠ HECHOS (bug de inercia, jun-2026)**. Vaio afirmó que Kevin es "caleño/sigue
+  fútbol" SIN consultar `searchMemory`. Causa: `prompt.ts` hardcodeaba el origen + un causal "Sos caleño
+  **por eso** hablás voseo" → proyectó la persona de Vaio como HECHO sobre Kevin, y la instrucción de
+  consultar era demasiado blanda para sobreescribir esa "verdad de fondo". Regla (verificada con fuentes,
+  29/31 claims): el prompt lleva SOLO rol/voz/política/grounding; los **hechos de dominio** de Kevin van a
+  la memoria y entran por la tool. Matiz honesto: NO es "ningún dato en el prompt" (Anthropic critica
+  hardcodear *lógica*, no *datos*; los rasgos de voz/identidad son señal cultural legítima) — la regla es
+  "sin **hechos de dominio consultables**". Followups completos → `NEXT-STEPS.md`.
+- **Grounding: constraint de FUENTE > exhortación** (OpenAI prompt-guidance): "respondé sólo con lo que
+  devuelva searchMemory" funciona; "no inventes" solo es débil. Pero **no sobre-imperar** ("DEBES SIEMPRE"
+  en mayúsculas) → los modelos modernos sobre-disparan tools (costo). Frasear condicional + excluir saludos.
+- **Retrieval NO es bala de plata (claim refutado en el research)**: la evidencia reciente muestra que los
+  modelos de alta capacidad **resisten** lo recuperado y que el retrieval introduce sus propios conflictos
+  — no asumir que "agregar RAG" hace que el modelo prefiera el hecho fresco sobre uno rancio del prompt.
+  Corolario: no meter hechos rancios/falsos en el prompt, y **adjudicar validez al INGERIR** (write-side,
+  bi-temporal estilo Graphiti/Zep), no esperar a desempatar en query-time (paper STALE).
+- **Prompt caching: hoy NO está activo** aunque `SPEC.md` lo asumía. `openrouter.ts` no setea `cache_control`
+  y el resumen rodante va dentro del string `system` (lo invalida; orden de cache = tools→system→messages,
+  un cambio invalida todo lo posterior). La persona es corta (< ~1024 tok mínimo) → cachearla sola no rinde;
+  el quick-win es cachear **tool defs + bloque estable** (se reusan en los ~5 steps/turno) y partir el system
+  en {estable, volátil}. Vía OpenRouter: `providerOptions.openrouter.cacheControl`. v6 idiomático = `instructions`
+  top-level; meter `system` como messages exige `allowSystemInMessages` (+ ojo inyección, /chat es público).
 - **Monorepo pnpm**: `@vaio/contracts` expone `"types": "./src/index.ts"` y `"default": "./dist/index.js"`
   → tsc/typecheck resuelven tipos del SOURCE (no necesitan build), runtime usa dist (build topológico
   de `pnpm -r build`: contracts antes que agent). `dev` del agent buildea contracts primero.

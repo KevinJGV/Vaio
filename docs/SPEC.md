@@ -47,6 +47,11 @@ demostrable y vamos capando.
 ⚠️ **Modelos exactos y precios** (chat + embeddings) se fijan **al construir** vía OpenRouter
 — el research trajo datos post-corte (ene-2026) que cambian mensualmente. La **estrategia**
 (primario barato → fallback → free de última instancia + prompt caching) es lo durable.
+> **Nota (jun-2026): el prompt caching es ESTRATEGIA, no está activo todavía.** Hoy `openrouter.ts`
+> no setea `cache_control` y el resumen rodante va dentro del string `system` (lo invalidaría). Además
+> la persona es corta (~200-400 tok < mínimo ~1024 del cache) → cachearla sola no rinde. El quick-win real
+> (cuando crezcan tools/policy) es cachear **tool defs + bloque estable** como prefijo y separar el system
+> en {estable, volátil}. Detalle y plan → `NEXT-STEPS.md` ("Hallazgos del bot real").
 
 ## Arquitectura
 
@@ -86,8 +91,17 @@ OpenRouter: models:[barato, fallback, llama-free]  → "siempre responde" + cach
   - **GitHub API** (token read-only): perfil, repos, lenguajes, pinned, READMEs.
   - **Last.fm** → gustos musicales / now-playing.
   - chunk → embed → upsert en `documents`. Lee fuentes públicas (desacoplado).
-- **System prompt**: persona "asistente de Kevin" (persona/pro/dev), tono alineado con sus
-  quirks (señal cultural deliberada, no neutralizar), responde en el **idioma del usuario**.
+- **System prompt — capas (principio fundacional, para que el prompt NO compita con el crecimiento
+  orgánico de la memoria):** el prompt define **rol + voz + política por canal + reglas de grounding**;
+  **NUNCA hechos consultables de Kevin** (origen, stack, proyectos, gustos, contacto, experiencia con
+  fecha). Esos **hechos viven en la memoria** (hoy `documents`/pgvector; fase 2 `facts`; fase 3 grafo) y
+  entran al contexto **sólo por la tool** (`searchMemory` → futuro `searchGraph`). Así el prompt no crece
+  con hechos y la frontera **sobrevive a Neon→Graphiti**. La persona (nombre, voseo valluno, tono — señal
+  cultural deliberada, no neutralizar) es la **VOZ de Vaio**, inmutable en código/git; **no es un hecho
+  sobre Kevin** y no debe proyectarse como tal (gatillo del bug de jun-2026: ver `NEXT-STEPS.md` →
+  "Hallazgos del bot real"). Responde en el **idioma del usuario**. *Persona-contexto dinámica
+  (snapshots versionados por DB) = fase 3+, no ahora; system-prompt-por-DB es prematuro hoy (git ya da
+  versionado/rollback; sumaría latencia + un punto de fallo en el camino que "siempre responde").*
 - **Endpoints MVP**: `POST /chat` (stream, requiere header `AGENT_API_KEY`), `GET /health`.
   **Iteración 2 suma** `POST /tg` (webhook Telegram: secret_token; allowlist **opcional** — vacía =
   abierto, con ids = whitelist) y vuelve el core **stateful** (memoria conversacional

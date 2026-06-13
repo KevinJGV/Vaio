@@ -63,6 +63,88 @@ biome/build limpios. Diseño/plan →
 **Pendiente (Kevin):** poner `OWNER_TELEGRAM_ID` (id de @userinfobot) en local+Railway; e2e real (2 topics
 = contexto aislado; owner vs visitante; HTML renderiza y rompe→plano).
 
+### 🔜 PRÓXIMO PASO MAYOR — evolución del core conversacional (espera el "go" de Kevin para `brainstorming`)
+La base conversacional (texto) quedó sólida y validada → es el cimiento del adaptador. **Antes de apilar
+audio/multimedia/harness**, Kevin va a resolver de su lado lo siguiente; cuando dé el go, **arrancar con
+`brainstorming` → design+plan** (su propio par por feature). Dos ejes **foundational** (caros de
+retro-ajustar, decidir primero):
+
+1. **Contrato de entrada multimodal** (lo que destraba audio/imágenes/docs). Hoy todo asume
+   `TurnRequest.userText: string` (cableado en `agent.respond`, persistencia `messages.content`, resumen,
+   traces). Decidir: ¿core *text-centric* con **adapters** que normalizan (puerto `Transcriber`/
+   `MediaUnderstanding`) o **mensajes multimodales nativos** (AI SDK v6 ya soporta `ModelMessage` con
+   partes text/image/file)? Recomendación: **híbrido** — `TurnRequest` con `parts`/`attachments` tipados +
+   puertos de comprensión de media inyectados; el core elige transcribir o pasar partes según el modelo.
+2. **Framework de tools/acciones (el "harness")**. Hoy `ToolName` es unión cerrada de **una** tool
+   (`searchMemory`, read-only). Generalizar a un **registry de acciones**: descriptor (name/description/
+   inputSchema/execute), flag *side-effecting*, gating por capacidad **y por principal**, y seam de
+   **confirmación / human-in-the-loop** antes de acciones reservadas (encaja con el `escalate` de fase 2).
+
+**Diferibles (ya hay seam, no urgen):** ventana de contexto **por tokens** (hoy por conteo de mensajes);
+persistencia de **adjuntos** (referencias de media + transcripción); **persona/policies como dato**
+(hoy hardcoded en `prompt.ts`) para tunear el system prompt sin redeploy; **guardas de costo/rate por
+principal** en el core (hoy solo en el proxy); identidad **cross-canal** + facts por-usuario (fase 2);
+**turnos proactivos** (no iniciados por el usuario).
+
+### 🔬 Hallazgos del bot real (jun-2026) → followups de grounding / meta-prompting (espera el "go" de Kevin)
+Probando el bot, ante "¿quién eres?" Vaio respondió **sin consultar `searchMemory`** y afirmó por inercia
+que Kevin es "caleño/palmireño de pura cepa" y que sigue fútbol/un equipo — **TODO inventado. Kevin NO es
+caleño.** La persona palmireña/voseo es la **VOZ de Vaio** (decisión cultural deliberada); el bug es que esa
+voz se **proyectó como HECHO sobre Kevin**. Auditoría + investigación con **verificación adversarial
+(29/31 claims soportados)** → followups (cuando Kevin dé el go; **produce su par design+plan**):
+
+1. **Desacoplar VOZ de HECHOS en `prompt.ts`** (raíz del bug). `prompt.ts:16/28` hardcodean origen + el
+   causal "Sos caleño… **Por eso** hablás voseo": (a) proyecta la persona de Vaio sobre Kevin como hecho,
+   (b) deja la instrucción de `searchMemory` demasiado blanda para sobreescribir esa "verdad de fondo".
+   `prompt.ts:28` (EN) incluso **afirma falsamente** "Kevin is from Palmira". Fix: el prompt mantiene SOLO
+   rol/voz/política/reglas de consulta; los **hechos de dominio** de Kevin salen del copy → vienen de
+   `searchMemory`. ⚠️ Matiz honesto (verificación marcó *uncertain* el absolutismo): la regla NO es "ningún
+   dato jamás" (Anthropic critica hardcodear *lógica* frágil y avala híbridos; los rasgos de voz/identidad
+   pueden quedar como señal cultural — `CLAUDE.md` los protege). Regla precisa: **sin hechos de DOMINIO
+   consultables; el voseo queda como estilo puro, sin afirmar biografía.** [Anthropic context-engineering]
+2. **Grounding duro + stop rule** (patrón OpenAI, *supported*): reemplazar "no inventes" (exhortación débil)
+   por **constraint de fuente**: "sobre Kevin, respondé ÚNICAMENTE con lo que devuelva `searchMemory` este
+   turno; si no hay, decílo y ofrecé alternativa". Salida por audiencia (owner: pedí el dato faltante;
+   visitor: "no tengo ese dato de Kevin" + ofrecé proyectos/contacto).
+3. **No sobre-imperar** (*supported*): NADA de "DEBES SIEMPRE/CRITICAL" en mayúsculas para `searchMemory`
+   — los modelos modernos **sobre-disparan** tools → costo (objetivo "pocos $/mes"); frasear condicional
+   ("cuando la respuesta dependa de un hecho concreto de Kevin, consultá primero") y **excluir saludos/charla**.
+   El bug fue *under-triggering*; cuidado de no pasarse al extremo opuesto.
+4. **Anclar el grounding en DOS lugares**: el prompt **y** la descripción de `searchMemory` en `tools.ts`
+   (enumerar categorías: bio, origen, stack, proyectos, gustos, contacto). [Anthropic writing-tools-for-agents]
+5. **Alimentar tu info real a la MEMORIA, no al prompt**: ingerir hechos graduales ("no me gusta el fútbol",
+   origen correcto, etc.) como memoria del producto → Vaio aprende sin tocar código.
+
+**Reconciliación construido↔norte (hecha YA en `SPEC.md` → bullet "System prompt — capas"):** prompt =
+rol/voz/política/grounding (núcleo inmutable en git); hechos en memoria/grafo, entran sólo por la tool; el
+prompt nunca crece con hechos → no compite con el crecimiento orgánico; sobrevive a Neon→Graphiti.
+
+**System prompt por DB (lo que preguntaste):** veredicto *supported* = **prematuro hoy** (solo-dev, una
+persona que editás vos; git ya da versionado/rollback/audit; un fetch remoto suma latencia + un punto de
+fallo en el camino que `CLAUDE.md` exige "siempre responde"). Disparador = mismo que OpenSpec (≥2 superficies
+con prompts distintos, o A/B sin redeploy). Cuando llegue: **núcleo en código + persona-snapshots versionadas
+en DB** (bi-temporal-friendly; nunca interpolar datos por-request en el bloque estable).
+
+**Grafos (tu duda "cómo compromete el conocimiento"):** la frontera no cambia — el grafo es el store durable
+fuera de la ventana; entra por la tool. Diseñar `facts`/grafo **bi-temporal** desde el día 1 (valid/invalid +
+created/expired; *invalidar en el WRITE/ingest, no borrar* — Graphiti/Zep + paper STALE, *supported*). ⚠️ Un
+claim salió **refutado**: "agregar retrieval resuelve el conflicto y los modelos prefieren lo recuperado" — la
+evidencia dice lo contrario (los modelos de alta capacidad **resisten** lo recuperado; el retrieval mete sus
+propios conflictos). Implicación: **no** confiar en que el retrieval "arregle" un hecho rancio → razón de más
+para no meter el hecho (rancio/falso) en el prompt, y para **adjudicar validez al ingerir**.
+
+**Feature — panel de control de conversaciones (alto valor, futuro):** revisar charlas; ver qué dijo/no dijo/
+inventó Vaio y darle **feedback conversacional correctivo**. Diseño *grounded*: el feedback **NO muta el
+system prompt** (rompería reproducibilidad) → va como `feedback_type` (confirmed/corrected/rejected) en los
+facts (fase 2) y **pesa el ranking de `searchMemory`**; en grafo (fase 3), edges temporales de aprobación.
+
+**Gap de costo descubierto:** `SPEC.md` asumía "prompt caching del system" pero **hoy NO se cachea**
+(`openrouter.ts` sin `cache_control`; el resumen rodante va dentro del `system` y lo invalida). Matiz: la
+persona es corta (< mínimo ~1024 tok) → cachearla sola no rinde; el quick-win (cuando crezcan tools/policy)
+es cachear **tool defs + bloque estable** como prefijo (las tools preceden al system y se reusan en los ~5
+steps/turno) y separar `buildSystemPrompt` en `{estable, volátil}`; la cadena de fallback rompe el cache al
+cambiar de provider. *SPEC ya ajustado para no afirmar un caching inexistente; implementación = followup cuando rinda.*
+
 ### 🔵 Pendiente FUTURO — Neon como DB reactiva estilo Convex
 El **hot-sync de esquema** (`db:push`) ya da la DX de "el esquema sigue al código". La **reactividad real**
 (queries que se actualizan solas, suscripciones) es otra cosa: Neon/Postgres no la trae. Opciones a futuro
