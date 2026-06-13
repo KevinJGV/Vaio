@@ -5,13 +5,14 @@
 `feat/conversational-core-telegram` (memoria conversacional persistida + resumen rodante, arnés con
 capacidades por canal, canal Telegram `/tg`). Plan/diseño por feature →
 [`superpowers/specs/2026-06-12-stateful-channels-telegram-{design,plan}.md`](superpowers/specs/).
-**Siguiente milestone: integración del portafolio.** Actualizado 2026-06-12
+**Siguiente:** followups de grounding + evolución del core (entrada multimodal / framework de tools-harness) +
+review/merge de la rama; **el portafolio va DESPUÉS**. Actualizado 2026-06-13
 **Repos:** este spec vive en AMBOS — el portafolio (`KevinJGV`) y el repo del agente
 (`Vaio`). Mantener en sync.
 
 > **Rol de este doc:** norte/visión + diseño **FUNDACIONAL** del agente (fases, arquitectura macro,
 > stack). Los **planes/diseños de cada feature** viven en [`superpowers/specs/`](superpowers/specs/)
-> (un archivo por feature; ahí se promueve el plan aprobado de plan mode / `writing-plans`). Estado
+> (**el par `-design.md` + `-plan.md`** por feature; ahí se promueve lo aprobado de plan mode / `writing-plans`). Estado
 > real + siguiente paso → [`NEXT-STEPS.md`](NEXT-STEPS.md). El agente vive en **repo aparte `Vaio`**;
 > el portafolio solo suma un chat-sheet + un proxy.
 
@@ -34,7 +35,7 @@ demostrable y vamos capando.
 | **Memoria** | **Neon Postgres + pgvector** (RAG + tabla `facts`) | Graphiti (→ fase 3), mem0 (menos control) |
 | **Hosting agente** | **Railway** (always-on, predecible, Postgres/cron) | Vercel functions (pelea con background), Fly (más ops) |
 | **Canales** | Telegram webhook + Resend (saliente, ya existe) — fase 2 | polling (lento), email entrante → fase 3 |
-| **Compresión memoria** | "caveman" al guardar conversaciones — fase 2 | — |
+| **Compresión de contexto** | **cavemem** (`@vaio/compress`, determinístico, al ENVIAR) — implementado (it. 2.1) | comprimir al guardar (descartado: turnos crudos en DB) |
 | **Repo** | **Monorepo pnpm** (`apps/agent` + `packages/contracts`, hueco `apps/web`) | Multi-repo (fricción para compartir contratos web↔agente) |
 | **Arquitectura agente** | **ports/adapters-lite** (core puro + puertos + adapters) | Hexagonal completo (ceremonia excesiva), módulos planos (poco desacople para fases) |
 | **DB** | **Drizzle ORM + migraciones** (driver `node-postgres`) | pg crudo (sin migraciones versionadas), Prisma (pesado, pgvector no first-class) |
@@ -84,7 +85,7 @@ OpenRouter: models:[barato, fallback, llama-free]  → "siempre responde" + cach
   `cosineDistance`. Embeddings con **`gemini-embedding-2`** vía OpenRouter (ver "Embeddings & ingesta
   multimodal"). Migraciones con `drizzle-kit` (la inicial antepone `CREATE EXTENSION vector`).
   Puerto `MemoryStore` (adapter `neon-memory`); tool `searchMemory(query)` → top-k → contexto al system.
-- **Embeddings**: modelo barato hosteado (decidir al construir; p.ej. OpenAI `text-embedding-3-small`).
+- **Embeddings**: **`gemini-embedding-2`** vía OpenRouter (multimodal, 3072→**1536** Matryoshka) — ver "Embeddings & ingesta multimodal".
 - **Ingesta** (`ingest.ts`, a mano y luego cron Railway):
   - `cv.vindevsito.dev/` y `/en/` → texto limpio del CV.
   - `vindevsito.dev/me`, `/contact` → "sobre mí" / posicionamiento.
@@ -185,8 +186,9 @@ comprime **al enviar, no al guardar** (turnos crudos en DB). Es una **primitiva 
 Diseño/plan → [`superpowers/specs/2026-06-12-cavemem-compression-{design,plan}.md`](superpowers/specs/).
 
 ## Fase 2 — Memoria viva + escalación (el "se nutre")
-- Tabla `facts(id, fact, source, valid_from, embedding)` + extracción de hechos post-conversación
-  (LLM) + dedup. Compresión **caveman** antes de guardar.
+- Tabla `facts` + extracción de hechos post-conversación (LLM) + dedup. **Diseñar bi-temporal**
+  (`valid_at`/`invalid_at` + `created_at`/`expired_at`; invalidar al INGERIR, no borrar — ver
+  `NEXT-STEPS.md` "Grafos"). La compresión de facts es seam futuro (el `Compressor` Tier 1 ya existe).
 - Tool `escalate(question)` con umbral de confianza → cola `unknown_questions`.
 - **Telegram bot** (webhook): te notifica la duda y por ahí respondés/charlás con el agente.
 - **Correo saliente** (Resend, ya está) para notificarte.
@@ -219,8 +221,8 @@ centavos · Upstash free. **≈ $5–10/mes**. (Re-verificar al construir.)
 
 ## Apéndice — fundamentos y fuentes (research 2026)
 
-- **Memoria/grafo**: Graphiti (Zep, arxiv 2501.13956) · mem0 · Letta/MemGPT · "caveman" =
-  compresión a hechos densos (github.com/wilpel/caveman-compression).
+- **Memoria/grafo**: Graphiti (Zep, arxiv 2501.13956) · mem0 · Letta/MemGPT. **Compresión adoptada:
+  cavemem** (`JuliusBrussee/cavemem`, MIT → vendorizado como `@vaio/compress`), determinístico/offline.
 - **Frameworks**: Vercel AI SDK (ai-sdk.dev) · Mastra · Claude Agent SDK.
 - **Gateways**: OpenRouter (fallback por array) · Vercel AI Gateway · LiteLLM · Portkey.
 - **Modelos baratos+tool-use** (verificar al construir): DeepSeek, Gemini Flash-Lite, Qwen3,

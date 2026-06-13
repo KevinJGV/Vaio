@@ -1,5 +1,21 @@
 # Pendientes — Vaio (para retomar)
 
+> **ESTADO ACTUAL (2026-06-13) — fuente de verdad viva.**
+> **Fase 1: completa y DESPLEGADA** (Railway/Docker; RAG real Neon+pgvector; observabilidad pino) — en `main`.
+> **Rama `feat/conversational-core-telegram` (sin mergear):** iteración 2 (núcleo *stateful* + capacidades por
+> canal + Telegram `/tg`), **compresión cavemem** (`@vaio/compress`), **refinamiento Telegram** (hilos/topics,
+> HTML, identidad/owner), **hot-sync de esquema** (`db:push` + release step) y la **corrección mínima de
+> grounding** (voz≠hechos). **Tests: 75 agente + 20 compress; typecheck/biome/build limpios.** El bot real ya
+> respondió por Telegram (e2e básico hecho; Kevin fue tratado como *visitante* → falta `OWNER_TELEGRAM_ID`).
+> **Pendiente real de Kevin:** `OWNER_TELEGRAM_ID` (local+Railway) · e2e 2 topics (contexto aislado) +
+> owner-vs-visitante · ver ahorro de tokens de compresión en logs · **review + merge de la rama**.
+> **Foco / "go" pendiente:** followups de grounding (§ "Hallazgos del bot real") + **próximo paso mayor**
+> (entrada multimodal + framework de tools/harness). **El portafolio va DESPUÉS — NO es el próximo paso.**
+
+---
+
+## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
+
 Estado (2026-06-10): **código de Fase 1 COMPLETO** en monorepo pnpm (`apps/agent` +
 `packages/contracts`), arquitectura ports/adapters, **Drizzle ORM + migración inicial**,
 Biome + Vitest (12 tests verdes). Verificado: typecheck/build/lint/test limpios; server
@@ -167,37 +183,20 @@ apuntar al dominio **público** de Railway, no al `.internal`). Luego `apps/web`
 
 ---
 
-## 🔴 Bloqueante (necesita cuentas/keys — solo Kevin)
+## Cuentas / keys — estado
+Las keys de **Fase 1 ya están** (OpenRouter, Neon `DATABASE_URL`, Embeddings, GitHub, Railway, Last.fm) y el
+repo está **conectado a Railway** (desplegado y corriendo). **Pendiente de Kevin (solo cuentas/secrets):**
+- `OWNER_TELEGRAM_ID` (id de @userinfobot) en `.env` local + secrets de Railway → habilita el perfil **owner**.
+- *(MÁS ADELANTE, para integrar el portafolio):* en **Vercel** `AGENT_URL`, `AGENT_API_KEY` (la del proxy) +
+  Upstash Redis (rate-limit), apuntando al dominio **público** de Railway.
 
-Crear las cuentas y poner las keys en `Vaio/.env` (copiar de `.env.example`) y luego en los
-secrets de Railway/Vercel. Cada una desbloquea:
-
-| Cuenta / key | Desbloquea | Dónde |
-|---|---|---|
-| **OpenRouter** (`OPENROUTER_API_KEY`) | respuestas del agente + cadena de fallback (`agent.ts`) | openrouter.ai/keys |
-| **Neon** (`DATABASE_URL`) | memoria/RAG (`memory.ts`, `ingest.ts`) | neon.tech (crear DB + `CREATE EXTENSION vector`) |
-| **Embeddings** (`EMBEDDINGS_API_KEY`) | vectorizar fuentes (ingesta/búsqueda) | OpenAI u otro barato |
-| **GitHub token** read-only (`GITHUB_TOKEN`) | ingerir perfil/repos | github.com/settings/tokens |
-| **Railway** | hostear Vaio always-on (deploy) | railway.app |
-| Last.fm (`LASTFM_*`) | música/gustos | **ya existen** (mismas del portafolio) |
-
-Acciones de Kevin además: crear el **repo de Vaio en GitHub** y **conectarlo a Railway**; en
-**Vercel** (portafolio) setear `AGENT_URL`, `AGENT_API_KEY` y Upstash Redis (rate-limit del proxy).
-
----
-
-## 🟢 No bloqueante (se puede hacer ya, sin keys)
-
-- **Código de Fase 1: HECHO** (monorepo, ports/adapters, Drizzle, tests). ✅
-- **`apps/web` (frontend)** — la visión nueva: dashboard de configs/datos/conectores/flujos.
-  Reusa `@vaio/contracts`. Diseñar con `brainstorming` antes de codear.
-- **Integración en el portafolio (`KevinJGV`)** — **verificable con `npm run build`** aunque Vaio
-  no esté live: `src/components/react/ChatSheet.tsx` (isla `client:visible`, botón flotante glass) +
-  proxy `src/pages/api/agent.ts` (origin-check + rate-limit + stream passthrough).
-- **Sincronizar la copia del SPEC en el portafolio** (`KevinJGV/docs/superpowers/specs/
-  2026-06-09-vaio-agent-design.md`) con los cambios de arquitectura de hoy (pendiente).
-- **DX opcional**: ~~`Dockerfile`~~ **HECHO** (es el mecanismo de deploy, no autodetect); Turborepo
-  (sumar cuando exista el 2º app).
+## No bloqueante (sin keys nuevas)
+- **`apps/web` (frontend)** — visión futura: dashboard de configs/datos/conectores/flujos + el **panel de
+  control de conversaciones** (feedback correctivo, ver arriba). Reusa `@vaio/contracts`. `brainstorming` antes.
+- **Integración en el portafolio (`KevinJGV`)** — `ChatSheet.tsx` + proxy `/api/agent` (verificable con build
+  aunque Vaio no esté live). **Va DESPUÉS del foco actual.**
+- **Sincronizar la copia del SPEC en el portafolio** (`KevinJGV/.../2026-06-09-vaio-agent-design.md`) con el
+  diseño actual — quedó **desfasada** (pendiente).
 
 ---
 
@@ -209,15 +208,13 @@ ahora arriesga sobre-especificación / spec rot. **El disparador exacto para ado
 en [`../CLAUDE.md`](../CLAUDE.md) → "Cuándo escalar a OpenSpec"** (resumen: cuando `apps/web` +
 fase 2 estén activos a la vez, o aparezcan ≥2 síntomas de que el `SPEC.md` monolítico quedó chico).
 
-## Secuencia sugerida
-1. (Kevin) cuentas + keys en `.env`; repo GitHub + Railway; env del portafolio en Vercel. *(bloqueante)*
-2. `npm install`. *(ya)*
-3. `memory.ts` (Neon+pgvector) con context7 → schema + búsqueda.
-4. `ingest.ts` → `npm run ingest` para poblar la memoria. *(necesita Neon+embeddings)*
-5. `agent.ts` + cablear `/chat`. *(necesita OpenRouter)*
-6. Probar local (`/health`, `/chat` real, matar primario→fallback). **Deploy a Railway. ✅ HECHO (Docker, 2026-06-12)**
-7. **← SIGUIENTE.** Portafolio: `ChatSheet.tsx` + proxy `/api/agent` (→ dominio público de Railway);
-   conectar a Vaio; smoke test end-to-end.
+## Secuencia sugerida (desde hoy)
+1. **Fase 1** (keys → memory/ingest/agent → local → **deploy Railway**). ✅ HECHO.
+2. **Iteración 2 + compresión + refinamiento Telegram + hot-sync + fix grounding** (en la rama). ✅ HECHO (sin mergear).
+3. **(Kevin)** `OWNER_TELEGRAM_ID` + e2e real (2 topics, owner/visitante, ahorro de tokens). **← acción de Kevin.**
+4. **Review + merge** de `feat/conversational-core-telegram`. **← siguiente al validar.**
+5. **Próximo paso mayor** (espera "go"): contrato de entrada **multimodal** + framework de **tools/harness**
+   (§ "Próximo paso mayor") y los **followups de grounding** (§ "Hallazgos del bot real").
+6. **Después:** integración del portafolio (`ChatSheet.tsx` + proxy → dominio público de Railway). Luego `apps/web`.
 
-> Pasos 2 y el *escribir+typecheck* de 3/5 son no-bloqueantes; *correr* (4,6) y el deploy necesitan keys.
 > Definition of Done por tarea y verificación: ver `../CLAUDE.md`.

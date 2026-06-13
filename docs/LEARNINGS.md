@@ -147,13 +147,15 @@ El código typecheckeó sin cambios de API salvo **dos rupturas reales**:
 - **Gotcha**: al construir la observabilidad entré en **plan mode**, cuyo workflow propio **reemplaza
   los pasos finales del `brainstorming`** (escribir el plan a `docs/` + `writing-plans`). El diseño
   quedó en el **plan file efímero** (`~/.claude/plans/…`). Hubo que backfillear al proyecto.
-- **Regla (OBLIGATORIA, no opcional)**: un plan aprobado **DEBE** quedar escrito en el proyecto.
-  Destino = **`docs/superpowers/specs/YYYY-MM-DD-<tema>.md`** (un archivo por feature; ahí se promueve
-  el plan de plan mode **o** de `writing-plans` — NO ambos, para no duplicar).
-- **Responsabilidades de `docs/` (no solapar):** `SPEC.md` = norte + diseño **fundacional** (fases,
-  arquitectura macro, stack); `superpowers/specs/` = **plan completo por feature**; `NEXT-STEPS.md` =
-  estado + siguiente paso (+ índice a specs); `LEARNINGS.md` = aprendizajes de dev. (Reemplaza la nota
-  previa "SPEC.md único destino" — quedó obsoleta al diferenciar responsabilidades.)
+- **Regla (OBLIGATORIA, no opcional)**: un plan aprobado **DEBE** quedar escrito en el proyecto como
+  **DOS artefactos** por feature (misma `YYYY-MM-DD-<tema>`): `…-design.md` (técnico, bajo nivel:
+  arquitectura/firmas/DDL/edge-cases) + `…-plan.md` (alto nivel: fases/secuencia + sección "Estrategia
+  de ejecución"). Distinta altitud, **sin duplicar** contenido. (Refinó la nota previa "un solo archivo /
+  NO ambos", ya obsoleta — design y plan son complementarios, **los dos van**.)
+- **Responsabilidades de `docs/` (no solapar):** `SPEC.md` = norte + diseño **fundacional**;
+  `superpowers/specs/<tema>-design.md` = diseño técnico por feature; `superpowers/specs/<tema>-plan.md` =
+  plan alto nivel + estrategia de ejecución; `NEXT-STEPS.md` = estado + siguiente paso; `LEARNINGS.md` =
+  aprendizajes de dev.
 - **Refuerzo**: hook `PostToolUse(ExitPlanMode)` (`.claude/hooks/spec-after-plan.sh`) inyecta el
   recordatorio **obligatorio** vía `additionalContext`. Hace determinístico el *disparo/timing*, NO la
   *acción* (escribir el archivo sigue siendo del modelo) → es recordatorio fuerte, no un gate que
