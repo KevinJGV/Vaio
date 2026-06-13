@@ -34,23 +34,19 @@ describe("modelChain", () => {
 })
 
 describe("envs por modalidad (fase 2)", () => {
-  it("visionChain usa VISION_MODELS; si no, cae a MULTIMODAL_MODELS; si no, al 1er chat", () => {
+  it("visionChain = VISION_MODELS explícito (csv); vacío → [] (visión OFF)", () => {
     expect(visionChain({ VISION_MODELS: "v/a, v/b " } as Env)).toEqual([
       "v/a",
       "v/b",
     ])
-    expect(visionChain({ MULTIMODAL_MODELS: "m/x" } as Env)).toEqual(["m/x"])
-    expect(visionChain({ OPENROUTER_MODELS: "c/1,c/2" } as Env)).toEqual([
-      "c/1",
-    ])
+    expect(visionChain({ OPENROUTER_MODELS: "c/1,c/2" } as Env)).toEqual([])
     expect(visionChain({} as Env)).toEqual([])
   })
-  it("transcribeModel usa TRANSCRIBE_MODEL; si no, el fallback multimodal[0]", () => {
+  it("transcribeModel = TRANSCRIBE_MODEL explícito; vacío → undefined (STT OFF)", () => {
     expect(transcribeModel({ TRANSCRIBE_MODEL: " stt/x " } as Env)).toBe(
       "stt/x"
     )
-    expect(transcribeModel({ MULTIMODAL_MODELS: "m/x,m/y" } as Env)).toBe("m/x")
-    expect(transcribeModel({ OPENROUTER_MODELS: "c/1" } as Env)).toBe("c/1")
+    expect(transcribeModel({ OPENROUTER_MODELS: "c/1" } as Env)).toBeUndefined()
     expect(transcribeModel({} as Env)).toBeUndefined()
   })
   it("speechChain: parsea model|voice|format por entrada (fallback client-side)", () => {

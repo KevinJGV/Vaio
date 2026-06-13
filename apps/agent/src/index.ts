@@ -102,7 +102,7 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
       sttModel
     )
   } else {
-    logger.warn("Sin TRANSCRIBE_MODEL/MULTIMODAL_MODELS → STT OFF.")
+    logger.warn("Sin TRANSCRIBE_MODEL → STT OFF.")
   }
   const visChain = visionChain(env)
   if (visChain.length > 0) {
@@ -110,7 +110,7 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
       createModel(env.OPENROUTER_API_KEY, visChain, logger)
     )
   } else {
-    logger.warn("Sin VISION_MODELS/MULTIMODAL_MODELS → visión OFF.")
+    logger.warn("Sin VISION_MODELS → visión OFF.")
   }
   agent = createAgent({
     model,

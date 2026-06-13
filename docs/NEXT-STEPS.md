@@ -20,7 +20,7 @@
 - [?] **Contrato de entrada multimodal** (audio/voz + imágenes) — eje 1 del próximo paso mayor.
   IMPLEMENTADO en `feat/multimodal-input` (sin mergear). Decisiones: multimodal primero (harness/HITL
   después), audio+imágenes (no PDF), híbrido (puertos `Transcriber`/`MediaUnderstanding` + parts nativos por
-  flag `MULTIMODAL_NATIVE_IMAGES`), cadena multimodal propia (`MULTIMODAL_MODELS`), persistencia
+  flag `MULTIMODAL_NATIVE_IMAGES`), modelos de media por modalidad (ver Fase 2), persistencia
   texto-derivado+ref (`messages.attachments` jsonb). **121 tests verdes** (101 agente + 20 compress);
   typecheck/biome/build limpios. **e2e ✅:** `/chat` con imagen base64 → visión describe → respuesta grounded
   ("rojo"); degradación con modelo multimodal roto → `[imagen no procesable]` + HTTP 200 (nunca 500). Diseño →
@@ -30,7 +30,7 @@
   `db:migrate` (el e2e mostró que sin la columna el turno responde igual, solo falla la persistencia en
   background); (2) e2e Telegram real (nota de voz + foto + voz→audio) tras deploy; (3) review + merge de la rama.
 - [?] **Multimodal Fase 2** (misma rama) — **IMPLEMENTADO**: envs por modalidad (`TRANSCRIBE_MODEL`/
-  `VISION_MODELS`/`SPEECH_*`, fallback a `MULTIMODAL_MODELS`); **STT dedicado** `POST /audio/transcriptions`;
+  `VISION_MODELS`/`SPEECH_MODELS`, cada uno explícito o OFF; sin `MULTIMODAL_MODELS`); **STT dedicado** `POST /audio/transcriptions`;
   **salida de voz (TTS)** `POST /audio/speech` → Telegram `sendAudio` con policy `shouldSpeak` (default texto;
   voz si entró voz o se pide); **cadena TTS de fallback** `SPEECH_MODELS=model|voice|format,…` (client-side,
   voz/formato por-modelo; pcm→WAV@24k para Telegram); **grounding del prompt** = capacidades de E/S reales
@@ -141,40 +141,19 @@ persistencia de **adjuntos** (referencias de media + transcripción); **persona/
 principal** en el core (hoy solo en el proxy); identidad **cross-canal** + facts por-usuario (fase 2);
 **turnos proactivos** (no iniciados por el usuario).
 
-### 🎙️ Evolución multimodal (followups del contrato — su propio par design+plan cuando Kevin dé el go)
-El contrato de entrada quedó hecho con UNA cadena multimodal (`MULTIMODAL_MODELS`, Gemini Flash cubre
-audio+imagen) + flag `MULTIMODAL_NATIVE_IMAGES`. Kevin pidió **refinar por modalidad** + **salida de voz**.
-**Dato verificado (catálogo OpenRouter, jun-2026 — captura de Kevin):** OpenRouter tiene categorías propias
-de **Rerank (4), Speech (9), Transcription (10), Audio (4), Image (32), Embeddings (26), Video (14)** además
-de Text (337). ⚠️ El endpoint `GET /api/v1/models` por default lista **solo los de texto** (no las otras
-categorías → no inferir cobertura de ahí; mirar la galería). **Implicación:** transcripción, visión, rerank y
-TTS se pueden cubrir **todo por OpenRouter → single-provider, "pocos $/mes" intacto**. (Detalle de impl a
-confirmar con context7 al diseñar: si el `@openrouter/ai-sdk-provider` expone `rerank()`/`speech()`/
-`transcription()` o hay que pegarle al endpoint OpenAI-compatible / REST de OpenRouter.)
+### 🎙️ Evolución multimodal
+**✅ HECHO en Fase 2** (ver el WIP `[?]` arriba): **envs por modalidad** (`VISION_MODELS`/`TRANSCRIBE_MODEL`/
+`SPEECH_MODELS`, cada uno explícito o OFF — sin `MULTIMODAL_MODELS`); **STT dedicado** (`/audio/transcriptions`);
+**salida de voz / TTS** (`/audio/speech` → Telegram, cadena `model|voice|format`, pcm→WAV); **grounding del
+prompt** = capacidades de E/S reales. Todo por OpenRouter REST → single-provider (ver `openrouter-api-surface`).
 
-1. **Envs por modalidad** (en vez de `MULTIMODAL_MODELS` único): separar la cadena por tipo, porque no todos
-   los modelos contemplan todos los datos y conviene optimizar por tarea →
-   - `TRANSCRIBE_MODELS` (audio→texto, optimizado STT; hoy Gemini Flash vía chat+file-part; o un modelo
-     Transcription dedicado de OpenRouter — ej. voxtral, gpt-4o-transcribe).
-   - `VISION_MODELS` (imagen→texto o nativa; Gemini/Qwen-VL).
-   - `SPEECH_MODELS` (TTS, **salida**; cadena `model|voice|format`; ver #2).
-   Refactor aditivo: `MULTIMODAL_MODELS` queda como default/fallback. Verificar slugs/precios al diseñar.
-2. **Salida de voz — "Vaio te habla" (TTS)**: **eje nuevo de SALIDA** (el contrato actual es solo ENTRADA).
-   AI SDK v6: `experimental_generateSpeech({ model: provider.speech(...), text, voice, format })` →
-   `audio.uint8Array`. OpenRouter tiene Speech (9 modelos) → single-provider posible. Diseño: tras generar la
-   respuesta, opcionalmente sintetizar audio y entregarlo (Telegram `sendVoice`/`sendAudio`; web necesita un
-   canal de audio). Decidir cuándo (¿siempre / solo si el usuario mandó voz / a pedido? — espejo del input).
-   Su propio design+plan; tamaño medio.
-3. **Grounding del prompt — capacidades reales de Vaio (EXPLÍCITO, pedido de Kevin):** hoy `prompt.ts`
-   afirma "solo proceso texto / no tengo visión" — **falso desde el contrato multimodal**. Al hacer los
-   followups de grounding (§ "Hallazgos del bot real"), el prompt debe declarar las **capacidades de E/S
-   reales** (recibe voz/imágenes; con TTS, responde en voz) sin hardcodear hechos de Kevin → es parte de
-   "VOZ/rol/política/**capacidades**" del prompt, no de los hechos. **Anclarlo junto al desacople voz≠hechos.**
-4. **Rerank — precisión de retrieval para el grounding** (OpenRouter Rerank, AI SDK `rerank()`): segunda
-   etapa del RAG = recuperar un K **ancho** por vectores → rerankear (cross-encoder, query+chunk juntos) →
-   recortar al top-N. Mejora QUÉ entra al contexto (mejor grounding). **Timing:** hoy el corpus (~29 chunks)
-   es chico → prematuro; **el valor escala con el corpus** (facts fase 2, más fuentes). Seam: `searchMemory`
-   con K ancho opcional → rerank → trim. Atar a los followups de grounding + fase 2.
+**Queda pendiente (futuro):**
+- **Rerank — precisión de retrieval para el grounding** (OpenRouter `/rerank`, AI SDK `rerank()`): segunda
+  etapa del RAG = recuperar un K **ancho** por vectores → rerankear (cross-encoder, query+chunk juntos) →
+  recortar al top-N. Mejora QUÉ entra al contexto (mejor grounding). **Timing:** hoy el corpus (~29 chunks)
+  es chico → prematuro; **el valor escala con el corpus** (facts fase 2, más fuentes). Seam: `searchMemory`
+  con K ancho opcional → rerank → trim. Diseño decidido en el design spec; atar a fase 2 de memoria.
+- **TTS en web `/chat`** (hoy solo Telegram; el `/chat` es stream de texto → necesita canal de audio).
 
 ### 🔬 Hallazgos del bot real (jun-2026) → followups de grounding / meta-prompting (espera el "go" de Kevin)
 Probando el bot, ante "¿quién eres?" Vaio respondió **sin consultar `searchMemory`** y afirmó por inercia

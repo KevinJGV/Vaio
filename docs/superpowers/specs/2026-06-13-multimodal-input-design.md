@@ -162,6 +162,10 @@ ref:string; caption?:string }`; `TurnRecord += userAttachments?: StoredAttachmen
 `railway.json preDeployCommand` (sin backfill).
 
 ### Config / wiring
+> **Superado por Fase 2:** esta fase introdujo una cadena única `MULTIMODAL_MODELS` (nunca desplegada). La
+> Fase 2 la reemplazó por envs **por modalidad** (`VISION_MODELS`/`TRANSCRIBE_MODEL`/`SPEECH_MODELS`, cada uno
+> explícito o OFF). Ver `## Fase 2`. Lo de abajo queda como registro histórico del primer corte.
+
 `config.ts` += `MULTIMODAL_MODELS` (csv, cap 3; default = 1er modelo de `OPENROUTER_MODELS` con warn),
 `MULTIMODAL_NATIVE_IMAGES` (bool, default false), `MEDIA_MAX_BYTES` (default 20·1024·1024). Helper
 `multimodalChain(env)`. `index.ts` cablea `mediaModel = createModel(key, multimodalChain, logger)` →
@@ -185,8 +189,9 @@ camino; 400 solo si no hay texto NI attachments.
 - Backward-compat: solo-texto → `attachments:[]`, `content` string, comportamiento idéntico; migración con
   default `[]` sin backfill.
 - Secret: el bot token arma URLs de descarga pero jamás se loguea (test lo verifica).
-- Constraint cadena-de-3: transcripción/visión usan `MULTIMODAL_MODELS` (propia); el chat conserva su cadena
-  barata/free. El modo nativo (opt-in `MULTIMODAL_NATIVE_IMAGES`) es la única vía que exige chat vision-capaz.
+- Constraint cadena-de-3: transcripción/visión usan su propia config (Fase 2: `VISION_MODELS`/
+  `TRANSCRIBE_MODEL`); el chat conserva su cadena barata/free. El modo nativo (opt-in
+  `MULTIMODAL_NATIVE_IMAGES`) es la única vía que exige chat vision-capaz.
 
 ---
 
@@ -208,9 +213,10 @@ directo** → Vaio sigue **single-provider**. Slugs/precios: galería `openroute
 
 ### Cambios de diseño
 - **Config por modalidad** (`config.ts`): `TRANSCRIBE_MODEL` (STT), `VISION_MODELS` (csv, chat+file-part),
-  `SPEECH_MODELS` (cadena TTS `model|voice|format`; voz omitida→"alloy", formato→"mp3"). `MULTIMODAL_MODELS`
-  queda como **fallback** de visión/transcripción (back-compat). Helpers `visionChain`/`transcribeModel`/
-  `speechChain`. (No hay vars `SPEECH_MODEL/VOICE/FORMAT` sueltas: `SPEECH_MODELS` las subsume.)
+  `SPEECH_MODELS` (cadena TTS `model|voice|format`; voz omitida→"alloy", formato→"mp3"). **Cada modalidad es
+  explícita o queda OFF** — NO hay `MULTIMODAL_MODELS` ni fallback implícito al modelo de chat (visión necesita
+  un VLM y STT un modelo de `/audio/transcriptions`: un modelo compartido sería semánticamente incorrecto).
+  Helpers `visionChain`/`transcribeModel`/`speechChain`. (Tampoco vars `SPEECH_MODEL/VOICE/FORMAT` sueltas.)
 - **STT dedicado** (`adapters/media-openrouter.ts`): `createTranscriber(apiKey, baseURL, model)` → `fetch`
   `POST /audio/transcriptions` con `input_audio:{data:base64, format}`. (Visión sigue `generateText`+file-part
   sobre `VISION_MODELS`.) Transcriber y visión dejan de compartir un solo `LanguageModel`.

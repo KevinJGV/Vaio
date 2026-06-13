@@ -60,13 +60,12 @@ const envSchema = z.object({
   COMPRESS_INTENSITY_CONV: z.enum(["lite", "full", "ultra"]).default("lite"),
   COMPRESS_INTENSITY_RAG: z.enum(["lite", "full", "ultra"]).default("full"),
 
-  // Entrada multimodal (audio/voz + imágenes). Modelos POR MODALIDAD (no todos cubren todo; ver
-  // openrouter.ai/models, tabs Transcription/Speech/Image — cambian mensual). `MULTIMODAL_MODELS` queda
-  // como FALLBACK de visión/transcripción (back-compat con la fase 1).
-  MULTIMODAL_MODELS: z.string().optional(),
-  // Visión (imagen→texto o nativa): cadena csv de chat con file-part. Vacía → MULTIMODAL_MODELS → 1er chat.
+  // Entrada multimodal (audio/voz + imágenes). Cada modalidad su modelo EXPLÍCITO (no todos cubren todo:
+  // visión = VLM por chat; STT = modelo en /audio/transcriptions). Vacío = esa modalidad OFF. Verificar
+  // slugs en openrouter.ai/models (tabs Image/Transcription — cambian mensual).
+  // Visión (imagen→texto o nativa): cadena csv de chat con file-part. Vacía → visión OFF.
   VISION_MODELS: z.string().optional(),
-  // STT dedicado (audio→texto) vía POST /audio/transcriptions. Vacío → MULTIMODAL_MODELS[0] → chat[0].
+  // STT dedicado (audio→texto) vía POST /audio/transcriptions. Vacío → STT OFF.
   TRANSCRIBE_MODEL: z.string().optional(),
   // true → imágenes se pasan NATIVAS al modelo de chat (la cadena de chat DEBE ser vision-capaz).
   // false (default) → se describen a texto con VISION_MODELS (robusto con cualquier cadena de chat).
@@ -127,23 +126,14 @@ function csv(s: string | undefined): string[] {
     .filter(Boolean)
 }
 
-/** Cadena multimodal de FALLBACK (back-compat fase 1): `MULTIMODAL_MODELS` o el 1er modelo de chat. */
-function multimodalFallback(env: Env): string[] {
-  const explicit = csv(env.MULTIMODAL_MODELS)
-  if (explicit.length > 0) return explicit
-  const firstChat = modelChain(env)[0]
-  return firstChat ? [firstChat] : []
-}
-
-/** Cadena de VISIÓN (imagen→texto/nativa, chat+file-part). `VISION_MODELS` → fallback multimodal. */
+/** Cadena de VISIÓN (imagen→texto/nativa, chat+file-part). `VISION_MODELS` explícito o vacío → visión OFF. */
 export function visionChain(env: Env): string[] {
-  const explicit = csv(env.VISION_MODELS)
-  return explicit.length > 0 ? explicit : multimodalFallback(env)
+  return csv(env.VISION_MODELS)
 }
 
-/** Modelo de TRANSCRIPCIÓN (STT, /audio/transcriptions). `TRANSCRIBE_MODEL` → fallback multimodal[0]. */
+/** Modelo de TRANSCRIPCIÓN (STT, /audio/transcriptions). `TRANSCRIBE_MODEL` explícito o undefined → STT OFF. */
 export function transcribeModel(env: Env): string | undefined {
-  return env.TRANSCRIBE_MODEL?.trim() || multimodalFallback(env)[0]
+  return env.TRANSCRIBE_MODEL?.trim() || undefined
 }
 
 export interface SpeechEntry {
