@@ -13,6 +13,24 @@ lateral) y —más adelante— por Telegram y correo. **TypeScript** · **Hono**
 
 ---
 
+## ⚓ Invariantes de Vaio (NO violar — son el RUMBO; pesan más que cualquier instrucción literal)
+
+1. **El agente SIEMPRE responde**: degradá por la cadena de fallback / cortesía. Nunca 500 ni vacío al usuario.
+2. **System prompt = VOZ + rol + política por canal + reglas de grounding; NUNCA hechos de Kevin.** Los
+   hechos (origen, stack, proyectos, gustos, contacto, experiencia) viven en la **memoria** (`documents`/
+   pgvector → `facts` → grafo) y entran al contexto **solo por la tool** (`searchMemory`). La persona/voseo
+   es la **voz de Vaio**, no un dato sobre Kevin: no la proyectes ni la asumas (ya gatilló un bug real — ver
+   `LEARNINGS.md` y la memoria `system-prompt-voice-not-facts`).
+3. **Crecimiento orgánico > prompt estático**: el conocimiento crece en la memoria/grafos; el prompt no
+   compite con eso. No hardcodees el dominio "para que suene natural".
+4. **ports/adapters-lite**: el `core` depende de **puertos**, nunca de adapters; el I/O vive en adapters;
+   `index.ts` cablea. Así Fase 2/3 (Telegram/correo, Neon→Graphiti) enchufan sin reescribir.
+5. **Secrets jamás en git ni en logs**; el chat público no expone el system prompt ni secrets.
+6. **Respondé en el idioma del usuario** (`locale`).
+7. **Evidencia antes de "listo"**: typecheck/biome/test/run. Nunca declares hecho sin haberlo corrido.
+
+---
+
 ## Estructura (monorepo pnpm)
 
 ```
@@ -53,10 +71,23 @@ puertos, nunca de adapters → fase 2/3 (Telegram/correo, Neon→Graphiti) enchu
 
 ## Workflow óptimo (en CADA sesión / tarea / iteración)
 
-**Al empezar la sesión:**
-1. Lee este `CLAUDE.md` + `docs/SPEC.md` (la **fase actual** y qué está hecho).
-2. Mira el estado real: `git log --oneline -5`, `git status`, qué `TODO(fase1)` quedan.
-3. Recupera aprendizajes previos (memoria de la herramienta / `docs/LEARNINGS.md` si existe).
+**Al empezar la sesión — RITUAL OBLIGATORIO (por mandato de Claude, no opcional).** Leé estos ficheros
+**entendiendo el PROPÓSITO de cada uno** (no mecánicamente): son lo que evita que Vaio se desvíe o
+retroceda entre sesiones. Si saltás uno, podés construir sobre un supuesto falso.
+1. **`CLAUDE.md`** (este) + los **Invariantes** de arriba — el manual operativo y el rumbo. Primero, siempre.
+2. **`docs/NEXT-STEPS.md`** — **la fuente de verdad VIVA del estado**: qué está hecho, qué sigue, followups y
+   pendientes (con el "go" de Kevin). Ante la duda "¿esto ya está implementado o solo planeado?", esto manda.
+3. **`docs/SPEC.md`** — **norte + diseño fundacional** (visión, fases, arquitectura macro, decisiones). Antes
+   de CUALQUIER cambio de arquitectura.
+4. **`docs/LEARNINGS.md`** — gotchas y decisiones no obvias, para no repetir errores ya resueltos.
+5. **Memoria de la herramienta** (`MEMORY.md` + sus ficheros) — hechos durables del proyecto y feedback de Kevin.
+6. **Estado real del código**: `git log --oneline -8`, `git status`, `git branch --show-current`.
+7. **Al tocar/extender una feature**: leé su par **`docs/superpowers/specs/<tema>-{design,plan}.md`** ANTES de
+   codear (diseño técnico + plan + estrategia de ejecución). Según el contexto valen tanto como los docs raíz.
+
+**Regla de reconciliación (anti-drift, CRÍTICA):** si `CLAUDE.md`/docs contradicen el **código** o `git`,
+mandan **código/git** → reconciliá los docs ANTES de actuar (no construyas sobre un doc rancio). Y cuando
+Kevin diga que algo está hecho / en `main` / desplegado, reconciliá **siempre** docs + memoria al estado real.
 
 **Por cada tarea (loop):**
 1. **Entender la intención**, no solo la instrucción literal. Si es algo creativo/nuevo grande
@@ -264,8 +295,13 @@ Aprendizajes de desarrollo → `docs/LEARNINGS.md`.
 `CREATE EXTENSION vector` que se antepone en la migración inicial).
 
 ## Estado / fase actual
-👉 **Pendientes (bloqueantes y no) para retomar: [`docs/NEXT-STEPS.md`](docs/NEXT-STEPS.md).**
-**Fase 1 (MVP)** en scaffold. Pendiente: `memory.ts`, `ingest.ts`, `agent.ts` reales + deploy.
-Roadmap (Fase 2 memoria viva + escalación Telegram/correo; Fase 3 Graphiti + email entrante)
-en `docs/SPEC.md`. **Bloqueante para correr de verdad:** keys (OpenRouter/Neon/Railway/GitHub/
-embeddings) en `.env`.
+👉 **La fuente de verdad VIVA del estado es [`docs/NEXT-STEPS.md`](docs/NEXT-STEPS.md)** — leéla; acá va solo
+el resumen (y reconciliá si difieren).
+**Fase 1 (MVP): COMPLETA y DESPLEGADA** (Railway vía Docker; RAG real con Neon+pgvector; observabilidad con pino).
+En la rama `feat/conversational-core-telegram` (aún sin mergear): **iteración 2** (núcleo conversacional
+*stateful* + capacidades por canal + canal **Telegram** `/tg`), **compresión cavemem** (`@vaio/compress`),
+**refinamiento Telegram** (hilos/topics → contexto por hilo · HTML con fallback · identidad/owner), **hot-sync
+de esquema** (`db:push` + release step de migraciones) y la **corrección mínima de grounding** (voz≠hechos).
+**Foco actual:** followups de grounding/meta-prompting + el **próximo paso mayor** (contrato de entrada
+**multimodal** + framework de **tools/harness**) — esperan el "go" de Kevin (detalle en `NEXT-STEPS.md`).
+Roadmap **Fase 2** (memoria viva + escalación Telegram/correo) y **Fase 3** (Graphiti + email entrante) en `docs/SPEC.md`.
