@@ -21,3 +21,5 @@ jobs:
       - run: pnpm -r build
       - run: pnpm exec biome check .
       - run: pnpm -r test
+      # Integridad documental (anti-drift): links rotos / contradicciones (falla) + staleness (avisa).
+      - run: bash scripts/check-docs.sh
