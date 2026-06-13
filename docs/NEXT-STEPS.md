@@ -28,9 +28,13 @@
   [`…-multimodal-input-plan.md`](superpowers/specs/2026-06-13-multimodal-input-plan.md).
   **Pendiente de Kevin:** (1) aplicar la migración `0002` (`messages.attachments`) a Neon — `db:push` (dev) o
   `db:migrate` (el e2e mostró que sin la columna el turno responde igual, solo falla la persistencia en
-  background); (2) e2e Telegram real (nota de voz + foto) tras deploy; (3) **followup de prompt**: la persona
-  aún dice "solo proceso texto / no tengo visión" → desacoplar de la nueva capacidad (encaja con los followups
-  de grounding/meta-prompting). (4) review + merge de la rama.
+  background); (2) e2e Telegram real (nota de voz + foto + voz→audio) tras deploy; (3) review + merge de la rama.
+- [~] **Multimodal Fase 2** (misma rama) — **EN CURSO**: envs por modalidad (`TRANSCRIBE_MODEL`/`VISION_MODELS`/
+  `SPEECH_*`, fallback a `MULTIMODAL_MODELS`); **STT dedicado** vía `POST /audio/transcriptions`; **salida de voz
+  (TTS)** vía `POST /audio/speech` → Telegram `sendAudio` con policy `shouldSpeak` (default texto; voz si entró
+  voz o se pide); **grounding del prompt** = declarar capacidades de E/S reales (cierra el followup "Vaio dice
+  solo-texto"). OpenRouter cubre todo por REST → single-provider (ver `openrouter-api-surface`). **Rerank** =
+  pendiente futuro (diseño en el design, no se codea: con ~29 chunks no aporta). Specs actualizados (`§ Fase 2`).
 > Cerrados el 2026-06-13 (→ Historial): `OWNER_TELEGRAM_ID` (local+Railway) · e2e Telegram (owner/visitante + 2
 > topics aislados) · **merge de `feat/conversational-core-telegram` a `main`** · **ahorro de tokens de compresión
 > verificado en logs** (RAG ~3.5% / conv ~0.6%; persona intacta).
@@ -116,12 +120,9 @@ audio/multimedia/harness**, Kevin va a resolver de su lado lo siguiente; cuando 
 `brainstorming` → design+plan** (su propio par por feature). Dos ejes **foundational** (caros de
 retro-ajustar, decidir primero):
 
-1. **Contrato de entrada multimodal** (lo que destraba audio/imágenes/docs). Hoy todo asume
-   `TurnRequest.userText: string` (cableado en `agent.respond`, persistencia `messages.content`, resumen,
-   traces). Decidir: ¿core *text-centric* con **adapters** que normalizan (puerto `Transcriber`/
-   `MediaUnderstanding`) o **mensajes multimodales nativos** (AI SDK v6 ya soporta `ModelMessage` con
-   partes text/image/file)? Recomendación: **híbrido** — `TurnRequest` con `parts`/`attachments` tipados +
-   puertos de comprensión de media inyectados; el core elige transcribir o pasar partes según el modelo.
+1. ✅ **Contrato de entrada multimodal** (audio/voz + imágenes) — **IMPLEMENTADO** (2026-06-13, rama
+   `feat/multimodal-input`; híbrido como se recomendó). Ver el WIP `[?]` arriba + specs
+   `2026-06-13-multimodal-input-{design,plan}.md`. Followups de evolución → § "Evolución multimodal" abajo.
 2. **Framework de tools/acciones (el "harness")**. Hoy `ToolName` es unión cerrada de **una** tool
    (`searchMemory`, read-only). Generalizar a un **registry de acciones**: descriptor (name/description/
    inputSchema/execute), flag *side-effecting*, gating por capacidad **y por principal**, y seam de
@@ -132,6 +133,41 @@ persistencia de **adjuntos** (referencias de media + transcripción); **persona/
 (hoy hardcoded en `prompt.ts`) para tunear el system prompt sin redeploy; **guardas de costo/rate por
 principal** en el core (hoy solo en el proxy); identidad **cross-canal** + facts por-usuario (fase 2);
 **turnos proactivos** (no iniciados por el usuario).
+
+### 🎙️ Evolución multimodal (followups del contrato — su propio par design+plan cuando Kevin dé el go)
+El contrato de entrada quedó hecho con UNA cadena multimodal (`MULTIMODAL_MODELS`, Gemini Flash cubre
+audio+imagen) + flag `MULTIMODAL_NATIVE_IMAGES`. Kevin pidió **refinar por modalidad** + **salida de voz**.
+**Dato verificado (catálogo OpenRouter, jun-2026 — captura de Kevin):** OpenRouter tiene categorías propias
+de **Rerank (4), Speech (9), Transcription (10), Audio (4), Image (32), Embeddings (26), Video (14)** además
+de Text (337). ⚠️ El endpoint `GET /api/v1/models` por default lista **solo los de texto** (no las otras
+categorías → no inferir cobertura de ahí; mirar la galería). **Implicación:** transcripción, visión, rerank y
+TTS se pueden cubrir **todo por OpenRouter → single-provider, "pocos $/mes" intacto**. (Detalle de impl a
+confirmar con context7 al diseñar: si el `@openrouter/ai-sdk-provider` expone `rerank()`/`speech()`/
+`transcription()` o hay que pegarle al endpoint OpenAI-compatible / REST de OpenRouter.)
+
+1. **Envs por modalidad** (en vez de `MULTIMODAL_MODELS` único): separar la cadena por tipo, porque no todos
+   los modelos contemplan todos los datos y conviene optimizar por tarea →
+   - `TRANSCRIBE_MODELS` (audio→texto, optimizado STT; hoy Gemini Flash vía chat+file-part; o un modelo
+     Transcription dedicado de OpenRouter — ej. voxtral, gpt-4o-transcribe).
+   - `VISION_MODELS` (imagen→texto o nativa; Gemini/Qwen-VL).
+   - `SPEECH_MODEL` (TTS, **salida**; ver #2; OpenRouter Speech, ej. `openai/gpt-audio*`).
+   Refactor aditivo: `MULTIMODAL_MODELS` queda como default/fallback. Verificar slugs/precios al diseñar.
+2. **Salida de voz — "Vaio te habla" (TTS)**: **eje nuevo de SALIDA** (el contrato actual es solo ENTRADA).
+   AI SDK v6: `experimental_generateSpeech({ model: provider.speech(...), text, voice, format })` →
+   `audio.uint8Array`. OpenRouter tiene Speech (9 modelos) → single-provider posible. Diseño: tras generar la
+   respuesta, opcionalmente sintetizar audio y entregarlo (Telegram `sendVoice`/`sendAudio`; web necesita un
+   canal de audio). Decidir cuándo (¿siempre / solo si el usuario mandó voz / a pedido? — espejo del input).
+   Su propio design+plan; tamaño medio.
+3. **Grounding del prompt — capacidades reales de Vaio (EXPLÍCITO, pedido de Kevin):** hoy `prompt.ts`
+   afirma "solo proceso texto / no tengo visión" — **falso desde el contrato multimodal**. Al hacer los
+   followups de grounding (§ "Hallazgos del bot real"), el prompt debe declarar las **capacidades de E/S
+   reales** (recibe voz/imágenes; con TTS, responde en voz) sin hardcodear hechos de Kevin → es parte de
+   "VOZ/rol/política/**capacidades**" del prompt, no de los hechos. **Anclarlo junto al desacople voz≠hechos.**
+4. **Rerank — precisión de retrieval para el grounding** (OpenRouter Rerank, AI SDK `rerank()`): segunda
+   etapa del RAG = recuperar un K **ancho** por vectores → rerankear (cross-encoder, query+chunk juntos) →
+   recortar al top-N. Mejora QUÉ entra al contexto (mejor grounding). **Timing:** hoy el corpus (~29 chunks)
+   es chico → prematuro; **el valor escala con el corpus** (facts fase 2, más fuentes). Seam: `searchMemory`
+   con K ancho opcional → rerank → trim. Atar a los followups de grounding + fase 2.
 
 ### 🔬 Hallazgos del bot real (jun-2026) → followups de grounding / meta-prompting (espera el "go" de Kevin)
 Probando el bot, ante "¿quién eres?" Vaio respondió **sin consultar `searchMemory`** y afirmó por inercia

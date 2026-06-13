@@ -188,9 +188,63 @@ camino; 400 solo si no hay texto NI attachments.
 - Constraint cadena-de-3: transcripción/visión usan `MULTIMODAL_MODELS` (propia); el chat conserva su cadena
   barata/free. El modo nativo (opt-in `MULTIMODAL_NATIVE_IMAGES`) es la única vía que exige chat vision-capaz.
 
+---
+
+## Fase 2 — envs por modalidad + STT dedicado + salida de voz (TTS) (2026-06-13)
+
+Evolución de la MISMA feature (no es otra). El contrato de entrada (arriba) queda; cambia **cómo** se procesa
+cada modalidad y se suma el eje de **salida de voz**.
+
+### API de OpenRouter (fuentes verificadas)
+**Autoritativa: `https://openrouter.ai/openapi.json`** (parsear con node; la doc web es JS-rendered → 404 en
+WebFetch; `GET /api/v1/models` lista **solo texto** → no inferir cobertura de ahí; el README del provider del
+AI SDK solo refleja lo que el *package* envuelve, no la plataforma). Endpoints REST OpenAI-compatible (base
+`https://openrouter.ai/api/v1`, `Bearer key`):
+- `POST /audio/transcriptions` → `{model, input_audio:{data(base64), format}, language}` ⇒ `{text}`.
+- `POST /audio/speech` → `{model, input, voice, response_format:"mp3"|"pcm", speed}` ⇒ audio binario.
+- `POST /rerank` → `{model, query, documents:string[], top_n}` ⇒ `{results:[{index, relevance_score, document}]}`.
+El `@openrouter/ai-sdk-provider` NO expone `transcription()/speech()/reranking()` → se llaman con **`fetch`
+directo** → Vaio sigue **single-provider**. Slugs/precios: galería `openrouter.ai/models` (cambian mensual).
+
+### Cambios de diseño
+- **Config por modalidad** (`config.ts`): `TRANSCRIBE_MODEL` (STT), `VISION_MODELS` (csv, chat+file-part),
+  `SPEECH_MODEL`+`SPEECH_VOICE`+`SPEECH_FORMAT` (default `mp3`). `MULTIMODAL_MODELS` queda como **fallback** de
+  visión/transcripción (back-compat). Helpers `visionChain`/`transcribeModel`/`speechConfig`.
+- **STT dedicado** (`adapters/media-openrouter.ts`): `createTranscriber(apiKey, baseURL, model)` → `fetch`
+  `POST /audio/transcriptions` con `input_audio:{data:base64, format}`. (Visión sigue `generateText`+file-part
+  sobre `VISION_MODELS`.) Transcriber y visión dejan de compartir un solo `LanguageModel`.
+- **Salida de voz** (eje nuevo, SOLO Telegram por ahora; web `/chat`=stream de texto → diferido):
+  - `ports/speech.ts`: `SpeechSynthesizer.synthesize(text, locale?) → { audio: Uint8Array; mediaType } | null`
+    (null = degradación → se manda texto).
+  - `adapters/speech-openrouter.ts`: `fetch POST /audio/speech` → bytes (mp3). Lanza→null capturado.
+  - `core/speech-policy.ts` (PURO): `shouldSpeak({ inboundHadAudio, userText, locale })` = **default TEXTO**;
+    voz si `inboundHadAudio` (espejo) **o** `wantsVoiceReply(userText)` (heurística ES/EN: "respondé(me)
+    con/en voz", "hablame", "mandame un audio", "/voz"; "in voice", "voice note"). `stripForSpeech(text)` saca
+    HTML/markdown/emojis para que el TTS lea limpio.
+  - `adapters/telegram/client.ts`: `sendAudio(chatId, bytes, opts)` (multipart/form-data; el `call` JSON-only
+    no sirve para subir binario). Telegram `sendAudio` acepta mp3. Token NUNCA en logs.
+  - `adapters/telegram/routes.ts`: `TelegramDeps += speech?`; tras `text`, si `shouldSpeak` y hay `speech` →
+    `synthesize(stripForSpeech(text))` → `sendAudio` (fallback `sendMessage` si null).
+- **Grounding del prompt** (`core/prompt.ts`): bloque de **capacidades de E/S** (recibe voz/imágenes
+  transcriptas/descriptas; responde en voz cuando corresponde). Rol/capacidad, **no** hechos de Kevin
+  (mantiene voz≠hechos).
+
+### Edge cases (fase 2)
+- `SPEECH_MODEL` ausente → `speech` null → siempre texto (sin romper). `synthesize` falla → null → texto.
+- TTS solo si `shouldSpeak`; default texto → cero costo extra en el caso común.
+- mp3 vía `sendAudio` (no `sendVoice`, que exige OGG/Opus y OpenRouter da mp3|pcm).
+- Token de Telegram y key de OpenRouter jamás en logs (tests lo verifican).
+
+## Rerank — pendiente futuro (diseño decidido, NO implementado)
+Con ~29 chunks no aporta (traés 6–8 de 29). **Activar cuando el corpus crezca** (facts fase 2 / más fuentes).
+Diseño: puerto `Reranker.rerank(query, docs[], topN)` + adapter `POST /rerank` (OpenRouter) + integración en
+`searchMemory`/`MemoryStore`: recuperar un **K ancho** (`RERANK_FETCH_K`) por vectores → `/rerank`
+(cross-encoder) → recortar a `k`. Flag `RERANK_ENABLED=false`. Disparador = corpus grande.
+
 ## Seams para el futuro (NO implementar acá)
 
 Harness/registry de acciones + side-effect flag + gating por principal + HITL; `kind` → `document`
 (aditivo); embeddings multimodales (RAG sigue text-only); persistencia de binarios (hoy solo `ref` →
 re-resolución futura sin tocar el contrato); `CapabilityResolver` por-modelo (declarar modalidades sin
-tocar el core); ventana por tokens; persona/policy como dato.
+tocar el core); ventana por tokens; persona/policy como dato; **TTS en web `/chat`** (stream de texto →
+canal de audio); **rerank** (arriba).

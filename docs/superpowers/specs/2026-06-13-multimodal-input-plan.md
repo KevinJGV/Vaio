@@ -61,7 +61,37 @@ worktree** (una sola línea de trabajo, rama `feat/multimodal-input`). TDD en la
 - **Tamaño de payloads base64** (web) vs límites del proxy/Hono → `MEDIA_MAX_BYTES` defensivo + nota en contrato.
 - **Costo**: audio siempre transcribe (barato); imagen nativa OFF por default (aísla el costo de vision).
 
+## Fase 2 (2026-06-13) — envs por modalidad + STT dedicado + salida de voz
+
+Misma feature, expansión pedida por Kevin para **construir la base completa** de multimodalidad. Detalle
+técnico (firmas, endpoints REST de OpenRouter, edge-cases) → design `## Fase 2`.
+
+**Entregables:** (1) envs por modalidad (`TRANSCRIBE_MODEL`/`VISION_MODELS`/`SPEECH_*`, fallback a
+`MULTIMODAL_MODELS`); (2) STT por `POST /audio/transcriptions` (modelo dedicado); (3) **salida de voz (TTS)**
+por `POST /audio/speech` → Telegram `sendAudio`, con policy `shouldSpeak` (default texto; voz si entró voz o se
+pide); (4) grounding del prompt = declarar capacidades de E/S reales; (5) rerank = **documentado como pendiente
+futuro** (no se codea).
+
+**Secuencia:** config → STT adapter (REST) → speech (puerto + adapter REST + `speech-policy` puro, TDD) →
+telegram (`sendAudio` + delivery) → prompt capacidades → wiring → verificación. Dependencias secuenciales
+(comparten tipos/config).
+
+**Verificación fase 2:** typecheck/biome/test; boot log `transcribe/vision/speech`; e2e Telegram: voz→STT→
+respuesta; voz→respuesta en **audio** (espejo); "respondeme con voz"→audio; texto→texto; `SPEECH_MODEL`
+inválido→cae a texto (nunca 500); token/key nunca en logs.
+
+**Estrategia de ejecución (fase 2):** **orquestador directo, secuencial-acoplado** (igual que fase 1: las
+piezas comparten config/tipos y convergen en el route de Telegram; TDD en `speech-policy` puro + adapters REST
+con mock `fetch`). Sin subagentes, sin worktree.
+
+## Fuente de la API de OpenRouter (no perder)
+Autoritativa: **`https://openrouter.ai/openapi.json`** (parsear con node). La doc web es JS-rendered y
+`GET /api/v1/models` solo lista texto → no inferir cobertura de ahí. OpenRouter expone `/audio/transcriptions`,
+`/audio/speech`, `/rerank` por REST OpenAI-compatible; el provider del AI SDK no los envuelve → `fetch` directo,
+single-provider. Memoria `reference`: `openrouter-api-surface`.
+
 ## Fuera de alcance (seams, NO implementar)
 
 Harness/registry + HITL (próxima iteración); PDF/docs; embeddings multimodales; persistencia de binarios;
-ventana por tokens; persona/policy como dato. Detalle de cada seam en el design.
+ventana por tokens; persona/policy como dato; **rerank** (pendiente futuro, diseño en el design); **TTS en web
+`/chat`** (diferido). Detalle de cada seam en el design.

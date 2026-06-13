@@ -6,6 +6,15 @@ para no repetirlas en próximas sesiones. Una línea por aprendizaje, concreta.
 > Esto es la memoria del **dev**. La memoria del **producto** (lo que el agente sabe de Kevin)
 > vive en Neon/pgvector — ver `docs/SPEC.md`.
 
+- **OpenRouter — API surface real + cómo encontrarla** (verificado jun-2026, openapi.json): la **fuente
+  autoritativa es `https://openrouter.ai/openapi.json`** (parsear con node; WebFetch lo trunca). La doc web es
+  JS-rendered (404 al fetchear). ⚠️ `GET /api/v1/models` por default lista **solo texto** (337) → NO inferir
+  cobertura de modalidades de ahí (me hizo afirmar MAL que "OpenRouter no tiene rerank/speech"). El README del
+  `@openrouter/ai-sdk-provider` solo refleja lo que el *package* envuelve (chat/embeddings/image/video), NO la
+  plataforma. **OpenRouter SÍ expone por REST OpenAI-compatible:** `POST /audio/transcriptions` (STT),
+  `POST /audio/speech` (TTS, mp3|pcm), `POST /rerank`, `/embeddings`, `/videos`. El provider del AI SDK no los
+  envuelve → **llamarlos con `fetch`** a `https://openrouter.ai/api/v1` + `Bearer key` → Vaio single-provider.
+  Slugs/precios: galería openrouter.ai/models (tabs por modalidad; cambian mensual). Memoria: `openrouter-api-surface`.
 - **Multimodal (AI SDK v6) — decisión nativo-vs-normalizar por CONFIG, no por sniffing**: el core recibe un
   `LanguageModel` opaco y OpenRouter capa la cadena a 3 modelos server-side (`extraBody.models`) → el core NO
   sabe cuál respondió ni si soporta visión. Por eso la decisión se lee de config (`MULTIMODAL_NATIVE_IMAGES`)
