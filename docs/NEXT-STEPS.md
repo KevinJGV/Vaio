@@ -8,50 +8,44 @@
 > **Tests: 75 agente + 20 compress; typecheck/biome/build limpios** (snapshot del merge). **e2e real ✅:** con
 > `OWNER_TELEGRAM_ID` puesto (local+Railway), el bot respondió por Telegram → owner-vs-visitante y 2 topics con
 > contexto aislado verificados.
-> **Sin WIP abierto.** El ahorro de compresión quedó **verificado en logs** (2026-06-13): ~3.5% RAG (`full`) /
-> ~0.6% conversación (`lite`) sobre el corpus real — marginal porque el corpus es denso/factual; persona/calidad
-> intactas. Detalle → Historial.
-> **Foco / "go" pendiente:** followups de grounding (§ "Hallazgos del bot real") + **próximo paso mayor**
-> (entrada multimodal + framework de tools/harness). **El portafolio va DESPUÉS — NO es el próximo paso.**
+> **Multimodal (fases 1+2) — MERGEADO en `main`** (2026-06-13): entrada de audio/voz + imágenes (híbrido,
+> texto-derivado), STT/visión/TTS por modalidad vía OpenRouter REST (single-provider), salida de voz en
+> Telegram (espejo / a pedido), observabilidad de media. e2e confirmado por Kevin. 142 tests + extras de Kevin
+> (`stepCountIs 10`, voces TTS). Detalle → Historial.
+> **Único WIP abierto:** confirmar que la migración `0002` (`messages.attachments`) está aplicada en Neon.
+> **Foco / "go" pendiente (próximo paso):** quedan los dos frentes —
+> **(a)** followups de **grounding** (§ "Hallazgos del bot real": voz≠hechos duro, raíz del bug "Kevin es
+> caleño") y **(b)** el **framework de tools/harness** (eje 2 del próximo paso mayor). **El portafolio va DESPUÉS.**
 
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [?] **Contrato de entrada multimodal** (audio/voz + imágenes) — eje 1 del próximo paso mayor.
-  IMPLEMENTADO en `feat/multimodal-input` (sin mergear). Decisiones: multimodal primero (harness/HITL
-  después), audio+imágenes (no PDF), híbrido (puertos `Transcriber`/`MediaUnderstanding` + parts nativos por
-  flag `MULTIMODAL_NATIVE_IMAGES`), modelos de media por modalidad (ver Fase 2), persistencia
-  texto-derivado+ref (`messages.attachments` jsonb). **121 tests verdes** (101 agente + 20 compress);
-  typecheck/biome/build limpios. **e2e ✅:** `/chat` con imagen base64 → visión describe → respuesta grounded
-  ("rojo"); degradación con modelo multimodal roto → `[imagen no procesable]` + HTTP 200 (nunca 500). Diseño →
-  [`…-multimodal-input-design.md`](superpowers/specs/2026-06-13-multimodal-input-design.md) · plan →
-  [`…-multimodal-input-plan.md`](superpowers/specs/2026-06-13-multimodal-input-plan.md).
-  **e2e Telegram real ✅ (Kevin, 2026-06-13):** recibe imágenes y notas de voz; responde en voz si el turno
-  entró por voz o si se lo pide; texto si no. **Pendiente:** (1) aplicar la migración `0002`
-  (`messages.attachments`) a Neon — `db:push` (dev) o `db:migrate` (sin la columna el turno responde igual,
-  solo falla la persistencia en background); (2) review + merge de la rama.
-- [?] **Multimodal Fase 2** (misma rama) — **IMPLEMENTADO**: envs por modalidad (`TRANSCRIBE_MODEL`/
-  `VISION_MODELS`/`SPEECH_MODELS`, cada uno explícito o OFF; sin `MULTIMODAL_MODELS`); **STT dedicado** `POST /audio/transcriptions`;
-  **salida de voz (TTS)** `POST /audio/speech` → Telegram `sendAudio` con policy `shouldSpeak` (default texto;
-  voz si entró voz o se pide); **cadena TTS de fallback** `SPEECH_MODELS=model|voice|format,…` (client-side,
-  voz/formato por-modelo; pcm→WAV@24k para Telegram); **grounding del prompt** = capacidades de E/S reales
-  (cierra "Vaio dice solo-texto"). Single-provider OpenRouter por REST (ver `openrouter-api-surface`).
-  **142 tests** (122 agente + 20 compress); typecheck/biome/build limpios. **e2e ✅:** boot
-  `transcribe/vision/speech` on; `/chat` imagen → "Rojo"; **round-trips reales** contra OpenRouter:
-  `kokoro-82m`/`af_bella`→mp3→`whisper-large-v3`, y `gemini-3.1-flash-tts-preview`/`Zephyr`→pcm→WAV@24k→whisper. **Rerank** = pendiente futuro (diseño en el design, no se codea: ~29 chunks no
-  aporta). **Observabilidad de media** (2026-06-13): cada llamada loguea el modelo real + latencia
-  (`media.vision` con `response.modelId` del fallback server-side, `media.transcribe`, `media.speak`) →
-  destapa qué modelo sirvió (antes caja negra). Specs actualizados (`§ Fase 2`).
-  **e2e Telegram real ✅ (Kevin, 2026-06-13):** imágenes + notas de voz; responde en voz (espejo / a pedido);
-  `openrouter/free` en visión resuelve a un modelo gratis vision-capaz (visto en `media.vision`).
-  **Pendiente:** review + merge (la migración `0002` de fase 1 sigue abierta).
-> Cerrados el 2026-06-13 (→ Historial): `OWNER_TELEGRAM_ID` (local+Railway) · e2e Telegram (owner/visitante + 2
+- [?] **Migración `0002` (`messages.attachments`) aplicada en Neon** — el código está en `main`; el deploy la
+  corre vía `railway.json preDeployCommand` (`db:migrate:prod`). Confirmar que se aplicó (sin la columna el
+  turno responde igual, solo falla la persistencia de adjuntos en background → revisar logs `persist/summary falló`).
+> Cerrados el 2026-06-13 (→ Historial): **Multimodal fases 1+2 mergeado en `main`** (entrada audio/voz+imágenes,
+> STT/visión/TTS por modalidad, salida de voz Telegram, observabilidad de media; e2e Kevin) · `OWNER_TELEGRAM_ID` (local+Railway) · e2e Telegram (owner/visitante + 2
 > topics aislados) · **merge de `feat/conversational-core-telegram` a `main`** · **ahorro de tokens de compresión
 > verificado en logs** (RAG ~3.5% / conv ~0.6%; persona intacta).
 
 ---
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
+
+**🟢 MULTIMODAL (fases 1+2) — MERGEADO en `main`** (2026-06-13, ex `feat/multimodal-input`). **Fase 1:**
+contrato de entrada multimodal (audio/voz + imágenes), estrategia híbrida (puertos `Transcriber`/
+`MediaUnderstanding` + parts nativos por flag `MULTIMODAL_NATIVE_IMAGES`), núcleo puro `core/modality`,
+Telegram normalize+descarga (token nunca en logs), persistencia texto-derivado+ref (`messages.attachments`
+jsonb, migración `0002`). **Fase 2:** modelos POR MODALIDAD (`VISION_MODELS`/`TRANSCRIBE_MODEL`/`SPEECH_MODELS`,
+explícito o OFF), STT dedicado (`/audio/transcriptions`), **salida de voz/TTS** (`/audio/speech` → Telegram
+`sendAudio`, policy `shouldSpeak`, cadena `model|voice|format` con fallback client-side, pcm→WAV@24k),
+grounding del prompt (capacidades E/S), observabilidad de media (`media.vision/transcribe/speak` con el modelo
+real). **Single-provider OpenRouter por REST** (fuente: `openrouter-api-surface`; el provider del AI SDK no
+envuelve rerank/speech/transcription). **142 tests** (122 agente + 20 compress) + fixes de Kevin
+(`stepCountIs 10`, voces TTS). **e2e ✅:** round-trips reales (kokoro mp3, gemini pcm→WAV→whisper) + Telegram
+real (imágenes + voz in/out). Specs → [`…-multimodal-input-design.md`](superpowers/specs/2026-06-13-multimodal-input-design.md)
+· [`…-plan.md`](superpowers/specs/2026-06-13-multimodal-input-plan.md). **Rerank** quedó como pendiente futuro
+(diseño decidido, no se codeó: ~29 chunks no aporta).
 
 Estado (2026-06-10): **código de Fase 1 COMPLETO** en monorepo pnpm (`apps/agent` +
 `packages/contracts`), arquitectura ports/adapters, **Drizzle ORM + migración inicial**,
