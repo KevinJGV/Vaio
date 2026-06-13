@@ -4,10 +4,15 @@
 // Fase 2 sumará canales (Telegram/correo) como otros adapters sobre el mismo core.
 
 import { randomUUID } from "node:crypto"
-import { chatBodySchema, type TurnRequest } from "@vaio/contracts"
+import {
+  chatBodySchema,
+  type InputAttachment,
+  type TurnRequest,
+} from "@vaio/contracts"
 import { Hono } from "hono"
 import { type Agent, courtesy } from "../../core/agent.js"
 import type { Logger } from "../../ports/logger.js"
+import type { ResolvedMedia } from "../../ports/media.js"
 import type { TraceSink } from "../../ports/trace.js"
 import { mountTelegram, type TelegramDeps } from "../telegram/routes.js"
 import { agentAuth } from "./auth.js"
@@ -21,6 +26,8 @@ export interface RouteDeps {
   sink: TraceSink
   /** Presente → se monta el webhook /tg del canal Telegram (ausente → no se monta). */
   telegram?: TelegramDeps
+  /** Límite de tamaño por adjunto (base64 web). Default 20MB. */
+  mediaMaxBytes?: number
 }
 
 export function buildApp({
@@ -29,6 +36,7 @@ export function buildApp({
   logger,
   sink,
   telegram,
+  mediaMaxBytes = 20 * 1024 * 1024,
 }: RouteDeps): Hono<{ Variables: Variables }> {
   const app = new Hono<{ Variables: Variables }>()
 
@@ -76,22 +84,48 @@ export function buildApp({
     // que tomamos solo el último mensaje del usuario y el resto lo reconstruye la memoria por
     // conversationKey. (Cuando se cablee el portafolio, el contrato se angosta a un solo mensaje.)
     const userText = parsed.data.messages.at(-1)?.content ?? ""
-    if (!userText) {
+    // Adjuntos web: base64 inline → bytes. El que exceda el límite se descarta (degradación).
+    const resolved: ResolvedMedia[] = []
+    for (const a of parsed.data.attachments) {
+      const buf = Buffer.from(a.dataBase64, "base64")
+      if (buf.byteLength === 0 || buf.byteLength > mediaMaxBytes) {
+        log.warn(
+          { kind: a.kind, size: buf.byteLength },
+          "web attachment descartado"
+        )
+        continue
+      }
+      resolved.push({
+        kind: a.kind,
+        mediaType: a.mediaType,
+        ref: `web-inline:${randomUUID()}`,
+        ...(a.caption ? { caption: a.caption } : {}),
+        data: new Uint8Array(buf),
+      })
+    }
+    if (!userText && resolved.length === 0) {
       return c.json({ error: "bad request" }, 400)
     }
     try {
       // El core arma el stream con degradación incluida (cortesía si el modelo falla) e
       // instrumenta el turno vía el sink (los eventos comparten requestId con estos logs).
+      const attachments: InputAttachment[] = resolved.map((r) => ({
+        kind: r.kind,
+        mediaType: r.mediaType,
+        ref: r.ref,
+        ...(r.caption ? { caption: r.caption } : {}),
+      }))
       const req: TurnRequest = {
         channel: "web",
         conversationKey: parsed.data.conversationId ?? randomUUID(),
         userText,
+        attachments,
         locale,
         principalId: "web",
         trusted: false,
       }
       const ctx = { logger: log, sink, requestId: c.get("requestId") }
-      const { stream } = await agent.respond(req, ctx)
+      const { stream } = await agent.respond(req, ctx, resolved)
       return new Response(stream, {
         headers: { "content-type": "text/plain; charset=utf-8" },
       })

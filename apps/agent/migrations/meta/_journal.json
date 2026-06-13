@@ -15,6 +15,13 @@
       "when": 1781285192029,
       "tag": "0001_sad_lockjaw",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781372765835,
+      "tag": "0002_condemned_lady_deathstrike",
+      "breakpoints": true
     }
   ]
 }

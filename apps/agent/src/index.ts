@@ -10,21 +10,28 @@ import { EMBEDDING_DIM } from "./adapters/db/schema.js"
 import { createEmbedder } from "./adapters/embeddings.js"
 import { buildApp } from "./adapters/http/routes.js"
 import { createLogger } from "./adapters/logger.js"
+import {
+  createMediaUnderstanding,
+  createTranscriber,
+} from "./adapters/media-openrouter.js"
 import { createConversationStore } from "./adapters/neon-conversation.js"
 import { createMemoryStore } from "./adapters/neon-memory.js"
 import { createModel } from "./adapters/openrouter.js"
 import { createSummarizer } from "./adapters/summarizer.js"
 import { createTelegramClient } from "./adapters/telegram/client.js"
+import { createTelegramMedia } from "./adapters/telegram/media.js"
 import type { TelegramDeps } from "./adapters/telegram/routes.js"
 import { createLoggerTraceSink } from "./adapters/trace-logger.js"
 import {
   loadConfig,
   modelChain,
+  multimodalChain,
   telegramAllowedIds,
   telegramEnabled,
 } from "./config.js"
 import { type Agent, createAgent } from "./core/agent.js"
 import type { ConversationStore } from "./ports/conversation.js"
+import type { MediaUnderstanding, Transcriber } from "./ports/media.js"
 import type { MemoryStore } from "./ports/memory.js"
 import type { Summarizer } from "./ports/summary.js"
 
@@ -43,6 +50,8 @@ let agent: Agent | null = null
 let ragEnabled = false
 let conversations: ConversationStore | null = null
 let summarizer: Summarizer | null = null
+let transcriber: Transcriber | null = null
+let mediaUnderstanding: MediaUnderstanding | null = null
 if (env.OPENROUTER_API_KEY && models.length > 0) {
   let memory: MemoryStore | null = null
   // La memoria conversacional (conversations/messages) solo necesita DB; el RAG necesita además
@@ -77,6 +86,16 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
       createModel(env.OPENROUTER_API_KEY, [summaryModel], logger)
     )
   }
+  // Comprensión de media (transcripción/visión) con su PROPIA cadena (no la del chat). Un Gemini
+  // Flash cubre audio+imagen. Si la cadena queda vacía, no se habilita (los puertos quedan null).
+  const mmChain = multimodalChain(env)
+  if (mmChain.length > 0) {
+    const mediaModel = createModel(env.OPENROUTER_API_KEY, mmChain, logger)
+    transcriber = createTranscriber(mediaModel)
+    mediaUnderstanding = createMediaUnderstanding(mediaModel)
+  } else {
+    logger.warn("Sin MULTIMODAL_MODELS ni OPENROUTER_MODELS → multimodal OFF.")
+  }
   agent = createAgent({
     model,
     memory,
@@ -87,6 +106,9 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
     ragIntensity: env.COMPRESS_INTENSITY_RAG,
     summaryThreshold: env.SUMMARY_THRESHOLD,
     recentLimit: env.CONVERSATION_RECENT_LIMIT,
+    transcriber,
+    mediaUnderstanding,
+    nativeImages: env.MULTIMODAL_NATIVE_IMAGES,
   })
 } else {
   logger.error(
@@ -114,6 +136,12 @@ if (
     webhookSecret: env.TELEGRAM_WEBHOOK_SECRET,
     ownerId: env.OWNER_TELEGRAM_ID,
     sink,
+    // Descarga de media de Telegram (audio/voz + imágenes). El core decide transcribir/describir.
+    media: createTelegramMedia(
+      env.TELEGRAM_BOT_TOKEN,
+      logger,
+      env.MEDIA_MAX_BYTES
+    ),
   }
 }
 
@@ -123,6 +151,7 @@ const app = buildApp({
   logger,
   sink,
   telegram,
+  mediaMaxBytes: env.MEDIA_MAX_BYTES,
 })
 
 serve({ fetch: app.fetch, port: env.PORT })
@@ -134,6 +163,8 @@ logger.info(
     conversations: conversations !== null,
     summarizer: summarizer !== null,
     compress: compressor !== null,
+    multimodal: transcriber !== null,
+    nativeImages: env.MULTIMODAL_NATIVE_IMAGES,
     telegram: telegram !== undefined,
     models,
     logLevel: env.LOG_LEVEL,

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import type { Env } from "../src/config.js"
 import {
   modelChain,
+  multimodalChain,
   telegramAllowedIds,
   telegramEnabled,
 } from "../src/config.js"
@@ -27,6 +28,20 @@ describe("modelChain", () => {
     const chain = modelChain(envWith("primary,fallback,free"))
     expect(chain[0]).toBe("primary")
     expect(chain.at(-1)).toBe("free")
+  })
+})
+
+describe("multimodalChain", () => {
+  it("usa MULTIMODAL_MODELS si está (csv trimeado)", () => {
+    const env = { MULTIMODAL_MODELS: "g/flash, g/pro " } as Env
+    expect(multimodalChain(env)).toEqual(["g/flash", "g/pro"])
+  })
+  it("vacío → cae al primer modelo de OPENROUTER_MODELS", () => {
+    const env = { OPENROUTER_MODELS: "primary/x,fallback/y" } as Env
+    expect(multimodalChain(env)).toEqual(["primary/x"])
+  })
+  it("sin ninguno → []", () => {
+    expect(multimodalChain({} as Env)).toEqual([])
   })
 })
 

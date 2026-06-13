@@ -57,6 +57,24 @@ const envSchema = z.object({
   COMPRESS_INTENSITY_CONV: z.enum(["lite", "full", "ultra"]).default("lite"),
   COMPRESS_INTENSITY_RAG: z.enum(["lite", "full", "ultra"]).default("full"),
 
+  // Entrada multimodal (audio/voz + imágenes).
+  // Cadena de modelos multimodales (transcripción + visión) — propia, NO la del chat, así no obliga
+  // a que la cadena de chat sea vision-capaz. Verificar slugs/precios en openrouter.ai/models (cambian
+  // mensual). Vacía → cae al primer modelo de OPENROUTER_MODELS (con warn).
+  MULTIMODAL_MODELS: z.string().optional(),
+  // true → imágenes se pasan NATIVAS al modelo de chat (la cadena de chat DEBE ser vision-capaz).
+  // false (default) → se describen a texto con MULTIMODAL_MODELS (robusto con cualquier cadena).
+  MULTIMODAL_NATIVE_IMAGES: z
+    .string()
+    .optional()
+    .transform((v) => v === "true" || v === "1"),
+  // Límite defensivo de tamaño de media (descarga Telegram / base64 web). Default 20MB.
+  MEDIA_MAX_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(20 * 1024 * 1024),
+
   // Canal Telegram (todo opcional → si falta algo, el webhook /tg no se monta).
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
@@ -87,6 +105,17 @@ export function modelChain(env: Env): string[] {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean)
+}
+
+/** Cadena de modelos multimodales (transcripción/visión). Vacía → cae al primer modelo de chat. */
+export function multimodalChain(env: Env): string[] {
+  const explicit = (env.MULTIMODAL_MODELS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+  if (explicit.length > 0) return explicit
+  const firstChat = modelChain(env)[0]
+  return firstChat ? [firstChat] : []
 }
 
 /** Telegram user ids permitidos (csv → Set<number>, descarta vacíos y no-numéricos). */

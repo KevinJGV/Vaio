@@ -152,6 +152,80 @@ describe("agent.respond (memoria conversacional)", () => {
     expect(after.recent.map((m) => m.content)).toEqual(["hola", "Hola Kevin"])
   })
 
+  it("turno multimodal: transcribe el audio y persiste el texto derivado", async () => {
+    const { ctx } = collectingCtx()
+    const store = createInMemoryConversationStore()
+    const agent = createAgent({
+      model: okModel(),
+      memory: null,
+      conversations: store,
+      summarizer: null,
+      transcriber: { transcribe: async () => "che, cómo andás" },
+      mediaUnderstanding: null,
+    })
+    const req: TurnRequest = {
+      channel: "telegram",
+      conversationKey: "k-media",
+      userText: "",
+      attachments: [{ kind: "audio", mediaType: "audio/ogg", ref: "v1" }],
+      locale: "es",
+      principalId: "1",
+      trusted: true,
+    }
+    const media = [
+      {
+        kind: "audio" as const,
+        mediaType: "audio/ogg",
+        ref: "v1",
+        data: new Uint8Array([1, 2, 3]),
+      },
+    ]
+    const { stream } = await agent.respond(req, ctx, media)
+    await drain(stream)
+    await tick()
+    const id = await store.ensure("telegram", "k-media", "es")
+    const after = await store.loadContext(id, 10)
+    expect(after.recent[0]?.content).toContain("[voz]")
+    expect(after.recent[0]?.content).toContain("che, cómo andás")
+  })
+
+  it("turno multimodal degradado: transcriber null → persiste marcador, nunca rompe", async () => {
+    const { ctx } = collectingCtx()
+    const store = createInMemoryConversationStore()
+    const agent = createAgent({
+      model: okModel(),
+      memory: null,
+      conversations: store,
+      summarizer: null,
+      transcriber: null,
+      mediaUnderstanding: null,
+    })
+    const req: TurnRequest = {
+      channel: "telegram",
+      conversationKey: "k-degr",
+      userText: "",
+      attachments: [{ kind: "audio", mediaType: "audio/ogg", ref: "v1" }],
+      locale: "es",
+      principalId: "1",
+      trusted: true,
+    }
+    const media = [
+      {
+        kind: "audio" as const,
+        mediaType: "audio/ogg",
+        ref: "v1",
+        data: new Uint8Array([1]),
+      },
+    ]
+    const { stream, text } = await agent.respond(req, ctx, media)
+    expect(await drain(stream)).toBe("Hola Kevin")
+    await tick()
+    const id = await store.ensure("telegram", "k-degr", "es")
+    const after = await store.loadContext(id, 10)
+    expect(after.recent[0]?.content).toContain("no procesable")
+    expect(await text).toBe("Hola Kevin")
+  })
+
   it("sobre el threshold: invoca el summarizer y guarda el resumen", async () => {
     const { ctx } = collectingCtx()
     const store = createInMemoryConversationStore()

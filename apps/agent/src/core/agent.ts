@@ -19,8 +19,14 @@ import type { Compressor, Intensity } from "../ports/compress.js"
 import type {
   ConversationContext,
   ConversationStore,
+  StoredAttachment,
 } from "../ports/conversation.js"
 import type { Logger } from "../ports/logger.js"
+import type {
+  MediaUnderstanding,
+  ResolvedMedia,
+  Transcriber,
+} from "../ports/media.js"
 import type { MemoryStore } from "../ports/memory.js"
 import type { Summarizer } from "../ports/summary.js"
 import type { TraceSink } from "../ports/trace.js"
@@ -29,6 +35,7 @@ import {
   createCapabilityResolver,
   type Principal,
 } from "./capabilities.js"
+import { buildUserContent } from "./modality.js"
 import { type Audience, buildSystemPrompt } from "./prompt.js"
 import { buildSummaryPrompt, shouldSummarize } from "./summary.js"
 import { buildTools, type TraceIds } from "./tools.js"
@@ -54,6 +61,11 @@ export interface AgentDeps {
   summaryThreshold?: number
   /** Cuántos mensajes recientes se pasan verbatim al modelo. */
   recentLimit?: number
+  /** Comprensión de media (entrada multimodal). null = sin transcripción/visión → se degrada. */
+  transcriber?: Transcriber | null
+  mediaUnderstanding?: MediaUnderstanding | null
+  /** true → imágenes se pasan NATIVAS al modelo de chat (la cadena debe ser vision-capaz). */
+  nativeImages?: boolean
 }
 
 /** Contexto de observabilidad de un turno (lo arma el adapter de canal por request). */
@@ -111,6 +123,9 @@ export function createAgent(deps: AgentDeps) {
     ragIntensity = "full",
     summaryThreshold = DEFAULT_SUMMARY_THRESHOLD,
     recentLimit = DEFAULT_RECENT_LIMIT,
+    transcriber = null,
+    mediaUnderstanding = null,
+    nativeImages = false,
   } = deps
 
   return {
@@ -119,7 +134,11 @@ export function createAgent(deps: AgentDeps) {
      * El error del modelo llega por `onError` (no lanza en textStream) → si erroró sin emitir nada,
      * inyectamos la cortesía. Nunca devuelve vacío ni 500 al usuario.
      */
-    async respond(req: TurnRequest, ctx: TurnContext): Promise<RespondResult> {
+    async respond(
+      req: TurnRequest,
+      ctx: TurnContext,
+      media: ResolvedMedia[] = []
+    ): Promise<RespondResult> {
       const locale: Locale = req.locale ?? "es"
       const turnId = randomUUID()
       const startedAt = Date.now()
@@ -157,12 +176,24 @@ export function createAgent(deps: AgentDeps) {
       let errored = false
       let lastUsage: Usage | undefined
 
+      // Entrada multimodal: resuelve los adjuntos (audio→texto / imagen→texto o part nativa). El I/O de
+      // descarga lo hizo el adapter de canal (pasó `media` con bytes); acá solo se decide y se arma el
+      // content. `derivedText` (texto plano con marcadores) es lo que se previsualiza y se persiste.
+      const { content: userContent, derivedText } = await buildUserContent({
+        userText: req.userText,
+        media,
+        transcriber,
+        understanding: mediaUnderstanding,
+        nativeImages,
+        locale,
+      })
+
       emit({
         ...ids,
         type: "turn.start",
         locale,
         messageCount: convCtx.recent.length + 1,
-        lastUserPreview: preview(req.userText),
+        lastUserPreview: preview(derivedText),
       })
 
       // Tier 1: comprimir el contexto de MEMORIA (resumen + turnos históricos) que va al modelo.
@@ -180,7 +211,7 @@ export function createAgent(deps: AgentDeps) {
         ...recent.map(
           (m) => ({ role: m.role, content: m.content }) as ModelMessage
         ),
-        { role: "user", content: req.userText },
+        { role: "user", content: userContent },
       ]
       if (compressor) {
         const before =
@@ -275,10 +306,19 @@ export function createAgent(deps: AgentDeps) {
       const persist = async (assistant: string): Promise<void> => {
         if (!conversations || !conversationId) return
         try {
+          const userAttachments: StoredAttachment[] = (
+            req.attachments ?? []
+          ).map((a) => ({
+            kind: a.kind,
+            mediaType: a.mediaType,
+            ref: a.ref,
+            ...(a.caption ? { caption: a.caption } : {}),
+          }))
           await conversations.appendTurn(conversationId, turnId, {
-            user: req.userText,
+            user: derivedText,
             assistant,
             ...(lastUsage ? { usage: lastUsage } : {}),
+            ...(userAttachments.length > 0 ? { userAttachments } : {}),
           })
           if (
             summarizer &&

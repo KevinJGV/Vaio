@@ -7,6 +7,7 @@ import {
   bigserial,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -14,6 +15,7 @@ import {
   uuid,
   vector,
 } from "drizzle-orm/pg-core"
+import type { StoredAttachment } from "../../ports/conversation.js"
 
 /** Dimensión de los embeddings. `gemini-embedding-2` da 3072 nativo, pero el índice HNSW de
  *  pgvector está limitado a 2000 dims para el tipo `vector` → truncamos a 1536 vía Matryoshka
@@ -74,6 +76,12 @@ export const messages = pgTable(
     turnId: text("turn_id").notNull(),
     role: text("role").notNull(), // 'user' | 'assistant'
     content: text("content").notNull(),
+    // Metadata de adjuntos del turno (texto-derivado va en `content`; acá kind/mediaType/ref/caption).
+    // Sin binarios. Default [] → backward-compatible, no necesita backfill.
+    attachments: jsonb("attachments")
+      .$type<StoredAttachment[]>()
+      .default([])
+      .notNull(),
     inputTokens: integer("input_tokens"),
     outputTokens: integer("output_tokens"),
     totalTokens: integer("total_tokens"),

@@ -17,11 +17,20 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [~] **Contrato de entrada multimodal** (audio/voz + imágenes) — eje 1 del próximo paso mayor. EN CURSO en
-  `feat/multimodal-input`. Decisiones: multimodal primero (harness/HITL después), audio+imágenes (no PDF),
-  híbrido (puertos de media + parts nativos por config), persistencia texto-derivado+ref. Diseño →
+- [?] **Contrato de entrada multimodal** (audio/voz + imágenes) — eje 1 del próximo paso mayor.
+  IMPLEMENTADO en `feat/multimodal-input` (sin mergear). Decisiones: multimodal primero (harness/HITL
+  después), audio+imágenes (no PDF), híbrido (puertos `Transcriber`/`MediaUnderstanding` + parts nativos por
+  flag `MULTIMODAL_NATIVE_IMAGES`), cadena multimodal propia (`MULTIMODAL_MODELS`), persistencia
+  texto-derivado+ref (`messages.attachments` jsonb). **121 tests verdes** (101 agente + 20 compress);
+  typecheck/biome/build limpios. **e2e ✅:** `/chat` con imagen base64 → visión describe → respuesta grounded
+  ("rojo"); degradación con modelo multimodal roto → `[imagen no procesable]` + HTTP 200 (nunca 500). Diseño →
   [`…-multimodal-input-design.md`](superpowers/specs/2026-06-13-multimodal-input-design.md) · plan →
   [`…-multimodal-input-plan.md`](superpowers/specs/2026-06-13-multimodal-input-plan.md).
+  **Pendiente de Kevin:** (1) aplicar la migración `0002` (`messages.attachments`) a Neon — `db:push` (dev) o
+  `db:migrate` (el e2e mostró que sin la columna el turno responde igual, solo falla la persistencia en
+  background); (2) e2e Telegram real (nota de voz + foto) tras deploy; (3) **followup de prompt**: la persona
+  aún dice "solo proceso texto / no tengo visión" → desacoplar de la nueva capacidad (encaja con los followups
+  de grounding/meta-prompting). (4) review + merge de la rama.
 > Cerrados el 2026-06-13 (→ Historial): `OWNER_TELEGRAM_ID` (local+Railway) · e2e Telegram (owner/visitante + 2
 > topics aislados) · **merge de `feat/conversational-core-telegram` a `main`** · **ahorro de tokens de compresión
 > verificado en logs** (RAG ~3.5% / conv ~0.6%; persona intacta).

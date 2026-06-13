@@ -37,7 +37,7 @@ describe("detectTelegramLocale", () => {
 })
 
 describe("normalizeUpdate", () => {
-  it("mensaje de texto de un user allowlisted → turn", () => {
+  it("mensaje de texto de un user allowlisted → turn (attachments vacío)", () => {
     const r = normalizeUpdate(update(), allowed)
     expect(r).toEqual({
       kind: "turn",
@@ -45,13 +45,14 @@ describe("normalizeUpdate", () => {
       chatId: 999,
       fromId: 42,
       text: "hola",
+      attachments: [],
       locale: "es",
     })
   })
 
-  it("sin texto → ignore(no-text)", () => {
+  it("sin texto ni media → ignore(no-content)", () => {
     const r = normalizeUpdate(update({ text: undefined }), allowed)
-    expect(r).toMatchObject({ kind: "ignore", reason: "no-text" })
+    expect(r).toMatchObject({ kind: "ignore", reason: "no-content" })
   })
 
   it("sin from → ignore(no-from)", () => {
@@ -91,6 +92,88 @@ describe("normalizeUpdate", () => {
   it("input basura no rompe → ignore", () => {
     expect(normalizeUpdate(null, allowed)).toMatchObject({ kind: "ignore" })
     expect(normalizeUpdate(42, allowed)).toMatchObject({ kind: "ignore" })
+  })
+
+  it("nota de voz → turn con attachment de audio", () => {
+    const r = normalizeUpdate(
+      update({
+        text: undefined,
+        voice: { file_id: "v1", mime_type: "audio/ogg" },
+      }),
+      allowed
+    )
+    expect(r).toMatchObject({
+      kind: "turn",
+      text: "",
+      attachments: [{ kind: "audio", fileId: "v1", mediaType: "audio/ogg" }],
+    })
+  })
+
+  it("foto (varios tamaños desordenados) → toma el de mayor file_size", () => {
+    const r = normalizeUpdate(
+      update({
+        text: undefined,
+        photo: [
+          { file_id: "small", file_size: 100, width: 90, height: 90 },
+          { file_id: "big", file_size: 9000, width: 1280, height: 1280 },
+          { file_id: "mid", file_size: 1500, width: 320, height: 320 },
+        ],
+      }),
+      allowed
+    ) as Extract<NormalizeResult, { kind: "turn" }>
+    expect(r.kind).toBe("turn")
+    expect(r.attachments).toEqual([
+      { kind: "image", fileId: "big", mediaType: "image/jpeg" },
+    ])
+  })
+
+  it("foto con caption → el caption es el texto del turno", () => {
+    const r = normalizeUpdate(
+      update({
+        text: undefined,
+        caption: "mirá mi gato",
+        photo: [{ file_id: "p1", file_size: 10, width: 10, height: 10 }],
+      }),
+      allowed
+    )
+    expect(r).toMatchObject({ kind: "turn", text: "mirá mi gato" })
+  })
+
+  it("foto sin caption → text vacío pero attachment presente", () => {
+    const r = normalizeUpdate(
+      update({
+        text: undefined,
+        photo: [{ file_id: "p1", file_size: 10, width: 10, height: 10 }],
+      }),
+      allowed
+    ) as Extract<NormalizeResult, { kind: "turn" }>
+    expect(r.text).toBe("")
+    expect(r.attachments).toHaveLength(1)
+  })
+
+  it("document PDF → unsupported (no ignore silencioso)", () => {
+    const r = normalizeUpdate(
+      update({
+        text: undefined,
+        document: { file_id: "d1", mime_type: "application/pdf" },
+      }),
+      allowed
+    )
+    expect(r).toMatchObject({ kind: "unsupported", chatId: 999 })
+  })
+
+  it("document con mime image/* → tratado como imagen", () => {
+    const r = normalizeUpdate(
+      update({
+        text: undefined,
+        document: { file_id: "d1", mime_type: "image/png" },
+      }),
+      allowed
+    )
+    expect(r).toMatchObject({
+      kind: "turn",
+      attachments: [{ kind: "image", fileId: "d1", mediaType: "image/png" }],
+    })
   })
 })
 

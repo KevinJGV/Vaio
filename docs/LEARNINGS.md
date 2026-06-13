@@ -6,6 +6,18 @@ para no repetirlas en próximas sesiones. Una línea por aprendizaje, concreta.
 > Esto es la memoria del **dev**. La memoria del **producto** (lo que el agente sabe de Kevin)
 > vive en Neon/pgvector — ver `docs/SPEC.md`.
 
+- **Multimodal (AI SDK v6) — decisión nativo-vs-normalizar por CONFIG, no por sniffing**: el core recibe un
+  `LanguageModel` opaco y OpenRouter capa la cadena a 3 modelos server-side (`extraBody.models`) → el core NO
+  sabe cuál respondió ni si soporta visión. Por eso la decisión se lee de config (`MULTIMODAL_NATIVE_IMAGES`)
+  y la transcripción/visión usan su PROPIA cadena (`MULTIMODAL_MODELS`, un Gemini Flash) — así la cadena de
+  chat (barata/free) no tiene que ser vision-capaz y el invariante "siempre responde" no depende de visión.
+  Parts en v6: `UserContent = string | Array<TextPart|ImagePart|FilePart>`; `FilePart {type:"file", data:
+  Uint8Array, mediaType}` sirve para audio Y imagen (un solo modelo cubre ambos vía `generateText`). Si el
+  content termina todo en texto, devolver **string** (no array) preserva el camino actual + prompt-caching.
+- **Multimodal — gotcha de persona/prompt (followup)**: con la visión funcionando, Vaio igual respondía "yo
+  solo proceso texto / no tengo visión" (el system prompt en `prompt.ts` asume text-only). La capacidad está;
+  el copy no la refleja → desacoplar al hacer los followups de grounding. El mecanismo (imagen→descripción→
+  respuesta grounded) funciona; es solo el framing de la persona.
 - **Compresión cavemem — ahorro REAL marginal en este corpus** (medido e2e jun-2026): RAG (`full`)
   ~3.5%, conversación (`lite`) ~0.6%. El benchmark del paquete (≥30%) es sobre prosa inglesa con filler;
   el corpus real (CV/portfolio/GitHub) es **denso/factual** → casi todo se preserva byte-a-byte (listas de

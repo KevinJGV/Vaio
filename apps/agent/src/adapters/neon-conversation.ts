@@ -71,6 +71,7 @@ export function createConversationStore(db: Database): ConversationStore {
             turnId,
             role: "user",
             content: rec.user,
+            attachments: rec.userAttachments ?? [],
           },
           {
             conversationId,

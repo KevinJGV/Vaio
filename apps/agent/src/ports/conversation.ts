@@ -8,6 +8,15 @@ import type { Channel, Usage } from "@vaio/contracts"
 
 export type { Channel }
 
+/** Metadata persistida de un adjunto del turno (texto-derivado + referencia; el binario NO se guarda). */
+export interface StoredAttachment {
+  kind: "image" | "audio"
+  mediaType: string
+  /** Puntero recuperable: telegram file_id | "web-inline:<uuid>". */
+  ref: string
+  caption?: string
+}
+
 /** Un mensaje persistido de una conversación (el resumen vive en la conversación, no acá). */
 export interface StoredMessage {
   role: "user" | "assistant"
@@ -31,6 +40,8 @@ export interface TurnRecord {
   user: string
   assistant: string
   usage?: Usage
+  /** Adjuntos del mensaje del usuario (texto-derivado ya está en `user`; acá la metadata + ref). */
+  userAttachments?: StoredAttachment[]
 }
 
 /** Store de conversaciones: historial persistido + resumen rodante. */

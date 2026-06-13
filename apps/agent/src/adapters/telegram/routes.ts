@@ -4,13 +4,15 @@
 // entrega es no-streaming: drena `text` del core y manda el mensaje (troceado a 4096).
 
 import { randomUUID } from "node:crypto"
-import type { TurnRequest } from "@vaio/contracts"
+import type { InputAttachment, TurnRequest } from "@vaio/contracts"
 import type { Hono } from "hono"
 import { type Agent, courtesy } from "../../core/agent.js"
 import type { Logger } from "../../ports/logger.js"
+import type { ResolvedMedia } from "../../ports/media.js"
 import type { TraceSink } from "../../ports/trace.js"
 import type { Variables } from "../http/types.js"
 import type { TelegramClient } from "./client.js"
+import type { TelegramMedia } from "./media.js"
 import {
   conversationKeyFor,
   isOwnerId,
@@ -27,16 +29,41 @@ export interface TelegramDeps {
   /** Id de Telegram de Kevin (owner). Solo ese id resuelve a `trusted` (perfil pleno). */
   ownerId?: number
   sink: TraceSink
+  /** Descarga de media (audio/voz + imágenes). undefined = sin multimodal → se ignoran adjuntos. */
+  media?: TelegramMedia
 }
 
 type Turn = Extract<NormalizeResult, { kind: "turn" }>
+type Unsupported = Extract<NormalizeResult, { kind: "unsupported" }>
 const DEDUPE_CAP = 1000
+
+/** Mensaje cortés ante un media que aún no soportamos (doc/PDF/video). */
+function unsupportedMessage(locale: "es" | "en"): string {
+  return locale === "en"
+    ? "I can't handle that kind of file yet — I work with text, voice notes and images. Send me one of those? 🙏"
+    : "Todavía no manejo ese tipo de archivo — trabajo con texto, notas de voz e imágenes. ¿Me mandás alguno de esos? 🙏"
+}
 
 export function mountTelegram(
   app: Hono<{ Variables: Variables }>,
   deps: TelegramDeps
 ): void {
   const seen = new Set<number>() // dedupe de update_id (in-memory; seam a persistir)
+
+  const replyUnsupported = async (norm: Unsupported): Promise<void> => {
+    const send: { messageThreadId?: number } = {
+      messageThreadId: norm.threadId,
+    }
+    try {
+      await deps.client.sendMessage(
+        norm.chatId,
+        unsupportedMessage(norm.locale),
+        send
+      )
+    } catch {
+      // si ni eso sale, ya está logueado aguas arriba; no rompemos el ACK.
+    }
+  }
 
   const handleTurn = async (
     norm: Turn,
@@ -53,21 +80,43 @@ export function mountTelegram(
         await deps.client.sendMessage(norm.chatId, courtesy(norm.locale), send)
         return
       }
+      // Bajar los adjuntos (I/O en el adapter). El que no se pueda bajar se descarta (degradación);
+      // el core decide transcribir/describir o pasar nativo con los que sí llegaron.
+      const resolved: ResolvedMedia[] = []
+      for (const att of norm.attachments) {
+        const r = deps.media ? await deps.media.download(att) : null
+        if (r) resolved.push(r)
+      }
+      // Si traía media pero NADA se pudo bajar y no hay texto, no hay turno útil → cortesía.
+      if (
+        norm.attachments.length > 0 &&
+        resolved.length === 0 &&
+        norm.text === ""
+      ) {
+        await deps.client.sendMessage(norm.chatId, courtesy(norm.locale), send)
+        return
+      }
+      const attachments: InputAttachment[] = resolved.map((r) => ({
+        kind: r.kind,
+        mediaType: r.mediaType,
+        ref: r.ref,
+      }))
       const req: TurnRequest = {
         channel: "telegram",
         // 1 topic = 1 conversación (su propia ventana de contexto); DM plano = clave por chat.
         conversationKey: conversationKeyFor(norm.chatId, norm.threadId),
         userText: norm.text,
+        attachments,
         locale: norm.locale,
         principalId: String(norm.fromId),
         // Sólo el owner (Kevin) es de confianza → perfil pleno; el resto = visitante capado.
         trusted: isOwnerId(deps.ownerId, norm.fromId),
       }
-      const { text } = await deps.agent.respond(req, {
-        logger: log,
-        sink: deps.sink,
-        requestId,
-      })
+      const { text } = await deps.agent.respond(
+        req,
+        { logger: log, sink: deps.sink, requestId },
+        resolved
+      )
       await deps.client.sendMessage(norm.chatId, await text, send)
     } catch (err) {
       log.error(
@@ -104,6 +153,11 @@ export function mountTelegram(
     if (seen.size > DEDUPE_CAP) {
       const oldest = seen.values().next().value
       if (oldest !== undefined) seen.delete(oldest)
+    }
+    if (norm.kind === "unsupported") {
+      // Media no soportado (doc/PDF/video): respondemos cortés, no ignoramos en silencio.
+      void replyUnsupported(norm)
+      return c.json({ ok: true })
     }
     // ACK rápido + trabajo en background (Telegram reintenta si tardamos).
     void handleTurn(norm, c.get("requestId") ?? randomUUID(), c.get("log"))
