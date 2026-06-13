@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import type { Env } from "../src/config.js"
 import {
   modelChain,
-  speechConfig,
+  speechChain,
   telegramAllowedIds,
   telegramEnabled,
   transcribeModel,
@@ -53,15 +53,31 @@ describe("envs por modalidad (fase 2)", () => {
     expect(transcribeModel({ OPENROUTER_MODELS: "c/1" } as Env)).toBe("c/1")
     expect(transcribeModel({} as Env)).toBeUndefined()
   })
-  it("speechConfig null sin SPEECH_MODEL; objeto con model/voice/format si está", () => {
-    expect(speechConfig({} as Env)).toBeNull()
+  it("speechChain: parsea model|voice|format por entrada (fallback client-side)", () => {
     expect(
-      speechConfig({
+      speechChain({
+        SPEECH_MODELS: "k/o|af_bella|mp3, g/tts|Zephyr|pcm ",
+        SPEECH_VOICE: "alloy",
+      } as Env)
+    ).toEqual([
+      { model: "k/o", voice: "af_bella", format: "mp3" },
+      { model: "g/tts", voice: "Zephyr", format: "pcm" },
+    ])
+  })
+  it("speechChain: format inválido → mp3; voz omitida → SPEECH_VOICE", () => {
+    expect(
+      speechChain({ SPEECH_MODELS: "k/o", SPEECH_VOICE: "nova" } as Env)
+    ).toEqual([{ model: "k/o", voice: "nova", format: "mp3" }])
+  })
+  it("speechChain: back-compat con SPEECH_MODEL único; vacío → []", () => {
+    expect(
+      speechChain({
         SPEECH_MODEL: "tts/x",
         SPEECH_VOICE: "nova",
-        SPEECH_FORMAT: "mp3",
+        SPEECH_FORMAT: "pcm",
       } as Env)
-    ).toEqual({ model: "tts/x", voice: "nova", format: "mp3" })
+    ).toEqual([{ model: "tts/x", voice: "nova", format: "pcm" }])
+    expect(speechChain({ SPEECH_VOICE: "alloy" } as Env)).toEqual([])
   })
 })
 

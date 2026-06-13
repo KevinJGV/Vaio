@@ -32,11 +32,12 @@
 - [?] **Multimodal Fase 2** (misma rama) — **IMPLEMENTADO**: envs por modalidad (`TRANSCRIBE_MODEL`/
   `VISION_MODELS`/`SPEECH_*`, fallback a `MULTIMODAL_MODELS`); **STT dedicado** `POST /audio/transcriptions`;
   **salida de voz (TTS)** `POST /audio/speech` → Telegram `sendAudio` con policy `shouldSpeak` (default texto;
-  voz si entró voz o se pide); **grounding del prompt** = capacidades de E/S reales (cierra "Vaio dice
-  solo-texto"). Single-provider OpenRouter por REST (ver `openrouter-api-surface`). **136 tests** (116 agente +
-  20 compress); typecheck/biome/build limpios. **e2e ✅:** boot `transcribe/vision/speech` on; `/chat` imagen →
-  "Rojo"; **round-trip TTS→STT real** contra OpenRouter (`hexgrad/kokoro-82m` voz `af_bella` → mp3 →
-  `whisper-large-v3` transcribe). **Rerank** = pendiente futuro (diseño en el design, no se codea: ~29 chunks no
+  voz si entró voz o se pide); **cadena TTS de fallback** `SPEECH_MODELS=model|voice|format,…` (client-side,
+  voz/formato por-modelo; pcm→WAV@24k para Telegram); **grounding del prompt** = capacidades de E/S reales
+  (cierra "Vaio dice solo-texto"). Single-provider OpenRouter por REST (ver `openrouter-api-surface`).
+  **142 tests** (122 agente + 20 compress); typecheck/biome/build limpios. **e2e ✅:** boot
+  `transcribe/vision/speech` on; `/chat` imagen → "Rojo"; **round-trips reales** contra OpenRouter:
+  `kokoro-82m`/`af_bella`→mp3→`whisper-large-v3`, y `gemini-3.1-flash-tts-preview`/`Zephyr`→pcm→WAV@24k→whisper. **Rerank** = pendiente futuro (diseño en el design, no se codea: ~29 chunks no
   aporta). Specs actualizados (`§ Fase 2`).
   **Pendiente de Kevin:** (1) e2e Telegram real (nota de voz → STT → respuesta; voz→audio espejo; "respondeme
   con voz") tras deploy + secrets `SPEECH_MODEL`/`TRANSCRIBE_MODEL`/`VISION_MODELS`; (2) sigue pendiente la

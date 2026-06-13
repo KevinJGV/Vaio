@@ -74,7 +74,13 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((v) => v === "true" || v === "1"),
-  // Salida de voz (TTS) vía POST /audio/speech. Sin SPEECH_MODEL → Vaio nunca habla (solo texto).
+  // Salida de voz (TTS) vía POST /audio/speech. CADENA de fallback client-side: voz Y formato son
+  // POR-MODELO (no portables) → cada entrada lleva `model|voice|format`. Se prueban en orden; la 1ª que
+  // devuelve audio gana; si todas fallan → texto. Ej:
+  //   SPEECH_MODELS=hexgrad/kokoro-82m|af_bella|mp3,google/gemini-3.1-flash-tts-preview|Zephyr|pcm
+  // pcm se envuelve en WAV (Telegram no reproduce pcm crudo). Vacío → Vaio solo habla por texto.
+  SPEECH_MODELS: z.string().optional(),
+  // Back-compat (un solo modelo): se usa solo si SPEECH_MODELS está vacío.
   SPEECH_MODEL: z.string().optional(),
   SPEECH_VOICE: z.string().default("alloy"), // voz provider-specific; verificar en la galería.
   SPEECH_FORMAT: z.enum(["mp3", "pcm"]).default("mp3"),
@@ -144,13 +150,32 @@ export function transcribeModel(env: Env): string | undefined {
   return env.TRANSCRIBE_MODEL?.trim() || multimodalFallback(env)[0]
 }
 
-/** Config de SALIDA de voz (TTS). null si no hay `SPEECH_MODEL` (Vaio solo habla por texto). */
-export function speechConfig(
-  env: Env
-): { model: string; voice: string; format: "mp3" | "pcm" } | null {
-  const model = env.SPEECH_MODEL?.trim()
-  if (!model) return null
-  return { model, voice: env.SPEECH_VOICE, format: env.SPEECH_FORMAT }
+export interface SpeechEntry {
+  model: string
+  voice: string
+  format: "mp3" | "pcm"
+}
+
+/** Cadena de SALIDA de voz (TTS), fallback client-side. Cada entrada `model|voice|format` (voz y formato
+ *  son por-modelo). `SPEECH_MODELS` tiene prioridad; si está vacío, cae al trío `SPEECH_MODEL`/VOICE/FORMAT
+ *  (back-compat). Lista vacía → Vaio solo responde por texto. */
+export function speechChain(env: Env): SpeechEntry[] {
+  const entries = csv(env.SPEECH_MODELS)
+    .map((spec) => {
+      const [model, voice, format] = spec.split("|").map((p) => p.trim())
+      if (!model) return null
+      return {
+        model,
+        voice: voice || env.SPEECH_VOICE,
+        format: format === "pcm" ? "pcm" : "mp3",
+      } satisfies SpeechEntry
+    })
+    .filter((e): e is SpeechEntry => e !== null)
+  if (entries.length > 0) return entries
+  const single = env.SPEECH_MODEL?.trim()
+  return single
+    ? [{ model: single, voice: env.SPEECH_VOICE, format: env.SPEECH_FORMAT }]
+    : []
 }
 
 /** Telegram user ids permitidos (csv → Set<number>, descarta vacíos y no-numéricos). */

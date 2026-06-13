@@ -26,7 +26,7 @@ import { createLoggerTraceSink } from "./adapters/trace-logger.js"
 import {
   loadConfig,
   modelChain,
-  speechConfig,
+  speechChain,
   telegramAllowedIds,
   telegramEnabled,
   transcribeModel,
@@ -126,15 +126,13 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
     mediaUnderstanding,
     nativeImages: env.MULTIMODAL_NATIVE_IMAGES,
   })
-  // Salida de voz (TTS) — solo si hay SPEECH_MODEL. Compartido por canales (hoy Telegram).
-  const sc = speechConfig(env)
-  if (sc) {
+  // Salida de voz (TTS) — cadena de fallback (model|voice|format). Vacía → Vaio solo habla por texto.
+  const ttsChain = speechChain(env)
+  if (ttsChain.length > 0) {
     speech = createSpeechSynthesizer({
       apiKey: env.OPENROUTER_API_KEY,
       baseURL: env.OPENROUTER_BASE_URL,
-      model: sc.model,
-      voice: sc.voice,
-      format: sc.format,
+      chain: ttsChain,
       logger,
     })
   }

@@ -37,7 +37,7 @@ export interface TelegramClient {
 
 /** mediaType → extensión para el nombre del archivo de audio. */
 function audioFilename(mediaType?: string): string {
-  if (mediaType === "audio/pcm") return "voice.pcm"
+  if (mediaType === "audio/wav") return "voice.wav"
   if (mediaType === "audio/ogg") return "voice.ogg"
   return "voice.mp3"
 }

@@ -23,6 +23,13 @@ para no repetirlas en próximas sesiones. Una línea por aprendizaje, concreta.
   Gotcha: los modelos de la tab "Speech"/"Transcription" NO salen en `GET /models` ni en `?output_modalities=audio`
   (eso da chat-con-audio gpt-audio + música lyria) → elegir en la galería. TTS=mp3 → Telegram `sendAudio` (no
   `sendVoice`, que exige OGG/Opus). Decisión de hablar = policy pura `shouldSpeak` (espejo voz-in OR pedido explícito).
+- **TTS — fallback es CLIENT-SIDE y por-modelo** (jun-2026): `/audio/speech` NO acepta el array `models` de
+  fallback server-side (eso es solo de `/chat/completions`). Y **voz + response_format son por-modelo, no
+  portables**: `hexgrad/kokoro-82m`→`af_bella`/mp3; `google/gemini-3.1-flash-tts-preview`→`Zephyr`/**pcm-only**
+  (rechaza mp3). ⇒ cadena `SPEECH_MODELS=model|voice|format,…` probada client-side (1ª con audio gana → si no,
+  texto). **pcm hay que envolverlo en WAV** (Telegram no reproduce pcm crudo): header de 44 bytes,
+  **24000 Hz mono 16-bit** (verificado e2e: 192000 bytes=96000 samples=4.0s @24kHz, coincide con la duración;
+  a 16kHz daría 6s). Round-trip gemini-pcm→WAV@24k→whisper transcribe bien → rate correcto.
 - **Multimodal (AI SDK v6) — decisión nativo-vs-normalizar por CONFIG, no por sniffing**: el core recibe un
   `LanguageModel` opaco y OpenRouter capa la cadena a 3 modelos server-side (`extraBody.models`) → el core NO
   sabe cuál respondió ni si soporta visión. Por eso la decisión se lee de config (`MULTIMODAL_NATIVE_IMAGES`)
