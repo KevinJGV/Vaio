@@ -2,6 +2,7 @@
 // (`conversations` + `messages`). La tabla `facts` (extracción semántica) llega en otra iteración.
 // El índice HNSW con `vector_cosine_ops` acelera la búsqueda por distancia coseno (<=>).
 
+import type { TraceEvent } from "@vaio/contracts"
 import {
   bigint,
   bigserial,
@@ -90,5 +91,27 @@ export const messages = pgTable(
   (t) => [
     index("messages_conversation_idx").on(t.conversationId, t.id),
     uniqueIndex("messages_turn_role_uq").on(t.conversationId, t.turnId, t.role),
+  ]
+)
+
+/** Traza persistida del agente: 1 fila por TraceEvent (append-only). Mismos eventos que el sink de stdout
+ *  (turn.start/reasoning/tool.call/tool.result/llm.step/turn.finish/turn.error). Habilita debug de
+ *  conversaciones / panel futuro. `seq` = orden dentro del turno (los inserts async no garantizan id/time). */
+export const traceEvents = pgTable(
+  "trace_events",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    requestId: text("request_id").notNull(),
+    // Nullable: los turnos stateless (sin DB de conversación) no traen conversationId. Sin FK dura.
+    conversationId: uuid("conversation_id"),
+    turnId: text("turn_id").notNull(),
+    seq: integer("seq").notNull(),
+    type: text("type").notNull(),
+    payload: jsonb("payload").$type<TraceEvent>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (t) => [
+    index("trace_events_conv_idx").on(t.conversationId, t.id),
+    index("trace_events_turn_idx").on(t.turnId, t.seq),
   ]
 )

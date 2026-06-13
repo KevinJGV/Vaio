@@ -23,6 +23,12 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((v) => v === "true" || v === "1"),
+  // Persistir la traza de cada turno en Postgres (tabla trace_events) si hay DB. ON salvo "false"/"0".
+  // El contenido se guarda COMPLETO (DB privada); la redacción LOG_PROMPTS es solo para stdout.
+  TRACE_PERSIST: z
+    .string()
+    .optional()
+    .transform((v) => v !== "false" && v !== "0"),
 
   // Auth del agente (lo valida el middleware; lo conoce solo el proxy del portafolio).
   AGENT_API_KEY: z.string().optional(),

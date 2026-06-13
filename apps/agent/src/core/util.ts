@@ -7,6 +7,14 @@ export function errMsg(e: unknown): string {
   return e instanceof Error ? e.message : String(e)
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** True si `s` es un UUID (para columnas uuid: los ids stateless/no-conversación no lo son). */
+export function isUuid(s: string): boolean {
+  return UUID_RE.test(s)
+}
+
 /** Comprime `text` si hay compresor; si es null o el texto está vacío, devuelve el crudo
  *  (degradación: la compresión nunca debe romper un turno). */
 export function compressOrRaw(

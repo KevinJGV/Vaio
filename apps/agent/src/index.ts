@@ -22,7 +22,9 @@ import { createSummarizer } from "./adapters/summarizer.js"
 import { createTelegramClient } from "./adapters/telegram/client.js"
 import { createTelegramMedia } from "./adapters/telegram/media.js"
 import type { TelegramDeps } from "./adapters/telegram/routes.js"
+import { createCompositeTraceSink } from "./adapters/trace-composite.js"
 import { createLoggerTraceSink } from "./adapters/trace-logger.js"
+import { createPgTraceSink } from "./adapters/trace-pg.js"
 import {
   attribution as buildAttribution,
   loadConfig,
@@ -46,7 +48,19 @@ const logger = createLogger({
   format: env.LOG_FORMAT,
   nodeEnv: env.NODE_ENV,
 })
-const sink = createLoggerTraceSink(logger, { logPrompts: env.LOG_PROMPTS })
+// DB (Pool) único: lo comparten conversaciones, RAG y la persistencia de traces. null = sin DB.
+const dbHandle = env.DATABASE_URL ? createDb(env.DATABASE_URL) : null
+// Traza: siempre a stdout (pino); + Postgres si hay DB y TRACE_PERSIST (mismos eventos, contenido completo).
+const loggerSink = createLoggerTraceSink(logger, {
+  logPrompts: env.LOG_PROMPTS,
+})
+const sink =
+  dbHandle && env.TRACE_PERSIST
+    ? createCompositeTraceSink([
+        loggerSink,
+        createPgTraceSink(dbHandle.db, logger),
+      ])
+    : loggerSink
 // App attribution para OpenRouter (dashboard): se pasa al provider y a las llamadas REST.
 const attribution = buildAttribution(env)
 const models = modelChain(env)
@@ -65,8 +79,8 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
   // La memoria conversacional (conversations/messages) solo necesita DB; el RAG necesita además
   // la key de embeddings (comparte provider con el chat → si no hay propia, usa la de OpenRouter).
   const embeddingsKey = env.EMBEDDINGS_API_KEY || env.OPENROUTER_API_KEY
-  if (env.DATABASE_URL) {
-    const { db } = createDb(env.DATABASE_URL)
+  if (dbHandle) {
+    const { db } = dbHandle
     conversations = createConversationStore(db)
     if (embeddingsKey) {
       const embedder = createEmbedder({
@@ -198,6 +212,7 @@ logger.info(
     conversations: conversations !== null,
     summarizer: summarizer !== null,
     compress: compressor !== null,
+    tracePersist: dbHandle !== null && env.TRACE_PERSIST,
     transcribe: transcriber !== null,
     vision: mediaUnderstanding !== null,
     speech: speech !== null,
