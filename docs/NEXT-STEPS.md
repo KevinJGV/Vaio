@@ -195,6 +195,21 @@ El puerto `Compressor` (Tier 1, determinístico) hoy se aplica a **conversación
   que Vaio participe del desarrollo (Claude Code u otros arneses) llevando prácticas/contexto de Kevin;
   ahí también cabría el **caveman de salida** (respuestas terse agente→agente, donde la persona no importa).
 
+> **Nota de diseño (2026-06-13) — dónde la compresión SÍ rinde, y dónde no.** El ahorro hoy es marginal
+> (~3.5% RAG / ~0.6% conv) porque el corpus es denso/factual. En **uso agéntico / desarrollo de sistemas** el
+> ahorro debería crecer, pero NO uniformemente:
+> - **SÍ rinde:** (a) prosa explicativa/conversacional voluminosa (más filler removible que el CV); (b) volumen
+>   alto → ahorro **absoluto** mayor aunque el % sea parecido, y el resumen rodante recién comprime de verdad al
+>   cruzar `SUMMARY_THRESHOLD` (12); (c) **caveman de salida agente→agente** en `ultra` (sin persona/legibilidad
+>   que cuidar → se puede comprimir agresivo).
+> - **NO rinde (por diseño):** código, paths, diffs, stack traces, identificadores → se preservan **byte-a-byte**
+>   a propósito; una charla 80% código tiene techo de ahorro bajo. Además el léxico es **ES** y mucho trabajo
+>   agéntico es en inglés.
+> - **Implicación:** la compresión léxica determinística es ahorro **gratis complementario**, NO el motor de
+>   costo. Las palancas grandes en uso agéntico serán: **selección/retrieval** (qué entra al contexto), el
+>   **resumen Tier 2 (LLM)** de historiales largos, y la **salida terse agente→agente**. Validar con medición
+>   real cuando "Vaio como harness" tenga su par design+plan (no asumir el % del CV).
+
 **Después de la iteración 2: integración del portafolio** (`ChatSheet.tsx` + proxy `/api/agent` →
 apuntar al dominio **público** de Railway, no al `.internal`). Luego `apps/web`. Diseño:
 [`SPEC.md`](SPEC.md) · Workflow: [`../CLAUDE.md`](../CLAUDE.md).
