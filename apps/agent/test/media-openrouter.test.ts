@@ -4,6 +4,7 @@ import {
   createMediaUnderstanding,
   createTranscriber,
 } from "../src/adapters/media-openrouter.js"
+import { attributionHeaders } from "../src/adapters/openrouter.js"
 import type { Logger } from "../src/ports/logger.js"
 
 const noop = (() => {}) as unknown as Logger["info"]
@@ -19,6 +20,15 @@ const data = new TextEncoder().encode("fake-bytes")
 const realFetch = globalThis.fetch
 afterEach(() => {
   globalThis.fetch = realFetch
+})
+
+describe("attributionHeaders", () => {
+  it("mapea appUrl→HTTP-Referer y appName→X-Title; sin attribution → {}", () => {
+    expect(
+      attributionHeaders({ appName: "Vaio", appUrl: "https://vindevsito.dev" })
+    ).toEqual({ "HTTP-Referer": "https://vindevsito.dev", "X-Title": "Vaio" })
+    expect(attributionHeaders(undefined)).toEqual({})
+  })
 })
 
 describe("createTranscriber (REST /audio/transcriptions)", () => {

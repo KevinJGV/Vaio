@@ -33,6 +33,10 @@ const envSchema = z.object({
   // Base REST de OpenRouter para los endpoints que el provider del AI SDK NO envuelve
   // (/audio/transcriptions, /audio/speech, /rerank). Ver memoria `openrouter-api-surface`.
   OPENROUTER_BASE_URL: z.string().url().default("https://openrouter.ai/api/v1"),
+  // App attribution: identifica la app en el dashboard de OpenRouter (sin esto aparece "unknown").
+  // appName → header X-Title; appUrl → HTTP-Referer. Aplica al provider del AI SDK Y a las llamadas REST.
+  APP_NAME: z.string().default("Vaio"),
+  APP_URL: z.string().default("https://vindevsito.dev"),
 
   // Memoria (Neon + embeddings).
   DATABASE_URL: z.string().optional(),
@@ -108,6 +112,15 @@ export function loadConfig(): Env {
     throw new Error("Configuración de entorno inválida.")
   }
   return parsed.data
+}
+
+/** Atribución de app para OpenRouter (dashboard). appName→X-Title, appUrl→HTTP-Referer. */
+export interface Attribution {
+  appName: string
+  appUrl: string
+}
+export function attribution(env: Env): Attribution {
+  return { appName: env.APP_NAME, appUrl: env.APP_URL }
 }
 
 /** Cadena de fallback de modelos (primario → fallback → free), desde OPENROUTER_MODELS. */

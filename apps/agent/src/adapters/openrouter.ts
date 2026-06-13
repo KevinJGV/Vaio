@@ -4,12 +4,14 @@
 
 import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import type { LanguageModel } from "ai"
+import type { Attribution } from "../config.js"
 import type { Logger } from "../ports/logger.js"
 
 export function createModel(
   apiKey: string,
   models: string[],
-  logger?: Logger
+  logger?: Logger,
+  attribution?: Attribution
 ): LanguageModel {
   // OpenRouter limita el array `models` (cadena de fallback) a 3 ítems → capamos y avisamos.
   const chain = models.slice(0, 3)
@@ -21,6 +23,23 @@ export function createModel(
       "OPENROUTER_MODELS > 3; OpenRouter limita la cadena de fallback a 3"
     )
   }
-  const openrouter = createOpenRouter({ apiKey })
+  // App attribution (dashboard de OpenRouter): appName→X-Title, appUrl→HTTP-Referer.
+  const openrouter = createOpenRouter({
+    apiKey,
+    ...(attribution
+      ? { appName: attribution.appName, appUrl: attribution.appUrl }
+      : {}),
+  })
   return openrouter.chat(primary, { extraBody: { models: chain } })
+}
+
+/** Headers de atribución para las llamadas REST a OpenRouter (que no pasan por el provider). */
+export function attributionHeaders(
+  attribution?: Attribution
+): Record<string, string> {
+  if (!attribution) return {}
+  return {
+    "HTTP-Referer": attribution.appUrl,
+    "X-Title": attribution.appName,
+  }
 }

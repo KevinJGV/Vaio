@@ -9,8 +9,10 @@
 
 import type { Locale } from "@vaio/contracts"
 import { generateText, type LanguageModel } from "ai"
+import type { Attribution } from "../config.js"
 import type { Logger } from "../ports/logger.js"
 import type { MediaUnderstanding, Transcriber } from "../ports/media.js"
+import { attributionHeaders } from "./openrouter.js"
 
 const DESCRIBE_ASK: Record<Locale, string> = {
   es: "Describí esta imagen de forma precisa y concisa para que un asistente la use como contexto.",
@@ -30,7 +32,8 @@ export function createTranscriber(
   apiKey: string,
   baseURL: string,
   model: string,
-  logger: Logger
+  logger: Logger,
+  attribution?: Attribution
 ): Transcriber {
   return {
     async transcribe({ data, mediaType, locale = "es" }) {
@@ -40,6 +43,7 @@ export function createTranscriber(
         headers: {
           authorization: `Bearer ${apiKey}`,
           "content-type": "application/json",
+          ...attributionHeaders(attribution),
         },
         body: JSON.stringify({
           model,

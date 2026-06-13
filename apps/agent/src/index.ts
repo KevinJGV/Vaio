@@ -24,6 +24,7 @@ import { createTelegramMedia } from "./adapters/telegram/media.js"
 import type { TelegramDeps } from "./adapters/telegram/routes.js"
 import { createLoggerTraceSink } from "./adapters/trace-logger.js"
 import {
+  attribution as buildAttribution,
   loadConfig,
   modelChain,
   speechChain,
@@ -46,6 +47,8 @@ const logger = createLogger({
   nodeEnv: env.NODE_ENV,
 })
 const sink = createLoggerTraceSink(logger, { logPrompts: env.LOG_PROMPTS })
+// App attribution para OpenRouter (dashboard): se pasa al provider y a las llamadas REST.
+const attribution = buildAttribution(env)
 const models = modelChain(env)
 // Compresor de contexto (Tier 1, determinístico). Independiente de OpenRouter/DB.
 const compressor = env.COMPRESS_ENABLED ? createCompressor() : null
@@ -82,13 +85,13 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
   } else {
     logger.warn("Sin DATABASE_URL → sin memoria conversacional ni RAG.")
   }
-  const model = createModel(env.OPENROUTER_API_KEY, models, logger)
+  const model = createModel(env.OPENROUTER_API_KEY, models, logger, attribution)
   // Resumidor: modelo barato. SUMMARY_MODEL o la cola de la cadena (el más barato/de respaldo).
   const summaryModel =
     env.SUMMARY_MODEL ?? models[models.length - 1] ?? models[0]
   if (summaryModel) {
     summarizer = createSummarizer(
-      createModel(env.OPENROUTER_API_KEY, [summaryModel], logger)
+      createModel(env.OPENROUTER_API_KEY, [summaryModel], logger, attribution)
     )
   }
   // Comprensión de media POR MODALIDAD (cada una su modelo/endpoint; no la cadena de chat):
@@ -100,7 +103,8 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
       env.OPENROUTER_API_KEY,
       env.OPENROUTER_BASE_URL,
       sttModel,
-      logger
+      logger,
+      attribution
     )
   } else {
     logger.warn("Sin TRANSCRIBE_MODEL → STT OFF.")
@@ -108,7 +112,7 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
   const visChain = visionChain(env)
   if (visChain.length > 0) {
     mediaUnderstanding = createMediaUnderstanding(
-      createModel(env.OPENROUTER_API_KEY, visChain, logger),
+      createModel(env.OPENROUTER_API_KEY, visChain, logger, attribution),
       logger
     )
   } else {
@@ -136,6 +140,7 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
       baseURL: env.OPENROUTER_BASE_URL,
       chain: ttsChain,
       logger,
+      attribution,
     })
   }
 } else {

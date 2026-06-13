@@ -4,18 +4,20 @@
 // audio gana; si todas fallan → null (el canal cae a texto). pcm se envuelve en WAV (Telegram no reproduce
 // pcm crudo). La key va en Authorization; nunca se loguea.
 
-import type { SpeechEntry } from "../config.js"
+import type { Attribution, SpeechEntry } from "../config.js"
 import { pcmToWav } from "../core/wav.js"
 import type { Logger } from "../ports/logger.js"
 import type { SpeechSynthesizer } from "../ports/speech.js"
+import { attributionHeaders } from "./openrouter.js"
 
 export function createSpeechSynthesizer(args: {
   apiKey: string
   baseURL: string
   chain: SpeechEntry[]
   logger: Logger
+  attribution?: Attribution
 }): SpeechSynthesizer {
-  const { apiKey, baseURL, chain, logger } = args
+  const { apiKey, baseURL, chain, logger, attribution } = args
   return {
     async synthesize(text) {
       const input = text.trim()
@@ -28,6 +30,7 @@ export function createSpeechSynthesizer(args: {
             headers: {
               authorization: `Bearer ${apiKey}`,
               "content-type": "application/json",
+              ...attributionHeaders(attribution),
             },
             body: JSON.stringify({
               model: entry.model,

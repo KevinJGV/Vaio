@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { Env } from "../src/config.js"
 import {
+  attribution,
   modelChain,
   speechChain,
   telegramAllowedIds,
@@ -30,6 +31,14 @@ describe("modelChain", () => {
     const chain = modelChain(envWith("primary,fallback,free"))
     expect(chain[0]).toBe("primary")
     expect(chain.at(-1)).toBe("free")
+  })
+})
+
+describe("attribution", () => {
+  it("toma APP_NAME/APP_URL del entorno", () => {
+    expect(
+      attribution({ APP_NAME: "Vaio", APP_URL: "https://x.dev" } as Env)
+    ).toEqual({ appName: "Vaio", appUrl: "https://x.dev" })
   })
 })
 
