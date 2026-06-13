@@ -2,23 +2,22 @@
 
 > **ESTADO ACTUAL (2026-06-13) — fuente de verdad viva.**
 > **Fase 1: completa y DESPLEGADA** (Railway/Docker; RAG real Neon+pgvector; observabilidad pino) — en `main`.
-> **Rama `feat/conversational-core-telegram` (sin mergear):** iteración 2 (núcleo *stateful* + capacidades por
-> canal + Telegram `/tg`), **compresión cavemem** (`@vaio/compress`), **refinamiento Telegram** (hilos/topics,
-> HTML, identidad/owner), **hot-sync de esquema** (`db:push` + release step) y la **corrección mínima de
-> grounding** (voz≠hechos). **Tests: 75 agente + 20 compress; typecheck/biome/build limpios.** El bot real ya
-> respondió por Telegram (e2e básico hecho; Kevin fue tratado como *visitante* → falta `OWNER_TELEGRAM_ID`).
-> **Pendiente real de Kevin:** `OWNER_TELEGRAM_ID` (local+Railway) · e2e 2 topics (contexto aislado) +
-> owner-vs-visitante · ver ahorro de tokens de compresión en logs · **review + merge de la rama**.
+> **Iteración 2 — MERGEADA en `main`:** núcleo *stateful* + capacidades por canal + Telegram `/tg`,
+> **compresión cavemem** (`@vaio/compress`), **refinamiento Telegram** (hilos/topics, HTML, identidad/owner),
+> **hot-sync de esquema** (`db:push` + release step) y la **corrección mínima de grounding** (voz≠hechos).
+> **Tests: 75 agente + 20 compress; typecheck/biome/build limpios** (snapshot del merge). **e2e real ✅:** con
+> `OWNER_TELEGRAM_ID` puesto (local+Railway), el bot respondió por Telegram → owner-vs-visitante y 2 topics con
+> contexto aislado verificados.
+> **Único pendiente abierto:** ver el **ahorro de tokens de compresión** en logs (persona/calidad intacta).
 > **Foco / "go" pendiente:** followups de grounding (§ "Hallazgos del bot real") + **próximo paso mayor**
 > (entrada multimodal + framework de tools/harness). **El portafolio va DESPUÉS — NO es el próximo paso.**
 
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [ ] (Kevin) `OWNER_TELEGRAM_ID` en `.env` local + secrets de Railway.
-- [?] e2e Telegram real: 2 topics (contexto aislado) + owner-vs-visitante.
-- [?] Compresión: confirmar ahorro de tokens en logs + persona/calidad intacta.
-- [ ] Review + merge de `feat/conversational-core-telegram` (al validar lo de arriba).
+- [?] Compresión: confirmar **ahorro de tokens** en logs + persona/calidad intacta. _(ÚNICO pendiente abierto)_
+> Cerrados el 2026-06-13 (→ Historial): `OWNER_TELEGRAM_ID` (local+Railway) · e2e Telegram (owner/visitante + 2
+> topics aislados) · **merge de `feat/conversational-core-telegram` a `main`**.
 
 ---
 
@@ -59,8 +58,8 @@ background); canal **Telegram** `/tg`. **58 tests verdes**; typecheck/biome/buil
 OK (`/health`, `/chat` auth+cortesía, `/tg` secret/allowlist/dedupe). Diseño técnico →
 [`…-telegram-design.md`](superpowers/specs/2026-06-12-stateful-channels-telegram-design.md) ·
 plan de alto nivel → [`…-telegram-plan.md`](superpowers/specs/2026-06-12-stateful-channels-telegram-plan.md).
-**Pendiente (Kevin):** `db:migrate` (aplica `0001` a Neon — muta la DB) + e2e real (multi-turno por
-`/chat` con mismo `conversationId`; bot real de Telegram vía `setWebhook`); luego review + merge.
+**✅ Cerrado (2026-06-13):** `db:migrate` aplicado + e2e real (multi-turno por `/chat` con mismo
+`conversationId`; bot real de Telegram vía `setWebhook`) verificado; **rama mergeada a `main`**.
 Diferido a iteraciones siguientes (cada una su par design+plan): HITL/escalación, facts semánticos, Graphiti.
 
 **🟢 IMPLEMENTADA (misma rama) — Capa de compresión determinística (cavemem):** `@cavemem/compress`
@@ -70,8 +69,8 @@ resumen LLM). **84 tests verdes** (18 del paquete + 66 del agente); typecheck/bi
 (`compress:true`, 0 import-errors). Diseño/plan →
 [`…-cavemem-compression-design.md`](superpowers/specs/2026-06-12-cavemem-compression-design.md) ·
 [`…-cavemem-compression-plan.md`](superpowers/specs/2026-06-12-cavemem-compression-plan.md).
-**Pendiente (Kevin):** e2e real con keys (ver el ahorro de tokens en logs + calidad/persona intacta);
-luego review + merge de toda la rama.
+**Pendiente (Kevin):** confirmar el **ahorro de tokens** en logs (calidad/persona intacta) — *único ítem
+abierto del WIP*. La rama ya está **mergeada a `main`** (2026-06-13).
 
 **🟢 IMPLEMENTADA (misma rama) — Sync de esquema (DX Convex-like) + refinamiento Telegram** (2026-06-12):
 (a) **hot-sync de esquema**: `db:push`/`db:push:watch` (dev) + release step de migraciones en deploy
@@ -84,8 +83,8 @@ Kevin; `audience` inyectada al system prompt. **75 tests del agente + 20 compres
 biome/build limpios. Diseño/plan →
 [`…-telegram-threads-persona-identity-design.md`](superpowers/specs/2026-06-12-telegram-threads-persona-identity-design.md)
 · [`…-plan.md`](superpowers/specs/2026-06-12-telegram-threads-persona-identity-plan.md).
-**Pendiente (Kevin):** poner `OWNER_TELEGRAM_ID` (id de @userinfobot) en local+Railway; e2e real (2 topics
-= contexto aislado; owner vs visitante; HTML renderiza y rompe→plano).
+**✅ Cerrado (2026-06-13):** `OWNER_TELEGRAM_ID` puesto (local+Railway); e2e real verificado (2 topics =
+contexto aislado; owner vs visitante; HTML renderiza y, si rompe, cae a plano).
 
 ### 🔜 PRÓXIMO PASO MAYOR — evolución del core conversacional (espera el "go" de Kevin para `brainstorming`)
 La base conversacional (texto) quedó sólida y validada → es el cimiento del adaptador. **Antes de apilar
@@ -194,7 +193,7 @@ apuntar al dominio **público** de Railway, no al `.internal`). Luego `apps/web`
 ## Cuentas / keys — estado
 Las keys de **Fase 1 ya están** (OpenRouter, Neon `DATABASE_URL`, Embeddings, GitHub, Railway, Last.fm) y el
 repo está **conectado a Railway** (desplegado y corriendo). **Pendiente de Kevin (solo cuentas/secrets):**
-- `OWNER_TELEGRAM_ID` (id de @userinfobot) en `.env` local + secrets de Railway → habilita el perfil **owner**.
+- ~~`OWNER_TELEGRAM_ID` (id de @userinfobot) en `.env` local + secrets de Railway~~ → **✅ puesto (2026-06-13)**; perfil **owner** activo.
 - *(MÁS ADELANTE, para integrar el portafolio):* en **Vercel** `AGENT_URL`, `AGENT_API_KEY` (la del proxy) +
   Upstash Redis (rate-limit), apuntando al dominio **público** de Railway.
 
@@ -218,9 +217,9 @@ fase 2 estén activos a la vez, o aparezcan ≥2 síntomas de que el `SPEC.md` m
 
 ## Secuencia sugerida (desde hoy)
 1. **Fase 1** (keys → memory/ingest/agent → local → **deploy Railway**). ✅ HECHO.
-2. **Iteración 2 + compresión + refinamiento Telegram + hot-sync + fix grounding** (en la rama). ✅ HECHO (sin mergear).
-3. **(Kevin)** `OWNER_TELEGRAM_ID` + e2e real (2 topics, owner/visitante, ahorro de tokens). **← acción de Kevin.**
-4. **Review + merge** de `feat/conversational-core-telegram`. **← siguiente al validar.**
+2. **Iteración 2 + compresión + refinamiento Telegram + hot-sync + fix grounding** → **✅ MERGEADO en `main`** (2026-06-13).
+3. **(Kevin)** `OWNER_TELEGRAM_ID` + e2e real (2 topics, owner/visitante) → **✅ HECHO**; queda solo **ver el ahorro de tokens** en logs.
+4. **Review + merge** de `feat/conversational-core-telegram` → **✅ HECHO** (2026-06-13).
 5. **Próximo paso mayor** (espera "go"): contrato de entrada **multimodal** + framework de **tools/harness**
    (§ "Próximo paso mayor") y los **followups de grounding** (§ "Hallazgos del bot real").
 6. **Después:** integración del portafolio (`ChatSheet.tsx` + proxy → dominio público de Railway). Luego `apps/web`.

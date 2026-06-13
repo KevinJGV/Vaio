@@ -1,12 +1,13 @@
 # Spec — Agente personal de IA "Vaio"
 
 **Estado:** Fase 1 (MVP) **en `main` y desplegado en Railway** (Docker). Observabilidad en `main`.
-**Iteración 2 (núcleo conversacional + canales + Telegram)** implementada en rama
-`feat/conversational-core-telegram` (memoria conversacional persistida + resumen rodante, arnés con
-capacidades por canal, canal Telegram `/tg`). Plan/diseño por feature →
+**Iteración 2 (núcleo conversacional + canales + Telegram)** **mergeada en `main`** (memoria conversacional
+persistida + resumen rodante, arnés con capacidades por canal, canal Telegram `/tg`, compresión cavemem,
+refinamiento Telegram, hot-sync de esquema). e2e verificado (owner/visitante, 2 topics aislados); **único
+pendiente = ver el ahorro de tokens de compresión en logs.** Plan/diseño por feature →
 [`superpowers/specs/2026-06-12-stateful-channels-telegram-{design,plan}.md`](superpowers/specs/).
-**Siguiente:** followups de grounding + evolución del core (entrada multimodal / framework de tools-harness) +
-review/merge de la rama; **el portafolio va DESPUÉS**. Actualizado 2026-06-13
+**Siguiente:** followups de grounding + evolución del core (entrada multimodal / framework de tools-harness);
+**el portafolio va DESPUÉS**. Actualizado 2026-06-13
 **Repos:** este spec vive en AMBOS — el portafolio (`KevinJGV`) y el repo del agente
 (`Vaio`). Mantener en sync.
 
