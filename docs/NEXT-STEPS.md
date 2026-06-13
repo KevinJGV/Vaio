@@ -17,7 +17,11 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- _(vacío — sin ítems abiertos)_
+- [~] **Contrato de entrada multimodal** (audio/voz + imágenes) — eje 1 del próximo paso mayor. EN CURSO en
+  `feat/multimodal-input`. Decisiones: multimodal primero (harness/HITL después), audio+imágenes (no PDF),
+  híbrido (puertos de media + parts nativos por config), persistencia texto-derivado+ref. Diseño →
+  [`…-multimodal-input-design.md`](superpowers/specs/2026-06-13-multimodal-input-design.md) · plan →
+  [`…-multimodal-input-plan.md`](superpowers/specs/2026-06-13-multimodal-input-plan.md).
 > Cerrados el 2026-06-13 (→ Historial): `OWNER_TELEGRAM_ID` (local+Railway) · e2e Telegram (owner/visitante + 2
 > topics aislados) · **merge de `feat/conversational-core-telegram` a `main`** · **ahorro de tokens de compresión
 > verificado en logs** (RAG ~3.5% / conv ~0.6%; persona intacta).
