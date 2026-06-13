@@ -208,8 +208,9 @@ directo** → Vaio sigue **single-provider**. Slugs/precios: galería `openroute
 
 ### Cambios de diseño
 - **Config por modalidad** (`config.ts`): `TRANSCRIBE_MODEL` (STT), `VISION_MODELS` (csv, chat+file-part),
-  `SPEECH_MODEL`+`SPEECH_VOICE`+`SPEECH_FORMAT` (default `mp3`). `MULTIMODAL_MODELS` queda como **fallback** de
-  visión/transcripción (back-compat). Helpers `visionChain`/`transcribeModel`/`speechConfig`.
+  `SPEECH_MODELS` (cadena TTS `model|voice|format`; voz omitida→"alloy", formato→"mp3"). `MULTIMODAL_MODELS`
+  queda como **fallback** de visión/transcripción (back-compat). Helpers `visionChain`/`transcribeModel`/
+  `speechChain`. (No hay vars `SPEECH_MODEL/VOICE/FORMAT` sueltas: `SPEECH_MODELS` las subsume.)
 - **STT dedicado** (`adapters/media-openrouter.ts`): `createTranscriber(apiKey, baseURL, model)` → `fetch`
   `POST /audio/transcriptions` con `input_audio:{data:base64, format}`. (Visión sigue `generateText`+file-part
   sobre `VISION_MODELS`.) Transcriber y visión dejan de compartir un solo `LanguageModel`.
@@ -230,7 +231,7 @@ directo** → Vaio sigue **single-provider**. Slugs/precios: galería `openroute
   (mantiene voz≠hechos).
 
 ### Edge cases (fase 2)
-- `SPEECH_MODEL` ausente → `speech` null → siempre texto (sin romper). `synthesize` falla → null → texto.
+- `SPEECH_MODELS` vacío → `speech` null → siempre texto (sin romper). Toda la cadena falla → null → texto.
 - TTS solo si `shouldSpeak`; default texto → cero costo extra en el caso común.
 - mp3 vía `sendAudio` (no `sendVoice`, que exige OGG/Opus y OpenRouter da mp3|pcm).
 - Token de Telegram y key de OpenRouter jamás en logs (tests lo verifican).

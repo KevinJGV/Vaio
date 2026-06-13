@@ -80,10 +80,6 @@ const envSchema = z.object({
   //   SPEECH_MODELS=hexgrad/kokoro-82m|af_bella|mp3,google/gemini-3.1-flash-tts-preview|Zephyr|pcm
   // pcm se envuelve en WAV (Telegram no reproduce pcm crudo). Vacío → Vaio solo habla por texto.
   SPEECH_MODELS: z.string().optional(),
-  // Back-compat (un solo modelo): se usa solo si SPEECH_MODELS está vacío.
-  SPEECH_MODEL: z.string().optional(),
-  SPEECH_VOICE: z.string().default("alloy"), // voz provider-specific; verificar en la galería.
-  SPEECH_FORMAT: z.enum(["mp3", "pcm"]).default("mp3"),
   // Límite defensivo de tamaño de media (descarga Telegram / base64 web). Default 20MB.
   MEDIA_MAX_BYTES: z.coerce
     .number()
@@ -157,25 +153,20 @@ export interface SpeechEntry {
 }
 
 /** Cadena de SALIDA de voz (TTS), fallback client-side. Cada entrada `model|voice|format` (voz y formato
- *  son por-modelo). `SPEECH_MODELS` tiene prioridad; si está vacío, cae al trío `SPEECH_MODEL`/VOICE/FORMAT
- *  (back-compat). Lista vacía → Vaio solo responde por texto. */
+ *  son por-modelo, no portables). Voz omitida → "alloy"; formato omitido/ inválido → "mp3". Lista vacía →
+ *  Vaio solo responde por texto. */
 export function speechChain(env: Env): SpeechEntry[] {
-  const entries = csv(env.SPEECH_MODELS)
+  return csv(env.SPEECH_MODELS)
     .map((spec) => {
       const [model, voice, format] = spec.split("|").map((p) => p.trim())
       if (!model) return null
       return {
         model,
-        voice: voice || env.SPEECH_VOICE,
+        voice: voice || "alloy",
         format: format === "pcm" ? "pcm" : "mp3",
       } satisfies SpeechEntry
     })
     .filter((e): e is SpeechEntry => e !== null)
-  if (entries.length > 0) return entries
-  const single = env.SPEECH_MODEL?.trim()
-  return single
-    ? [{ model: single, voice: env.SPEECH_VOICE, format: env.SPEECH_FORMAT }]
-    : []
 }
 
 /** Telegram user ids permitidos (csv → Set<number>, descarta vacíos y no-numéricos). */

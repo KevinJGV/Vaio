@@ -40,7 +40,7 @@
   `kokoro-82m`/`af_bella`→mp3→`whisper-large-v3`, y `gemini-3.1-flash-tts-preview`/`Zephyr`→pcm→WAV@24k→whisper. **Rerank** = pendiente futuro (diseño en el design, no se codea: ~29 chunks no
   aporta). Specs actualizados (`§ Fase 2`).
   **Pendiente de Kevin:** (1) e2e Telegram real (nota de voz → STT → respuesta; voz→audio espejo; "respondeme
-  con voz") tras deploy + secrets `SPEECH_MODEL`/`TRANSCRIBE_MODEL`/`VISION_MODELS`; (2) sigue pendiente la
+  con voz") tras deploy + secrets `SPEECH_MODELS`/`TRANSCRIBE_MODEL`/`VISION_MODELS`; (2) sigue pendiente la
   migración `0002` de fase 1; (3) review + merge.
 > Cerrados el 2026-06-13 (→ Historial): `OWNER_TELEGRAM_ID` (local+Railway) · e2e Telegram (owner/visitante + 2
 > topics aislados) · **merge de `feat/conversational-core-telegram` a `main`** · **ahorro de tokens de compresión
@@ -157,7 +157,7 @@ confirmar con context7 al diseñar: si el `@openrouter/ai-sdk-provider` expone `
    - `TRANSCRIBE_MODELS` (audio→texto, optimizado STT; hoy Gemini Flash vía chat+file-part; o un modelo
      Transcription dedicado de OpenRouter — ej. voxtral, gpt-4o-transcribe).
    - `VISION_MODELS` (imagen→texto o nativa; Gemini/Qwen-VL).
-   - `SPEECH_MODEL` (TTS, **salida**; ver #2; OpenRouter Speech, ej. `openai/gpt-audio*`).
+   - `SPEECH_MODELS` (TTS, **salida**; cadena `model|voice|format`; ver #2).
    Refactor aditivo: `MULTIMODAL_MODELS` queda como default/fallback. Verificar slugs/precios al diseñar.
 2. **Salida de voz — "Vaio te habla" (TTS)**: **eje nuevo de SALIDA** (el contrato actual es solo ENTRADA).
    AI SDK v6: `experimental_generateSpeech({ model: provider.speech(...), text, voice, format })` →

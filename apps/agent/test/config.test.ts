@@ -57,27 +57,22 @@ describe("envs por modalidad (fase 2)", () => {
     expect(
       speechChain({
         SPEECH_MODELS: "k/o|af_bella|mp3, g/tts|Zephyr|pcm ",
-        SPEECH_VOICE: "alloy",
       } as Env)
     ).toEqual([
       { model: "k/o", voice: "af_bella", format: "mp3" },
       { model: "g/tts", voice: "Zephyr", format: "pcm" },
     ])
   })
-  it("speechChain: format inválido → mp3; voz omitida → SPEECH_VOICE", () => {
-    expect(
-      speechChain({ SPEECH_MODELS: "k/o", SPEECH_VOICE: "nova" } as Env)
-    ).toEqual([{ model: "k/o", voice: "nova", format: "mp3" }])
+  it("speechChain: voz omitida → 'alloy'; formato omitido/ inválido → mp3", () => {
+    expect(speechChain({ SPEECH_MODELS: "k/o" } as Env)).toEqual([
+      { model: "k/o", voice: "alloy", format: "mp3" },
+    ])
+    expect(speechChain({ SPEECH_MODELS: "k/o|v|xyz" } as Env)).toEqual([
+      { model: "k/o", voice: "v", format: "mp3" },
+    ])
   })
-  it("speechChain: back-compat con SPEECH_MODEL único; vacío → []", () => {
-    expect(
-      speechChain({
-        SPEECH_MODEL: "tts/x",
-        SPEECH_VOICE: "nova",
-        SPEECH_FORMAT: "pcm",
-      } as Env)
-    ).toEqual([{ model: "tts/x", voice: "nova", format: "pcm" }])
-    expect(speechChain({ SPEECH_VOICE: "alloy" } as Env)).toEqual([])
+  it("speechChain: vacío → []", () => {
+    expect(speechChain({} as Env)).toEqual([])
   })
 })
 

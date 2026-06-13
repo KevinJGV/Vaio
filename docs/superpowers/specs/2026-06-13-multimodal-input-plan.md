@@ -77,8 +77,8 @@ telegram (`sendAudio` + delivery) → prompt capacidades → wiring → verifica
 (comparten tipos/config).
 
 **Verificación fase 2:** typecheck/biome/test; boot log `transcribe/vision/speech`; e2e Telegram: voz→STT→
-respuesta; voz→respuesta en **audio** (espejo); "respondeme con voz"→audio; texto→texto; `SPEECH_MODEL`
-inválido→cae a texto (nunca 500); token/key nunca en logs.
+respuesta; voz→respuesta en **audio** (espejo); "respondeme con voz"→audio; texto→texto; toda la cadena
+`SPEECH_MODELS` inválida→cae a texto (nunca 500); token/key nunca en logs.
 
 **Estrategia de ejecución (fase 2):** **orquestador directo, secuencial-acoplado** (igual que fase 1: las
 piezas comparten config/tipos y convergen en el route de Telegram; TDD en `speech-policy` puro + adapters REST
