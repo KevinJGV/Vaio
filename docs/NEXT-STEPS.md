@@ -29,12 +29,18 @@
   **Pendiente de Kevin:** (1) aplicar la migración `0002` (`messages.attachments`) a Neon — `db:push` (dev) o
   `db:migrate` (el e2e mostró que sin la columna el turno responde igual, solo falla la persistencia en
   background); (2) e2e Telegram real (nota de voz + foto + voz→audio) tras deploy; (3) review + merge de la rama.
-- [~] **Multimodal Fase 2** (misma rama) — **EN CURSO**: envs por modalidad (`TRANSCRIBE_MODEL`/`VISION_MODELS`/
-  `SPEECH_*`, fallback a `MULTIMODAL_MODELS`); **STT dedicado** vía `POST /audio/transcriptions`; **salida de voz
-  (TTS)** vía `POST /audio/speech` → Telegram `sendAudio` con policy `shouldSpeak` (default texto; voz si entró
-  voz o se pide); **grounding del prompt** = declarar capacidades de E/S reales (cierra el followup "Vaio dice
-  solo-texto"). OpenRouter cubre todo por REST → single-provider (ver `openrouter-api-surface`). **Rerank** =
-  pendiente futuro (diseño en el design, no se codea: con ~29 chunks no aporta). Specs actualizados (`§ Fase 2`).
+- [?] **Multimodal Fase 2** (misma rama) — **IMPLEMENTADO**: envs por modalidad (`TRANSCRIBE_MODEL`/
+  `VISION_MODELS`/`SPEECH_*`, fallback a `MULTIMODAL_MODELS`); **STT dedicado** `POST /audio/transcriptions`;
+  **salida de voz (TTS)** `POST /audio/speech` → Telegram `sendAudio` con policy `shouldSpeak` (default texto;
+  voz si entró voz o se pide); **grounding del prompt** = capacidades de E/S reales (cierra "Vaio dice
+  solo-texto"). Single-provider OpenRouter por REST (ver `openrouter-api-surface`). **136 tests** (116 agente +
+  20 compress); typecheck/biome/build limpios. **e2e ✅:** boot `transcribe/vision/speech` on; `/chat` imagen →
+  "Rojo"; **round-trip TTS→STT real** contra OpenRouter (`hexgrad/kokoro-82m` voz `af_bella` → mp3 →
+  `whisper-large-v3` transcribe). **Rerank** = pendiente futuro (diseño en el design, no se codea: ~29 chunks no
+  aporta). Specs actualizados (`§ Fase 2`).
+  **Pendiente de Kevin:** (1) e2e Telegram real (nota de voz → STT → respuesta; voz→audio espejo; "respondeme
+  con voz") tras deploy + secrets `SPEECH_MODEL`/`TRANSCRIBE_MODEL`/`VISION_MODELS`; (2) sigue pendiente la
+  migración `0002` de fase 1; (3) review + merge.
 > Cerrados el 2026-06-13 (→ Historial): `OWNER_TELEGRAM_ID` (local+Railway) · e2e Telegram (owner/visitante + 2
 > topics aislados) · **merge de `feat/conversational-core-telegram` a `main`** · **ahorro de tokens de compresión
 > verificado en logs** (RAG ~3.5% / conv ~0.6%; persona intacta).

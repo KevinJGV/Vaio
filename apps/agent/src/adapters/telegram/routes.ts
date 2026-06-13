@@ -7,8 +7,10 @@ import { randomUUID } from "node:crypto"
 import type { InputAttachment, TurnRequest } from "@vaio/contracts"
 import type { Hono } from "hono"
 import { type Agent, courtesy } from "../../core/agent.js"
+import { shouldSpeak, stripForSpeech } from "../../core/speech-policy.js"
 import type { Logger } from "../../ports/logger.js"
 import type { ResolvedMedia } from "../../ports/media.js"
+import type { SpeechSynthesizer } from "../../ports/speech.js"
 import type { TraceSink } from "../../ports/trace.js"
 import type { Variables } from "../http/types.js"
 import type { TelegramClient } from "./client.js"
@@ -31,6 +33,8 @@ export interface TelegramDeps {
   sink: TraceSink
   /** Descarga de media (audio/voz + imágenes). undefined = sin multimodal → se ignoran adjuntos. */
   media?: TelegramMedia
+  /** Síntesis de voz (TTS). undefined = Vaio solo responde por texto. */
+  speech?: SpeechSynthesizer
 }
 
 type Turn = Extract<NormalizeResult, { kind: "turn" }>
@@ -117,7 +121,29 @@ export function mountTelegram(
         { logger: log, sink: deps.sink, requestId },
         resolved
       )
-      await deps.client.sendMessage(norm.chatId, await text, send)
+      const reply = await text
+      // Salida de voz (TTS): default texto; voz si entró voz (espejo) o el usuario la pidió.
+      const wantsVoice =
+        deps.speech != null &&
+        shouldSpeak({
+          inboundHadAudio: resolved.some((m) => m.kind === "audio"),
+          userText: norm.text,
+        })
+      if (wantsVoice && deps.speech) {
+        const spoken = await deps.speech.synthesize(
+          stripForSpeech(reply),
+          norm.locale
+        )
+        if (spoken) {
+          const ok = await deps.client.sendAudio(norm.chatId, spoken.audio, {
+            ...send,
+            mediaType: spoken.mediaType,
+          })
+          if (ok) return
+          // si el envío de audio falla, caemos a texto (nunca dejamos al usuario sin respuesta).
+        }
+      }
+      await deps.client.sendMessage(norm.chatId, reply, send)
     } catch (err) {
       log.error(
         { err: err instanceof Error ? err.message : String(err) },

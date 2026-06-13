@@ -15,6 +15,14 @@ para no repetirlas en próximas sesiones. Una línea por aprendizaje, concreta.
   `POST /audio/speech` (TTS, mp3|pcm), `POST /rerank`, `/embeddings`, `/videos`. El provider del AI SDK no los
   envuelve → **llamarlos con `fetch`** a `https://openrouter.ai/api/v1` + `Bearer key` → Vaio single-provider.
   Slugs/precios: galería openrouter.ai/models (tabs por modalidad; cambian mensual). Memoria: `openrouter-api-surface`.
+- **Multimodal fase 2 — endpoints REST de OpenRouter validados e2e** (jun-2026): STT `POST /audio/transcriptions`
+  (`{model, input_audio:{data:base64, format}, language}→{text}`) y TTS `POST /audio/speech`
+  (`{model, input, voice, response_format:mp3|pcm}→bytes`) funcionan con `fetch` directo (el provider del AI SDK
+  no los envuelve). Round-trip real OK: `hexgrad/kokoro-82m` (voz `af_bella`/`af_heart`/`am_adam` — **NO "alloy"**,
+  la voz es por-modelo) → mp3 → `whisper-large-v3` (el STT más barato; también whisper-1, gpt-4o(-mini)-transcribe).
+  Gotcha: los modelos de la tab "Speech"/"Transcription" NO salen en `GET /models` ni en `?output_modalities=audio`
+  (eso da chat-con-audio gpt-audio + música lyria) → elegir en la galería. TTS=mp3 → Telegram `sendAudio` (no
+  `sendVoice`, que exige OGG/Opus). Decisión de hablar = policy pura `shouldSpeak` (espejo voz-in OR pedido explícito).
 - **Multimodal (AI SDK v6) — decisión nativo-vs-normalizar por CONFIG, no por sniffing**: el core recibe un
   `LanguageModel` opaco y OpenRouter capa la cadena a 3 modelos server-side (`extraBody.models`) → el core NO
   sabe cuál respondió ni si soporta visión. Por eso la decisión se lee de config (`MULTIMODAL_NATIVE_IMAGES`)

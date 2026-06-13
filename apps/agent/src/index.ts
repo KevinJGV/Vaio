@@ -17,6 +17,7 @@ import {
 import { createConversationStore } from "./adapters/neon-conversation.js"
 import { createMemoryStore } from "./adapters/neon-memory.js"
 import { createModel } from "./adapters/openrouter.js"
+import { createSpeechSynthesizer } from "./adapters/speech-openrouter.js"
 import { createSummarizer } from "./adapters/summarizer.js"
 import { createTelegramClient } from "./adapters/telegram/client.js"
 import { createTelegramMedia } from "./adapters/telegram/media.js"
@@ -25,14 +26,17 @@ import { createLoggerTraceSink } from "./adapters/trace-logger.js"
 import {
   loadConfig,
   modelChain,
-  multimodalChain,
+  speechConfig,
   telegramAllowedIds,
   telegramEnabled,
+  transcribeModel,
+  visionChain,
 } from "./config.js"
 import { type Agent, createAgent } from "./core/agent.js"
 import type { ConversationStore } from "./ports/conversation.js"
 import type { MediaUnderstanding, Transcriber } from "./ports/media.js"
 import type { MemoryStore } from "./ports/memory.js"
+import type { SpeechSynthesizer } from "./ports/speech.js"
 import type { Summarizer } from "./ports/summary.js"
 
 const env = loadConfig()
@@ -52,6 +56,7 @@ let conversations: ConversationStore | null = null
 let summarizer: Summarizer | null = null
 let transcriber: Transcriber | null = null
 let mediaUnderstanding: MediaUnderstanding | null = null
+let speech: SpeechSynthesizer | null = null
 if (env.OPENROUTER_API_KEY && models.length > 0) {
   let memory: MemoryStore | null = null
   // La memoria conversacional (conversations/messages) solo necesita DB; el RAG necesita además
@@ -86,15 +91,26 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
       createModel(env.OPENROUTER_API_KEY, [summaryModel], logger)
     )
   }
-  // Comprensión de media (transcripción/visión) con su PROPIA cadena (no la del chat). Un Gemini
-  // Flash cubre audio+imagen. Si la cadena queda vacía, no se habilita (los puertos quedan null).
-  const mmChain = multimodalChain(env)
-  if (mmChain.length > 0) {
-    const mediaModel = createModel(env.OPENROUTER_API_KEY, mmChain, logger)
-    transcriber = createTranscriber(mediaModel)
-    mediaUnderstanding = createMediaUnderstanding(mediaModel)
+  // Comprensión de media POR MODALIDAD (cada una su modelo/endpoint; no la cadena de chat):
+  //  - STT: REST /audio/transcriptions con TRANSCRIBE_MODEL.
+  //  - Visión: chat+file-part con la cadena VISION_MODELS.
+  const sttModel = transcribeModel(env)
+  if (sttModel) {
+    transcriber = createTranscriber(
+      env.OPENROUTER_API_KEY,
+      env.OPENROUTER_BASE_URL,
+      sttModel
+    )
   } else {
-    logger.warn("Sin MULTIMODAL_MODELS ni OPENROUTER_MODELS → multimodal OFF.")
+    logger.warn("Sin TRANSCRIBE_MODEL/MULTIMODAL_MODELS → STT OFF.")
+  }
+  const visChain = visionChain(env)
+  if (visChain.length > 0) {
+    mediaUnderstanding = createMediaUnderstanding(
+      createModel(env.OPENROUTER_API_KEY, visChain, logger)
+    )
+  } else {
+    logger.warn("Sin VISION_MODELS/MULTIMODAL_MODELS → visión OFF.")
   }
   agent = createAgent({
     model,
@@ -110,6 +126,18 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
     mediaUnderstanding,
     nativeImages: env.MULTIMODAL_NATIVE_IMAGES,
   })
+  // Salida de voz (TTS) — solo si hay SPEECH_MODEL. Compartido por canales (hoy Telegram).
+  const sc = speechConfig(env)
+  if (sc) {
+    speech = createSpeechSynthesizer({
+      apiKey: env.OPENROUTER_API_KEY,
+      baseURL: env.OPENROUTER_BASE_URL,
+      model: sc.model,
+      voice: sc.voice,
+      format: sc.format,
+      logger,
+    })
+  }
 } else {
   logger.error(
     "Sin OPENROUTER_API_KEY/OPENROUTER_MODELS → /chat degradado a cortesía."
@@ -142,6 +170,8 @@ if (
       logger,
       env.MEDIA_MAX_BYTES
     ),
+    // Salida de voz (null = Vaio responde solo por texto en Telegram).
+    ...(speech ? { speech } : {}),
   }
 }
 
@@ -163,7 +193,9 @@ logger.info(
     conversations: conversations !== null,
     summarizer: summarizer !== null,
     compress: compressor !== null,
-    multimodal: transcriber !== null,
+    transcribe: transcriber !== null,
+    vision: mediaUnderstanding !== null,
+    speech: speech !== null,
     nativeImages: env.MULTIMODAL_NATIVE_IMAGES,
     telegram: telegram !== undefined,
     models,

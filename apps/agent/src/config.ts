@@ -30,6 +30,9 @@ const envSchema = z.object({
   // OpenRouter (modelo + cadena de fallback).
   OPENROUTER_API_KEY: z.string().optional(),
   OPENROUTER_MODELS: z.string().optional(),
+  // Base REST de OpenRouter para los endpoints que el provider del AI SDK NO envuelve
+  // (/audio/transcriptions, /audio/speech, /rerank). Ver memoria `openrouter-api-surface`.
+  OPENROUTER_BASE_URL: z.string().url().default("https://openrouter.ai/api/v1"),
 
   // Memoria (Neon + embeddings).
   DATABASE_URL: z.string().optional(),
@@ -57,17 +60,24 @@ const envSchema = z.object({
   COMPRESS_INTENSITY_CONV: z.enum(["lite", "full", "ultra"]).default("lite"),
   COMPRESS_INTENSITY_RAG: z.enum(["lite", "full", "ultra"]).default("full"),
 
-  // Entrada multimodal (audio/voz + imágenes).
-  // Cadena de modelos multimodales (transcripción + visión) — propia, NO la del chat, así no obliga
-  // a que la cadena de chat sea vision-capaz. Verificar slugs/precios en openrouter.ai/models (cambian
-  // mensual). Vacía → cae al primer modelo de OPENROUTER_MODELS (con warn).
+  // Entrada multimodal (audio/voz + imágenes). Modelos POR MODALIDAD (no todos cubren todo; ver
+  // openrouter.ai/models, tabs Transcription/Speech/Image — cambian mensual). `MULTIMODAL_MODELS` queda
+  // como FALLBACK de visión/transcripción (back-compat con la fase 1).
   MULTIMODAL_MODELS: z.string().optional(),
+  // Visión (imagen→texto o nativa): cadena csv de chat con file-part. Vacía → MULTIMODAL_MODELS → 1er chat.
+  VISION_MODELS: z.string().optional(),
+  // STT dedicado (audio→texto) vía POST /audio/transcriptions. Vacío → MULTIMODAL_MODELS[0] → chat[0].
+  TRANSCRIBE_MODEL: z.string().optional(),
   // true → imágenes se pasan NATIVAS al modelo de chat (la cadena de chat DEBE ser vision-capaz).
-  // false (default) → se describen a texto con MULTIMODAL_MODELS (robusto con cualquier cadena).
+  // false (default) → se describen a texto con VISION_MODELS (robusto con cualquier cadena de chat).
   MULTIMODAL_NATIVE_IMAGES: z
     .string()
     .optional()
     .transform((v) => v === "true" || v === "1"),
+  // Salida de voz (TTS) vía POST /audio/speech. Sin SPEECH_MODEL → Vaio nunca habla (solo texto).
+  SPEECH_MODEL: z.string().optional(),
+  SPEECH_VOICE: z.string().default("alloy"), // voz provider-specific; verificar en la galería.
+  SPEECH_FORMAT: z.enum(["mp3", "pcm"]).default("mp3"),
   // Límite defensivo de tamaño de media (descarga Telegram / base64 web). Default 20MB.
   MEDIA_MAX_BYTES: z.coerce
     .number()
@@ -107,15 +117,40 @@ export function modelChain(env: Env): string[] {
     .filter(Boolean)
 }
 
-/** Cadena de modelos multimodales (transcripción/visión). Vacía → cae al primer modelo de chat. */
-export function multimodalChain(env: Env): string[] {
-  const explicit = (env.MULTIMODAL_MODELS ?? "")
+/** csv → lista (trim, sin vacíos). */
+function csv(s: string | undefined): string[] {
+  return (s ?? "")
     .split(",")
-    .map((s) => s.trim())
+    .map((x) => x.trim())
     .filter(Boolean)
+}
+
+/** Cadena multimodal de FALLBACK (back-compat fase 1): `MULTIMODAL_MODELS` o el 1er modelo de chat. */
+function multimodalFallback(env: Env): string[] {
+  const explicit = csv(env.MULTIMODAL_MODELS)
   if (explicit.length > 0) return explicit
   const firstChat = modelChain(env)[0]
   return firstChat ? [firstChat] : []
+}
+
+/** Cadena de VISIÓN (imagen→texto/nativa, chat+file-part). `VISION_MODELS` → fallback multimodal. */
+export function visionChain(env: Env): string[] {
+  const explicit = csv(env.VISION_MODELS)
+  return explicit.length > 0 ? explicit : multimodalFallback(env)
+}
+
+/** Modelo de TRANSCRIPCIÓN (STT, /audio/transcriptions). `TRANSCRIBE_MODEL` → fallback multimodal[0]. */
+export function transcribeModel(env: Env): string | undefined {
+  return env.TRANSCRIBE_MODEL?.trim() || multimodalFallback(env)[0]
+}
+
+/** Config de SALIDA de voz (TTS). null si no hay `SPEECH_MODEL` (Vaio solo habla por texto). */
+export function speechConfig(
+  env: Env
+): { model: string; voice: string; format: "mp3" | "pcm" } | null {
+  const model = env.SPEECH_MODEL?.trim()
+  if (!model) return null
+  return { model, voice: env.SPEECH_VOICE, format: env.SPEECH_FORMAT }
 }
 
 /** Telegram user ids permitidos (csv → Set<number>, descarta vacíos y no-numéricos). */

@@ -1,39 +1,57 @@
-// Adapters de los puertos de comprensión de media (Transcriber + MediaUnderstanding) sobre el AI SDK
-// (`generateText`) con un modelo multimodal barato (p.ej. Gemini Flash vía OpenRouter). El audio y la
-// imagen se pasan como FILE PART inline (el AI SDK codifica los bytes); un solo modelo cubre ambos.
-// El I/O de descarga NO está acá: recibimos los bytes ya resueltos. Estos adapters LANZAN si el modelo
-// falla → el core (core/modality) lo captura y degrada.
+// Adapters de comprensión de media sobre OpenRouter.
+//  - Transcriber (audio→texto): REST `POST /audio/transcriptions` (modelo STT dedicado, OpenAI-compatible).
+//    El `@openrouter/ai-sdk-provider` NO envuelve este endpoint → `fetch` directo (ver memoria
+//    `openrouter-api-surface`). Single-provider.
+//  - MediaUnderstanding (imagen→texto): `generateText` + file-part sobre la cadena de VISIÓN (no hay endpoint
+//    dedicado de visión; va por chat).
+// Ambos LANZAN si fallan → el core (core/modality) lo captura y degrada (nunca rompe el turno). La key va en
+// el header Authorization; jamás se loguea.
 
 import type { Locale } from "@vaio/contracts"
 import { generateText, type LanguageModel } from "ai"
 import type { MediaUnderstanding, Transcriber } from "../ports/media.js"
-
-const TRANSCRIBE_ASK: Record<Locale, string> = {
-  es: "Transcribí este audio textualmente. Devolvé SOLO la transcripción, sin comentarios.",
-  en: "Transcribe this audio verbatim. Output ONLY the transcription, no commentary.",
-}
 
 const DESCRIBE_ASK: Record<Locale, string> = {
   es: "Describí esta imagen de forma precisa y concisa para que un asistente la use como contexto.",
   en: "Describe this image precisely and concisely for an assistant to use as context.",
 }
 
-export function createTranscriber(model: LanguageModel): Transcriber {
+/** mediaType ("audio/ogg") → format que espera /audio/transcriptions ("ogg"). */
+function audioFormat(mediaType: string): string {
+  const sub = mediaType.split("/")[1] ?? "ogg"
+  if (sub === "mpeg") return "mp3"
+  if (sub === "x-wav" || sub === "wave") return "wav"
+  return sub // ogg, mp3, wav, webm, m4a, flac…
+}
+
+/** STT vía REST. `baseURL` ya incluye `/api/v1`; pegamos `/audio/transcriptions`. */
+export function createTranscriber(
+  apiKey: string,
+  baseURL: string,
+  model: string
+): Transcriber {
   return {
     async transcribe({ data, mediaType, locale = "es" }) {
-      const { text } = await generateText({
-        model,
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: TRANSCRIBE_ASK[locale] },
-              { type: "file", data, mediaType },
-            ],
+      const res = await fetch(`${baseURL}/audio/transcriptions`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${apiKey}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          input_audio: {
+            data: Buffer.from(data).toString("base64"),
+            format: audioFormat(mediaType),
           },
-        ],
+          language: locale,
+        }),
       })
-      return text.trim()
+      if (!res.ok) {
+        throw new Error(`transcriptions ${res.status}`)
+      }
+      const json = (await res.json()) as { text?: string }
+      return (json.text ?? "").trim()
     },
   }
 }

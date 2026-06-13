@@ -13,14 +13,33 @@ export interface SendOpts {
   messageThreadId?: number
 }
 
+/** Opciones de envío de audio: hilo + caption + MIME (para el nombre/representación del archivo). */
+export interface SendAudioOpts extends SendOpts {
+  caption?: string
+  mediaType?: string
+}
+
 export interface TelegramClient {
   sendMessage(chatId: number, text: string, opts?: SendOpts): Promise<void>
+  /** Envía un audio (multipart). Devuelve `ok` para que el caller pueda caer a texto si falla. */
+  sendAudio(
+    chatId: number,
+    audio: Uint8Array,
+    opts?: SendAudioOpts
+  ): Promise<boolean>
   sendChatAction(
     chatId: number,
     action: "typing",
     opts?: SendOpts
   ): Promise<void>
   setWebhook(url: string, secret: string): Promise<void>
+}
+
+/** mediaType → extensión para el nombre del archivo de audio. */
+function audioFilename(mediaType?: string): string {
+  if (mediaType === "audio/pcm") return "voice.pcm"
+  if (mediaType === "audio/ogg") return "voice.ogg"
+  return "voice.mp3"
 }
 
 /** Trocea un texto en partes ≤ size, cortando preferentemente en un salto/espacio cercano al límite. */
@@ -86,6 +105,35 @@ export function createTelegramClient(
           )
           await call("sendMessage", { chat_id: chatId, text: part, ...thread })
         }
+      }
+    },
+    async sendAudio(chatId, audio, opts) {
+      // Multipart: el `call` genérico es JSON-only. fetch arma el boundary solo (sin content-type manual).
+      try {
+        const form = new FormData()
+        form.append("chat_id", String(chatId))
+        if (opts?.messageThreadId !== undefined) {
+          form.append("message_thread_id", String(opts.messageThreadId))
+        }
+        if (opts?.caption) form.append("caption", opts.caption)
+        const blob = new Blob([audio as Uint8Array<ArrayBuffer>], {
+          type: opts?.mediaType ?? "audio/mpeg",
+        })
+        form.append("audio", blob, audioFilename(opts?.mediaType))
+        const res = await fetch(`${base}/sendAudio`, {
+          method: "POST",
+          body: form,
+        })
+        if (!res.ok) {
+          logger.warn({ status: res.status }, "telegram sendAudio no-2xx")
+        }
+        return res.ok
+      } catch (err) {
+        logger.warn(
+          { err: err instanceof Error ? err.message : String(err) },
+          "telegram sendAudio falló"
+        )
+        return false
       }
     },
     async sendChatAction(chatId, action, opts) {

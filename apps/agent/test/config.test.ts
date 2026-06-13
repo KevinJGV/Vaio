@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest"
 import type { Env } from "../src/config.js"
 import {
   modelChain,
-  multimodalChain,
+  speechConfig,
   telegramAllowedIds,
   telegramEnabled,
+  transcribeModel,
+  visionChain,
 } from "../src/config.js"
 
 function envWith(models: string | undefined): Env {
@@ -31,17 +33,35 @@ describe("modelChain", () => {
   })
 })
 
-describe("multimodalChain", () => {
-  it("usa MULTIMODAL_MODELS si está (csv trimeado)", () => {
-    const env = { MULTIMODAL_MODELS: "g/flash, g/pro " } as Env
-    expect(multimodalChain(env)).toEqual(["g/flash", "g/pro"])
+describe("envs por modalidad (fase 2)", () => {
+  it("visionChain usa VISION_MODELS; si no, cae a MULTIMODAL_MODELS; si no, al 1er chat", () => {
+    expect(visionChain({ VISION_MODELS: "v/a, v/b " } as Env)).toEqual([
+      "v/a",
+      "v/b",
+    ])
+    expect(visionChain({ MULTIMODAL_MODELS: "m/x" } as Env)).toEqual(["m/x"])
+    expect(visionChain({ OPENROUTER_MODELS: "c/1,c/2" } as Env)).toEqual([
+      "c/1",
+    ])
+    expect(visionChain({} as Env)).toEqual([])
   })
-  it("vacío → cae al primer modelo de OPENROUTER_MODELS", () => {
-    const env = { OPENROUTER_MODELS: "primary/x,fallback/y" } as Env
-    expect(multimodalChain(env)).toEqual(["primary/x"])
+  it("transcribeModel usa TRANSCRIBE_MODEL; si no, el fallback multimodal[0]", () => {
+    expect(transcribeModel({ TRANSCRIBE_MODEL: " stt/x " } as Env)).toBe(
+      "stt/x"
+    )
+    expect(transcribeModel({ MULTIMODAL_MODELS: "m/x,m/y" } as Env)).toBe("m/x")
+    expect(transcribeModel({ OPENROUTER_MODELS: "c/1" } as Env)).toBe("c/1")
+    expect(transcribeModel({} as Env)).toBeUndefined()
   })
-  it("sin ninguno → []", () => {
-    expect(multimodalChain({} as Env)).toEqual([])
+  it("speechConfig null sin SPEECH_MODEL; objeto con model/voice/format si está", () => {
+    expect(speechConfig({} as Env)).toBeNull()
+    expect(
+      speechConfig({
+        SPEECH_MODEL: "tts/x",
+        SPEECH_VOICE: "nova",
+        SPEECH_FORMAT: "mp3",
+      } as Env)
+    ).toEqual({ model: "tts/x", voice: "nova", format: "mp3" })
   })
 })
 

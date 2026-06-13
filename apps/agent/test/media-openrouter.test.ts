@@ -1,87 +1,107 @@
 import { MockLanguageModelV3 } from "ai/test"
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it } from "vitest"
 import {
   createMediaUnderstanding,
   createTranscriber,
 } from "../src/adapters/media-openrouter.js"
 
-interface CapturedPrompt {
-  prompt: unknown
-}
-
-/** Modelo mock para generateText: captura el prompt y devuelve un texto fijo. */
-function captureModel(reply: string): {
-  model: MockLanguageModelV3
-  captured: CapturedPrompt
-} {
-  const captured: CapturedPrompt = { prompt: null }
-  const model = new MockLanguageModelV3({
-    modelId: "mock/media",
-    doGenerate: async (options) => {
-      captured.prompt = options.prompt
-      return {
-        content: [{ type: "text", text: reply }],
-        finishReason: "stop",
-        usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
-        warnings: [],
-      }
-    },
-  })
-  return { model, captured }
-}
-
-/** Busca el file part en el prompt convertido del AI SDK. */
-function findFilePart(prompt: unknown): Record<string, unknown> | undefined {
-  const messages = prompt as Array<{ content: Array<Record<string, unknown>> }>
-  for (const msg of messages) {
-    if (!Array.isArray(msg.content)) continue
-    const file = msg.content.find((p) => p.type === "file")
-    if (file) return file
-  }
-  return undefined
-}
-
 const data = new TextEncoder().encode("fake-bytes")
+const realFetch = globalThis.fetch
+afterEach(() => {
+  globalThis.fetch = realFetch
+})
 
-describe("media-openrouter adapters", () => {
-  it("transcribe manda un file part de audio y devuelve solo el texto", async () => {
-    const { model, captured } = captureModel("  hola mundo  ")
-    const t = createTranscriber(model)
+describe("createTranscriber (REST /audio/transcriptions)", () => {
+  it("postea al endpoint con model + input_audio y devuelve el texto", async () => {
+    const calls: Array<{ url: string; body: Record<string, unknown> }> = []
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      calls.push({ url: String(url), body: JSON.parse(String(init?.body)) })
+      return new Response(JSON.stringify({ text: "  hola mundo  " }), {
+        status: 200,
+      })
+    }) as typeof fetch
+
+    const t = createTranscriber(
+      "SECRET-KEY",
+      "https://openrouter.ai/api/v1",
+      "stt/model"
+    )
     const out = await t.transcribe({
       data,
       mediaType: "audio/ogg",
       locale: "es",
     })
+
     expect(out).toBe("hola mundo")
-    const file = findFilePart(captured.prompt)
-    expect(file).toBeDefined()
-    expect(file?.mediaType).toBe("audio/ogg")
+    expect(calls[0]?.url).toBe(
+      "https://openrouter.ai/api/v1/audio/transcriptions"
+    )
+    expect(calls[0]?.body.model).toBe("stt/model")
+    const ia = calls[0]?.body.input_audio as { format: string; data: string }
+    expect(ia.format).toBe("ogg")
+    expect(typeof ia.data).toBe("string") // base64
   })
 
-  it("describe manda un file part de imagen con el mediaType correcto", async () => {
+  it("mapea audio/mpeg → mp3", async () => {
+    let fmt = ""
+    globalThis.fetch = (async (_u: string, init?: RequestInit) => {
+      fmt = (JSON.parse(String(init?.body)).input_audio as { format: string })
+        .format
+      return new Response(JSON.stringify({ text: "x" }), { status: 200 })
+    }) as typeof fetch
+    await createTranscriber("k", "https://or/api/v1", "m").transcribe({
+      data,
+      mediaType: "audio/mpeg",
+    })
+    expect(fmt).toBe("mp3")
+  })
+
+  it("no-2xx → lanza (el core degrada)", async () => {
+    globalThis.fetch = (async () =>
+      new Response("nope", { status: 401 })) as typeof fetch
+    await expect(
+      createTranscriber("k", "https://or/api/v1", "m").transcribe({
+        data,
+        mediaType: "audio/ogg",
+      })
+    ).rejects.toThrow()
+  })
+})
+
+describe("createMediaUnderstanding (visión, chat+file-part)", () => {
+  function captureModel(reply: string): {
+    model: MockLanguageModelV3
+    captured: { prompt: unknown }
+  } {
+    const captured: { prompt: unknown } = { prompt: null }
+    const model = new MockLanguageModelV3({
+      modelId: "mock/vision",
+      doGenerate: async (options) => {
+        captured.prompt = options.prompt
+        return {
+          content: [{ type: "text", text: reply }],
+          finishReason: "stop",
+          usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+          warnings: [],
+        }
+      },
+    })
+    return { model, captured }
+  }
+
+  it("manda un file part de imagen con el mediaType correcto", async () => {
     const { model, captured } = captureModel("una foto de un gato")
-    const u = createMediaUnderstanding(model)
-    const out = await u.describe({
+    const out = await createMediaUnderstanding(model).describe({
       data,
       mediaType: "image/jpeg",
       caption: "mi gato",
       locale: "es",
     })
     expect(out).toBe("una foto de un gato")
-    const file = findFilePart(captured.prompt)
+    const messages = captured.prompt as Array<{
+      content: Array<Record<string, unknown>>
+    }>
+    const file = messages[0]?.content.find((p) => p.type === "file")
     expect(file?.mediaType).toBe("image/jpeg")
-  })
-
-  it("propaga el error del modelo (el core lo degrada)", async () => {
-    const model = new MockLanguageModelV3({
-      modelId: "mock/boom",
-      doGenerate: async () => {
-        throw new Error("modelo caído")
-      },
-    })
-    const t = createTranscriber(model)
-    await expect(
-      t.transcribe({ data, mediaType: "audio/ogg" })
-    ).rejects.toThrow()
   })
 })

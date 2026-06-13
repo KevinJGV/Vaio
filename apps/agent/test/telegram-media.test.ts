@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest"
+import { createTelegramClient } from "../src/adapters/telegram/client.js"
 import { createTelegramMedia } from "../src/adapters/telegram/media.js"
 import type { LogFields, Logger } from "../src/ports/logger.js"
 
@@ -113,5 +114,38 @@ describe("createTelegramMedia.download", () => {
       mediaType: "audio/ogg",
     })
     expect(out).toBeNull()
+  })
+})
+
+describe("createTelegramClient.sendAudio", () => {
+  it("postea multipart a sendAudio y devuelve ok (token no en logs)", async () => {
+    const seen: { url: string; isForm: boolean } = { url: "", isForm: false }
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      seen.url = String(url)
+      seen.isForm = init?.body instanceof FormData
+      return new Response("{}", { status: 200 })
+    }) as typeof fetch
+    const { logger, lines } = capturingLogger()
+    const ok = await createTelegramClient(TOKEN, logger).sendAudio(
+      123,
+      new Uint8Array([1, 2, 3]),
+      { mediaType: "audio/mpeg" }
+    )
+    expect(ok).toBe(true)
+    expect(seen.url).toContain("/sendAudio")
+    expect(seen.isForm).toBe(true)
+    expect(lines.join("\n")).not.toContain(TOKEN)
+  })
+
+  it("no-2xx → false (el caller cae a texto)", async () => {
+    globalThis.fetch = (async () =>
+      new Response("bad", { status: 400 })) as typeof fetch
+    const { logger } = capturingLogger()
+    const ok = await createTelegramClient(TOKEN, logger).sendAudio(
+      123,
+      new Uint8Array([1]),
+      {}
+    )
+    expect(ok).toBe(false)
   })
 })
