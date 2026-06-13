@@ -34,6 +34,10 @@ ENV NODE_ENV=production
 # pino-pretty es devDep (no está en el bundle prod) → forzar json (lo captura Railway).
 ENV LOG_FORMAT=json
 COPY --from=pruned /prod/agent .
+# Migraciones drizzle: el release step (railway.json preDeployCommand → db:migrate:prod) las aplica
+# con el migrator de drizzle-orm (dep de prod) desde dist/. `runMigrations` las busca en ./migrations
+# relativo al cwd (= /app), por eso se copian explícitamente (no asumimos qué incluye `pnpm deploy`).
+COPY --from=workspace /app/apps/agent/migrations ./migrations
 # Documental: el server bindea a $PORT (Railway lo inyecta; default 8787).
 EXPOSE 8787
 CMD ["node", "dist/index.js"]

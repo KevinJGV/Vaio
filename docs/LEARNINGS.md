@@ -21,6 +21,19 @@ para no repetirlas en próximas sesiones. Una línea por aprendizaje, concreta.
 - **Migración pgvector**: `drizzle-kit generate` crea el DDL pero el tipo `vector` exige la
   extensión ANTES → se antepone `CREATE EXTENSION IF NOT EXISTS vector;--> statement-breakpoint`
   como primer statement de la migración inicial (`0000_*.sql`). `generate` corre offline (sin DB).
+- **Sync de esquema (DX tipo Convex)**: híbrido `push` (dev) + `generate`/`migrate` (prod). `db:push`
+  (codebase-first: difea schema.ts vs la DB y aplica ALTER directo, SIN migraciones) para iterar en
+  caliente; `db:push:watch` lo re-corre al guardar (watcher zero-dep `node:fs.watch` sobre el **dir**
+  `adapters/db`, no el archivo → sobrevive a saves atómicos de editores). **`push` solo en dev** y
+  contra un **branch de Neon** (es destructivo-ciego: rename = drop+create). `push` necesita
+  `dbCredentials.url` en `drizzle.config.ts` (`generate` no) → ahí cargamos el `.env` de la raíz vía
+  `dotenv` resuelto por `import.meta.url` (no por cwd).
+- **Release step de migraciones en Railway (Docker)**: `railway.json deploy.preDeployCommand`
+  (array) corre EN la imagen construida antes de arrancar; si sale ≠0 falla el deploy. La imagen de
+  runtime está **podada** (`pnpm deploy --prod`: sin `tsx`/`drizzle-kit` ni `src/`) → el migrate de
+  deploy es `node dist/adapters/db/migrate.js` (usa el migrator de `drizzle-orm`, dep de PROD, no
+  drizzle-kit). `runMigrations` busca `./migrations` relativo al cwd (`/app`) → el Dockerfile copia
+  `migrations/` explícitamente a la imagen (`COPY --from=workspace …/migrations ./migrations`).
 - **Monorepo pnpm**: `@vaio/contracts` expone `"types": "./src/index.ts"` y `"default": "./dist/index.js"`
   → tsc/typecheck resuelven tipos del SOURCE (no necesitan build), runtime usa dist (build topológico
   de `pnpm -r build`: contracts antes que agent). `dev` del agent buildea contracts primero.

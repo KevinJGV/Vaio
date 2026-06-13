@@ -11,7 +11,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx src/adapters/db/migrate.ts"
+    "db:migrate": "tsx src/adapters/db/migrate.ts",
+    "db:migrate:prod": "node dist/adapters/db/migrate.js",
+    "db:push": "drizzle-kit push",
+    "db:push:watch": "tsx src/adapters/db/push-watch.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2",

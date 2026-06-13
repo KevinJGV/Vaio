@@ -40,6 +40,10 @@ puertos, nunca de adapters → fase 2/3 (Telegram/correo, Neon→Graphiti) enchu
 - `pnpm ingest` — pobla la memoria (fuentes → embeddings → Neon). A mano / cron.
 - `pnpm --filter @vaio/agent db:generate` — genera migración Drizzle (offline, sin DB).
 - `pnpm --filter @vaio/agent db:migrate` — aplica migraciones (necesita `DATABASE_URL`).
+- `pnpm --filter @vaio/agent db:push` — **dev**: sincroniza `schema.ts` → DB directo, SIN migración
+  (codebase-first). `db:push:watch` lo re-corre al guardar. ⚠️ **solo dev + branch de Neon** (`push`
+  es destructivo-ciego). Prod/deploy usa `generate` + `migrate` (versionado). El deploy aplica las
+  migraciones solo vía `railway.json preDeployCommand` (`db:migrate:prod` = `node dist/.../migrate.js`).
 
 **Antes de declarar trabajo completo:** `pnpm -r typecheck` + `pnpm exec biome check .` +
 `pnpm -r test` sin errores **y** correr el server (`/health` 200; si tocaste el agente, probar
