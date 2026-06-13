@@ -75,6 +75,28 @@ function searchMemoryTool({
                     `[${d.source}${d.url ? ` · ${d.url}` : ""}]\n${compressOrRaw(compressor, d.chunk, ragIntensity)}`
                 )
                 .join("\n\n")
+        // Métrica del ahorro Tier 1 sobre los chunks de RAG (el componente dominante,
+        // `full`). Espeja el log de conversación en agent.ts para confirmar el ahorro en logs.
+        if (compressor && docs.length > 0) {
+          const before = docs.reduce(
+            (n, d) => n + compressor.countTokens(d.chunk),
+            0
+          )
+          const after = docs.reduce(
+            (n, d) =>
+              n +
+              compressor.countTokens(
+                compressor.compress(d.chunk, ragIntensity)
+              ),
+            0
+          )
+          if (before > 0) {
+            logger.debug(
+              { before, after, saved: before - after, chunks: docs.length },
+              "rag compressed"
+            )
+          }
+        }
         emit({
           ...ids,
           type: "tool.result",

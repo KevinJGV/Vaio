@@ -8,16 +8,19 @@
 > **Tests: 75 agente + 20 compress; typecheck/biome/build limpios** (snapshot del merge). **e2e real ✅:** con
 > `OWNER_TELEGRAM_ID` puesto (local+Railway), el bot respondió por Telegram → owner-vs-visitante y 2 topics con
 > contexto aislado verificados.
-> **Único pendiente abierto:** ver el **ahorro de tokens de compresión** en logs (persona/calidad intacta).
+> **Sin WIP abierto.** El ahorro de compresión quedó **verificado en logs** (2026-06-13): ~3.5% RAG (`full`) /
+> ~0.6% conversación (`lite`) sobre el corpus real — marginal porque el corpus es denso/factual; persona/calidad
+> intactas. Detalle → Historial.
 > **Foco / "go" pendiente:** followups de grounding (§ "Hallazgos del bot real") + **próximo paso mayor**
 > (entrada multimodal + framework de tools/harness). **El portafolio va DESPUÉS — NO es el próximo paso.**
 
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [?] Compresión: confirmar **ahorro de tokens** en logs + persona/calidad intacta. _(ÚNICO pendiente abierto)_
+- _(vacío — sin ítems abiertos)_
 > Cerrados el 2026-06-13 (→ Historial): `OWNER_TELEGRAM_ID` (local+Railway) · e2e Telegram (owner/visitante + 2
-> topics aislados) · **merge de `feat/conversational-core-telegram` a `main`**.
+> topics aislados) · **merge de `feat/conversational-core-telegram` a `main`** · **ahorro de tokens de compresión
+> verificado en logs** (RAG ~3.5% / conv ~0.6%; persona intacta).
 
 ---
 
@@ -69,8 +72,16 @@ resumen LLM). **84 tests verdes** (18 del paquete + 66 del agente); typecheck/bi
 (`compress:true`, 0 import-errors). Diseño/plan →
 [`…-cavemem-compression-design.md`](superpowers/specs/2026-06-12-cavemem-compression-design.md) ·
 [`…-cavemem-compression-plan.md`](superpowers/specs/2026-06-12-cavemem-compression-plan.md).
-**Pendiente (Kevin):** confirmar el **ahorro de tokens** en logs (calidad/persona intacta) — *único ítem
-abierto del WIP*. La rama ya está **mergeada a `main`** (2026-06-13).
+La rama ya está **mergeada a `main`** (2026-06-13).
+**✅ Ahorro verificado en logs (2026-06-13):** se agregó el log `"rag compressed"` (`{before,after,saved,chunks}`
+en `tools.ts`, espejando el `"context compressed"` de `agent.ts` — antes el ahorro de RAG era invisible). e2e
+real (`/chat` con keys, `LOG_LEVEL=debug`): **RAG (`full`) ~3.5%** (5 muestras 1197–1345 tok → 38–71 saved) y
+**conversación (`lite`) ~0.6%**. **Ahorro marginal** porque el corpus real (CV/portfolio/GitHub) es **denso/
+factual** (listas de tech, fechas, identificadores, headings → se preservan byte-a-byte); el benchmark ≥30% era
+prosa inglesa con filler, no representativo. **Persona/calidad intactas** (respuestas grounded + voseo). Es
+ahorro "gratis" (sin llamada a modelo). El gran ahorro real vendría de comprimir **en ingesta** la prosa de los
+chunks (ya anotado en "Compresión transversal") o cuando las charlas crucen `SUMMARY_THRESHOLD` (12) y el resumen
+rodante compuesto comprima de verdad — hoy, marginal.
 
 **🟢 IMPLEMENTADA (misma rama) — Sync de esquema (DX Convex-like) + refinamiento Telegram** (2026-06-12):
 (a) **hot-sync de esquema**: `db:push`/`db:push:watch` (dev) + release step de migraciones en deploy

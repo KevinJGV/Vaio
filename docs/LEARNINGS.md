@@ -6,6 +6,13 @@ para no repetirlas en próximas sesiones. Una línea por aprendizaje, concreta.
 > Esto es la memoria del **dev**. La memoria del **producto** (lo que el agente sabe de Kevin)
 > vive en Neon/pgvector — ver `docs/SPEC.md`.
 
+- **Compresión cavemem — ahorro REAL marginal en este corpus** (medido e2e jun-2026): RAG (`full`)
+  ~3.5%, conversación (`lite`) ~0.6%. El benchmark del paquete (≥30%) es sobre prosa inglesa con filler;
+  el corpus real (CV/portfolio/GitHub) es **denso/factual** → casi todo se preserva byte-a-byte (listas de
+  tech, fechas, IDs, headings, URLs). La compresión **funciona y no degrada** persona/calidad (es ahorro
+  "gratis", sin LLM), pero el gran ahorro vendría de comprimir **en ingesta** o cuando las charlas crucen
+  `SUMMARY_THRESHOLD` (12). Gotcha de observabilidad: el ahorro de RAG era **invisible** (solo `agent.ts`
+  logueaba conv); se agregó el log `"rag compressed"` en `tools.ts` para poder confirmarlo.
 - **AI SDK**: el scaffold pineaba `ai@^4` (chocaba con el provider de OpenRouter, peer `ai@^5`).
   Se subió a `^5`, y luego **Dependabot lo llevó a `ai@6` (6.0.x)** — la API de `streamText`/`tool`/
   `stepCountIs`/`ModelMessage`/`toTextStreamResponse` que usamos sigue compatible en v6 (typecheckea).
