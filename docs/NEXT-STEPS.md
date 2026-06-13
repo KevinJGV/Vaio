@@ -20,9 +20,18 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [?] **Migración `0002` (`messages.attachments`) aplicada en Neon** — el código está en `main`; el deploy la
-  corre vía `railway.json preDeployCommand` (`db:migrate:prod`). Confirmar que se aplicó (sin la columna el
-  turno responde igual, solo falla la persistencia de adjuntos en background → revisar logs `persist/summary falló`).
+- [?] **Observabilidad: App Attribution + DB traceability** — IMPLEMENTADO en `feat/observability-traceability`
+  (sin mergear). **(a)** App Attribution: `APP_NAME`(→X-Title)/`APP_URL`(→HTTP-Referer) al provider y a las
+  REST → el dashboard ya no muestra "unknown". **(b)** Persistencia de traza: tabla `trace_events` (append-only,
+  jsonb + seq), `PgTraceSink` best-effort (nunca rompe el turno) + composite (stdout+pg) + flag `TRACE_PERSIST`;
+  habilita el panel futuro y hace verificable el grounding. **149 tests**; typecheck/biome/build limpios.
+  **e2e:** boot `tracePersist:true`; degradación OK (tabla ausente → inserts fallan best-effort, turno responde).
+  Specs → [`…-trace-persistence-design.md`](superpowers/specs/2026-06-13-trace-persistence-design.md) ·
+  [`…-plan.md`](superpowers/specs/2026-06-13-trace-persistence-plan.md). **Pendiente:** review + merge.
+- [?] **Migraciones `0002` (`messages.attachments`) + `0003` (`trace_events`) aplicadas en Neon** — additivas;
+  el deploy las corre vía `railway.json preDeployCommand` (`db:migrate:prod`). Confirmar (sin las tablas/columnas
+  el turno responde igual, solo fallan las persistencias en background → logs `persist/summary falló` /
+  `trace persist falló`).
 > Cerrados el 2026-06-13 (→ Historial): **Multimodal fases 1+2 mergeado en `main`** (entrada audio/voz+imágenes,
 > STT/visión/TTS por modalidad, salida de voz Telegram, observabilidad de media; e2e Kevin) · `OWNER_TELEGRAM_ID` (local+Railway) · e2e Telegram (owner/visitante + 2
 > topics aislados) · **merge de `feat/conversational-core-telegram` a `main`** · **ahorro de tokens de compresión
