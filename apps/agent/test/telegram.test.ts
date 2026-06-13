@@ -3,7 +3,6 @@ import {
   createTelegramClient,
   splitForTelegram,
 } from "../src/adapters/telegram/client.js"
-import type { Logger } from "../src/ports/logger.js"
 import {
   conversationKeyFor,
   detectTelegramLocale,
@@ -11,6 +10,7 @@ import {
   type NormalizeResult,
   normalizeUpdate,
 } from "../src/adapters/telegram/normalize.js"
+import type { Logger } from "../src/ports/logger.js"
 
 const allowed = new Set<number>([42])
 
