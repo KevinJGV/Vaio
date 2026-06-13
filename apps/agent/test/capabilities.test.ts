@@ -32,8 +32,20 @@ describe("createCapabilityResolver", () => {
     expect(p.policyText.toLowerCase()).toContain("privada")
   })
 
-  it("seam: telegram NO confiable = sin tools (perfil mínimo defensivo)", () => {
+  it("telegram NO confiable = visitante: searchMemory público + presenta a Kevin", () => {
     const p = resolver.resolve("telegram", principal("telegram", false))
-    expect(p.allowedTools).toEqual([])
+    expect(p.allowedTools).toContain("searchMemory")
+    expect(p.memoryScope.sources).toBeDefined()
+    expect(p.memoryScope.maxK).toBe(6)
+    expect(p.policyText).toContain("NO es Kevin")
+  })
+
+  it("ambas policies de telegram piden formato HTML", () => {
+    expect(
+      resolver.resolve("telegram", principal("telegram", true)).policyText
+    ).toContain("HTML")
+    expect(
+      resolver.resolve("telegram", principal("telegram", false)).policyText
+    ).toContain("HTML")
   })
 })

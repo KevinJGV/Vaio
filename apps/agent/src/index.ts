@@ -102,11 +102,17 @@ if (
   env.TELEGRAM_BOT_TOKEN &&
   env.TELEGRAM_WEBHOOK_SECRET
 ) {
+  if (env.OWNER_TELEGRAM_ID === undefined) {
+    logger.warn(
+      "Sin OWNER_TELEGRAM_ID → nadie es owner en Telegram (todos = visitante capado)."
+    )
+  }
   telegram = {
     agent,
     client: createTelegramClient(env.TELEGRAM_BOT_TOKEN, logger),
     allowedIds: telegramAllowedIds(env),
     webhookSecret: env.TELEGRAM_WEBHOOK_SECRET,
+    ownerId: env.OWNER_TELEGRAM_ID,
     sink,
   }
 }

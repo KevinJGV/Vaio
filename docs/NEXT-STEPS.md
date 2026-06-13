@@ -49,6 +49,26 @@ resumen LLM). **84 tests verdes** (18 del paquete + 66 del agente); typecheck/bi
 **Pendiente (Kevin):** e2e real con keys (ver el ahorro de tokens en logs + calidad/persona intacta);
 luego review + merge de toda la rama.
 
+**🟢 IMPLEMENTADA (misma rama) — Sync de esquema (DX Convex-like) + refinamiento Telegram** (2026-06-12):
+(a) **hot-sync de esquema**: `db:push`/`db:push:watch` (dev) + release step de migraciones en deploy
+(`railway.json preDeployCommand`); (b) **allowlist Telegram opcional** (vacía = abierto); (c) **hilos
+de Telegram**: `message_thread_id` → 1 topic = 1 conversación (ventana de contexto por hilo), el bot
+responde dentro del topic; (d) **persona**: nombre desambiguado (no "Sos Vaio") + caleño/palmireño
+(voseo valluno medido) + **formato HTML con fallback a texto plano**; (e) **identidad/owner**:
+`OWNER_TELEGRAM_ID` → sólo Kevin es `trusted` (perfil pleno), el resto = visitante capado que presenta a
+Kevin; `audience` inyectada al system prompt. **75 tests del agente + 20 compress verdes**; typecheck/
+biome/build limpios. Diseño/plan →
+[`…-telegram-threads-persona-identity-design.md`](superpowers/specs/2026-06-12-telegram-threads-persona-identity-design.md)
+· [`…-plan.md`](superpowers/specs/2026-06-12-telegram-threads-persona-identity-plan.md).
+**Pendiente (Kevin):** poner `OWNER_TELEGRAM_ID` (id de @userinfobot) en local+Railway; e2e real (2 topics
+= contexto aislado; owner vs visitante; HTML renderiza y rompe→plano).
+
+### 🔵 Pendiente FUTURO — Neon como DB reactiva estilo Convex
+El **hot-sync de esquema** (`db:push`) ya da la DX de "el esquema sigue al código". La **reactividad real**
+(queries que se actualizan solas, suscripciones) es otra cosa: Neon/Postgres no la trae. Opciones a futuro
+(su propio par design+plan): Postgres `LISTEN/NOTIFY` + WebSockets/SSE para empujar cambios a los clientes,
+o evaluar Convex si la app `web` lo justifica. Fuera de alcance hoy.
+
 ### 🔵 Pendiente FUTURO — Compresión transversal (`Compressor`) + Vaio como harness
 El puerto `Compressor` (Tier 1, determinístico) hoy se aplica a **conversación + RAG**. Queda como
 **seam transversal** para extenderlo, cuando aplique (cada uno su par design+plan):

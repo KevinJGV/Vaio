@@ -29,7 +29,7 @@ import {
   createCapabilityResolver,
   type Principal,
 } from "./capabilities.js"
-import { buildSystemPrompt } from "./prompt.js"
+import { type Audience, buildSystemPrompt } from "./prompt.js"
 import { buildSummaryPrompt, shouldSummarize } from "./summary.js"
 import { buildTools, type TraceIds } from "./tools.js"
 import { compressOrRaw, errMsg, preview } from "./util.js"
@@ -129,6 +129,13 @@ export function createAgent(deps: AgentDeps) {
         trusted: req.trusted,
       }
       const caps = capabilities.resolve(req.channel, principal)
+      // Con quién habla Vaio: en Telegram, trusted = el owner (Kevin); si no, visitante. Web = público.
+      const audience: Audience =
+        req.channel === "telegram"
+          ? principal.trusted
+            ? "owner"
+            : "visitor"
+          : "public"
 
       // Historial server-side (el canal NO manda todo el historial). Sin DB → stateless single-turn.
       let conversationId: string | undefined
@@ -197,6 +204,7 @@ export function createAgent(deps: AgentDeps) {
         model,
         system: buildSystemPrompt({
           locale,
+          audience,
           policyText: caps.policyText,
           summary: compressedSummary,
         }),

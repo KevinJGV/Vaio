@@ -1,15 +1,25 @@
 // Cliente fino de la Bot API de Telegram (fetch, sin dependencia). Solo lo que usamos: enviar
-// mensajes (con troceo a ≤4096), la acción "typing", y registrar el webhook. Los errores se loguean
-// y NO se lanzan: el handler del webhook ya respondió 200, no queremos que Telegram reintente.
+// mensajes (con troceo a ≤4096, formato HTML con fallback a texto plano), la acción "typing"
+// (dentro del topic si aplica), y registrar el webhook. Los errores se loguean y NO se lanzan: el
+// handler del webhook ya respondió 200, no queremos que Telegram reintente.
 
 import type { Logger } from "../../ports/logger.js"
 
 const API = "https://api.telegram.org"
 const MAX_LEN = 4096
 
+/** Opciones por envío. `messageThreadId` enruta al topic/hilo del que vino el mensaje. */
+export interface SendOpts {
+  messageThreadId?: number
+}
+
 export interface TelegramClient {
-  sendMessage(chatId: number, text: string): Promise<void>
-  sendChatAction(chatId: number, action: "typing"): Promise<void>
+  sendMessage(chatId: number, text: string, opts?: SendOpts): Promise<void>
+  sendChatAction(
+    chatId: number,
+    action: "typing",
+    opts?: SendOpts
+  ): Promise<void>
   setWebhook(url: string, secret: string): Promise<void>
 }
 
@@ -35,7 +45,8 @@ export function createTelegramClient(
   logger: Logger
 ): TelegramClient {
   const base = `${API}/bot${botToken}`
-  const call = async (method: string, body: unknown): Promise<void> => {
+  // Devuelve `ok` (2xx) para poder decidir fallbacks; no lanza (el webhook ya respondió 200).
+  const call = async (method: string, body: unknown): Promise<boolean> => {
     try {
       const res = await fetch(`${base}/${method}`, {
         method: "POST",
@@ -45,21 +56,44 @@ export function createTelegramClient(
       if (!res.ok) {
         logger.warn({ method, status: res.status }, "telegram api no-2xx")
       }
+      return res.ok
     } catch (err) {
       logger.warn(
         { method, err: err instanceof Error ? err.message : String(err) },
         "telegram api falló"
       )
+      return false
     }
   }
   return {
-    async sendMessage(chatId, text) {
+    async sendMessage(chatId, text, opts) {
+      const thread =
+        opts?.messageThreadId !== undefined
+          ? { message_thread_id: opts.messageThreadId }
+          : {}
       for (const part of splitForTelegram(text)) {
-        await call("sendMessage", { chat_id: chatId, text: part })
+        // Intento con HTML; si Telegram rechaza (p.ej. entities inválidas), reenvío en texto plano.
+        const okHtml = await call("sendMessage", {
+          chat_id: chatId,
+          text: part,
+          parse_mode: "HTML",
+          ...thread,
+        })
+        if (!okHtml) {
+          logger.warn(
+            { chatId },
+            "telegram HTML rechazado → fallback texto plano"
+          )
+          await call("sendMessage", { chat_id: chatId, text: part, ...thread })
+        }
       }
     },
-    async sendChatAction(chatId, action) {
-      await call("sendChatAction", { chat_id: chatId, action })
+    async sendChatAction(chatId, action, opts) {
+      const thread =
+        opts?.messageThreadId !== undefined
+          ? { message_thread_id: opts.messageThreadId }
+          : {}
+      await call("sendChatAction", { chat_id: chatId, action, ...thread })
     },
     async setWebhook(url, secret) {
       await call("setWebhook", { url, secret_token: secret })

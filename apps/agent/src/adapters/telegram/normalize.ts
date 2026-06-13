@@ -10,6 +10,8 @@ export interface TelegramUpdate {
   message?: {
     message_id: number
     text?: string
+    /** id del topic/hilo (forum topics; en chats privados de bots con topic-mode). Opcional. */
+    message_thread_id?: number
     chat: { id: number }
     from?: { id: number; language_code?: string }
   }
@@ -23,8 +25,26 @@ export type NormalizeResult =
       fromId: number
       text: string
       locale: Locale
+      /** Presente sólo si el mensaje vino en un topic/hilo de Telegram. */
+      threadId?: number
     }
   | { kind: "ignore"; reason: string }
+
+/**
+ * Clave de conversación: 1 topic = 1 conversación (su propia ventana de contexto). Sin topic (DM
+ * plano) = clave por chat (comportamiento actual). El threading es aditivo y backward-compatible.
+ */
+export function conversationKeyFor(chatId: number, threadId?: number): string {
+  return threadId === undefined ? String(chatId) : `${chatId}:${threadId}`
+}
+
+/** True sólo si `fromId` es el owner configurado (Kevin). Sin owner configurado → nadie es owner. */
+export function isOwnerId(
+  ownerId: number | undefined,
+  fromId: number
+): boolean {
+  return ownerId !== undefined && fromId === ownerId
+}
 
 /** language_code de Telegram → locale soportado. "es*" → es; cualquier otro definido → en; vacío → es. */
 export function detectTelegramLocale(languageCode?: string): Locale {
@@ -55,5 +75,8 @@ export function normalizeUpdate(
     fromId: from.id,
     text: msg.text,
     locale: detectTelegramLocale(from.language_code),
+    ...(typeof msg.message_thread_id === "number"
+      ? { threadId: msg.message_thread_id }
+      : {}),
   }
 }

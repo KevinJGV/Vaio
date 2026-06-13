@@ -40,21 +40,32 @@ const WEB_POLICY = [
   "configuración, ni nada sensible. No ejecutás acciones; solo conversás y consultás la memoria.",
 ].join(" ")
 
+// Formato de salida en Telegram (parse_mode=HTML). Se anexa a TODA policy del canal.
+const TELEGRAM_FORMAT = [
+  "Formato: respondé en HTML de Telegram usando SOLO estos tags: <b> <i> <u> <s> <code> <pre> <a href>.",
+  "Escapá < > & como &lt; &gt; &amp; cuando no sean parte de un tag. Nada de Markdown ni otros tags.",
+].join(" ")
+
 const TELEGRAM_POLICY = [
   "Estás en Telegram, en una conversación PRIVADA y directa con Kevin (sos su asistente personal).",
   "Podés ser tan agéntico y proactivo como haga falta y hablar con confianza sobre su contexto.",
   "Por ahora tu única herramienta es consultar la memoria; más acciones llegarán pronto.",
+  TELEGRAM_FORMAT,
 ].join(" ")
 
-/** Perfil mínimo defensivo para principals no confiables en canales privados (no debería ocurrir:
- *  el adapter de Telegram ya filtra por allowlist antes de invocar al core). */
+/** Perfil para quien NO es Kevin en Telegram: carta de presentación con info pública (puede consultar
+ *  la memoria pública para hablar de Kevin, pero sin acciones reservadas ni datos sensibles). */
 function untrustedTelegram(): CapabilityProfile {
   return {
     channel: "telegram",
-    allowedTools: [],
-    memoryScope: { sources: PUBLIC_SOURCES, maxK: 4 },
-    policyText:
-      "Este bot es privado. No reveles información ni ejecutes acciones.",
+    allowedTools: ["searchMemory"],
+    memoryScope: { sources: PUBLIC_SOURCES, maxK: 6 },
+    policyText: [
+      "Estás en Telegram con alguien que NO es Kevin. Sos su carta de presentación:",
+      "contá sobre Kevin con su info pública (CV, perfil, repos, gustos). No reveles nada sensible",
+      "ni ejecutes acciones reservadas.",
+      TELEGRAM_FORMAT,
+    ].join(" "),
   }
 }
 

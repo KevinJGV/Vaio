@@ -89,10 +89,15 @@ OpenRouter: models:[barato, fallback, llama-free]  → "siempre responde" + cach
 - **System prompt**: persona "asistente de Kevin" (persona/pro/dev), tono alineado con sus
   quirks (señal cultural deliberada, no neutralizar), responde en el **idioma del usuario**.
 - **Endpoints MVP**: `POST /chat` (stream, requiere header `AGENT_API_KEY`), `GET /health`.
-  **Iteración 2 suma** `POST /tg` (webhook Telegram: secret_token + allowlist; canal "pleno") y vuelve
-  el core **stateful** (memoria conversacional `conversations`/`messages` + resumen rodante; capacidades
-  por canal — web capado / Telegram pleno; `searchMemory` gated por capacidad). Diseño:
-  [`superpowers/specs/2026-06-12-stateful-channels-telegram-design.md`](superpowers/specs/2026-06-12-stateful-channels-telegram-design.md).
+  **Iteración 2 suma** `POST /tg` (webhook Telegram: secret_token; allowlist **opcional** — vacía =
+  abierto, con ids = whitelist) y vuelve el core **stateful** (memoria conversacional
+  `conversations`/`messages` + resumen rodante; capacidades por canal; `searchMemory` gated por capacidad).
+  **Refinamiento Telegram**: **hilos** (`message_thread_id` → 1 topic = 1 conversación = su propia ventana
+  de contexto; responde dentro del topic); respuestas en **HTML** (fallback a texto plano); **identidad por
+  owner** (`OWNER_TELEGRAM_ID` → sólo Kevin es `trusted`/pleno; el resto = visitante capado que **presenta a
+  Kevin**; `audience` owner/visitor/public inyectada al system prompt). Diseño:
+  [`superpowers/specs/2026-06-12-stateful-channels-telegram-design.md`](superpowers/specs/2026-06-12-stateful-channels-telegram-design.md)
+  · [`…-telegram-threads-persona-identity-design.md`](superpowers/specs/2026-06-12-telegram-threads-persona-identity-design.md).
   Ambos instrumentados con observabilidad (ver "Observabilidad" abajo).
 
 **Integración en el portafolio** (mínima, no rompe `output:'static'`):

@@ -61,6 +61,9 @@ const envSchema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
   TELEGRAM_ALLOWED_USER_IDS: z.string().optional(), // csv de telegram user ids
+  // Id de Telegram de Kevin (owner). Sólo ese id resuelve a `trusted` (perfil pleno/agéntico);
+  // cualquier otro = visitante capado (Vaio lo presenta). Sin esto, nadie es owner.
+  OWNER_TELEGRAM_ID: z.coerce.number().int().optional(),
 })
 
 export type Env = z.infer<typeof envSchema>

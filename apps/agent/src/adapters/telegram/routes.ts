@@ -11,7 +11,12 @@ import type { Logger } from "../../ports/logger.js"
 import type { TraceSink } from "../../ports/trace.js"
 import type { Variables } from "../http/types.js"
 import type { TelegramClient } from "./client.js"
-import { type NormalizeResult, normalizeUpdate } from "./normalize.js"
+import {
+  conversationKeyFor,
+  isOwnerId,
+  type NormalizeResult,
+  normalizeUpdate,
+} from "./normalize.js"
 
 export interface TelegramDeps {
   /** null → el agente degrada a cortesía (sin OpenRouter configurado). */
@@ -19,6 +24,8 @@ export interface TelegramDeps {
   client: TelegramClient
   allowedIds: Set<number>
   webhookSecret: string
+  /** Id de Telegram de Kevin (owner). Solo ese id resuelve a `trusted` (perfil pleno). */
+  ownerId?: number
   sink: TraceSink
 }
 
@@ -36,33 +43,39 @@ export function mountTelegram(
     requestId: string,
     log: Logger
   ): Promise<void> => {
+    // Responder dentro del topic/hilo del que vino el mensaje (si aplica).
+    const send: { messageThreadId?: number } = {
+      messageThreadId: norm.threadId,
+    }
     try {
-      await deps.client.sendChatAction(norm.chatId, "typing")
+      await deps.client.sendChatAction(norm.chatId, "typing", send)
       if (!deps.agent) {
-        await deps.client.sendMessage(norm.chatId, courtesy(norm.locale))
+        await deps.client.sendMessage(norm.chatId, courtesy(norm.locale), send)
         return
       }
       const req: TurnRequest = {
         channel: "telegram",
-        conversationKey: String(norm.chatId),
+        // 1 topic = 1 conversación (su propia ventana de contexto); DM plano = clave por chat.
+        conversationKey: conversationKeyFor(norm.chatId, norm.threadId),
         userText: norm.text,
         locale: norm.locale,
         principalId: String(norm.fromId),
-        trusted: true,
+        // Sólo el owner (Kevin) es de confianza → perfil pleno; el resto = visitante capado.
+        trusted: isOwnerId(deps.ownerId, norm.fromId),
       }
       const { text } = await deps.agent.respond(req, {
         logger: log,
         sink: deps.sink,
         requestId,
       })
-      await deps.client.sendMessage(norm.chatId, await text)
+      await deps.client.sendMessage(norm.chatId, await text, send)
     } catch (err) {
       log.error(
         { err: err instanceof Error ? err.message : String(err) },
         "telegram handleTurn falló"
       )
       try {
-        await deps.client.sendMessage(norm.chatId, courtesy(norm.locale))
+        await deps.client.sendMessage(norm.chatId, courtesy(norm.locale), send)
       } catch {
         // si ni la cortesía sale, lo dejamos: ya logueamos el error original.
       }

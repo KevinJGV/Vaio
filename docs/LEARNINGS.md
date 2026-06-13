@@ -34,6 +34,23 @@ para no repetirlas en próximas sesiones. Una línea por aprendizaje, concreta.
   deploy es `node dist/adapters/db/migrate.js` (usa el migrator de `drizzle-orm`, dep de PROD, no
   drizzle-kit). `runMigrations` busca `./migrations` relativo al cwd (`/app`) → el Dockerfile copia
   `migrations/` explícitamente a la imagen (`COPY --from=workspace …/migrations ./migrations`).
+- **Telegram: topics en chats privados de bots** — `message_thread_id` aplica "for supergroups and
+  private chats of bots with forum topic mode enabled" (verificado context7/doc). Lo leemos en
+  `normalize` y la `conversationKey` pasa a `chatId:threadId` → **1 topic = 1 conversación = su propia
+  ventana de contexto** (gratis: la unique `(channel, threadKey)` ya lo separa). Hay que pasar
+  `message_thread_id` también al **responder** (`sendMessage`/`sendChatAction`) o el bot contesta fuera
+  del hilo. Backward-compat: sin topic → clave = `chatId`.
+- **Telegram formato HTML > MarkdownV2** — para texto generado por LLM, `parse_mode=HTML` es mucho más
+  robusto (solo escapar `< > &`; MarkdownV2 exige ~18 caracteres y se rompe seguido). Aun así el modelo
+  puede emitir HTML inválido → el cliente **reintenta sin `parse_mode`** (texto plano) ante no-2xx. Nunca
+  rompe. (El corte a 4096 puede partir un tag → mismo fallback.)
+- **"Sos Vaio" se leía como apellido** — el voseo "Sos" pegado al nombre confundía al modelo. Fix:
+  separar nombre del verbo ("Tu nombre es Vaio. Sos…"). El voseo de Vaio es **valluno (caleño/palmireño)**,
+  auténtico, no rioplatense.
+- **Owner gating en el adapter, no en el core** — `OWNER_TELEGRAM_ID` se compara en `routes.ts`
+  (`isOwnerId`) para setear `trusted`; el core sólo interpreta `trusted`/`channel` → deriva `audience`
+  (owner/visitor/public) para el system prompt. Mantiene el core puro (sin env). El perfil **visitante**
+  de Telegram NO es mudo: presenta a Kevin con memoria pública (searchMemory + `PUBLIC_SOURCES`).
 - **Monorepo pnpm**: `@vaio/contracts` expone `"types": "./src/index.ts"` y `"default": "./dist/index.js"`
   → tsc/typecheck resuelven tipos del SOURCE (no necesitan build), runtime usa dist (build topológico
   de `pnpm -r build`: contracts antes que agent). `dev` del agent buildea contracts primero.
