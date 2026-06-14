@@ -15,29 +15,24 @@
 > **Observabilidad — MERGEADA + EN PRODUCCIÓN** (2026-06-13): App Attribution (dashboard ya no "unknown") +
 > persistencia de traza por turno (`trace_events`). Migraciones `0002`+`0003` aplicadas en Neon (verificado:
 > `trace_events` con filas, `messages.attachments` existe). Detalle → Historial.
-> **Sin WIP abierto.**
-> **Foco / "go" pendiente (próximo paso):** quedan los dos frentes —
-> **(a)** followups de **grounding** (§ "Hallazgos del bot real": voz≠hechos duro, raíz del bug "Kevin es
-> caleño"; ahora **verificable** con los traces persistidos) y **(b)** el **framework de tools/harness** (eje 2
-> del próximo paso mayor). **El portafolio va DESPUÉS.**
+> **Grounding (voz≠hechos) — MERGEADO en `main`** (2026-06-13): system prompt endurecido (voz=estilo sin
+> biografía, grounding duro+stop-rule, fallback por audiencia, no over-trigger) + `searchMemory` con categorías.
+> e2e: "¿de dónde es Kevin?"→Bucaramanga (no caleño), saludo no dispara la tool. Detalle → Historial.
+> **Ritual refinado** (`CLAUDE.md`): skills + subagentes = disciplina visible (considerar siempre, decir si se
+> salta + por qué; default a desplegar agentes en lo grande, incl. diseño). **Sin WIP abierto.**
+> **Foco / "go" pendiente (próximo paso):** el **framework de tools/harness** (eje 2 del próximo paso mayor) —
+> grande/foundational → arrancar con `superpowers:brainstorming` + **panel de agentes de diseño en paralelo**;
+> ahí enchufa la **curación agéntica** del norte "Vaio se nutre solo" (write-actions + HITL). **El portafolio va DESPUÉS.**
 
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [?] **Grounding: voz ≠ hechos** — IMPLEMENTADO en `feat/grounding-voice-not-facts` (sin mergear). Hardening
-  del system prompt (§"Hallazgos del bot real" #1-4): voz=estilo sin biografía (quitada "caleño de Palmira"),
-  grounding duro + stop-rule, fallback por audiencia, no over-imperar; + `searchMemory` anclado en `tools.ts`
-  (categorías, sin "SIEMPRE"). **151 tests**; typecheck/biome/build limpios. **e2e ✅** (verificado con las
-  trazas): "¿de dónde es Kevin?" → disparó `searchMemory` → respondió **Bucaramanga** (del CV), NO "caleño";
-  "hola" → **no** disparó `searchMemory` (sin over-trigger); voz (voseo) intacta. Diseño →
-  [`…-grounding-voice-not-facts-design.md`](superpowers/specs/2026-06-13-grounding-voice-not-facts-design.md) ·
-  plan → [`…-plan.md`](superpowers/specs/2026-06-13-grounding-voice-not-facts-plan.md). **Pendiente:** review +
-  merge. (§Hallazgos #5 —ingerir hechos personales— queda futuro; el CV ya ancla el origen.)
-- [ ] **Visión REGISTRADA (diferida): "Vaio se nutre solo"** — memoria viva auto-curada + self-awareness +
-  fuentes crudas/tiempo-real (Kevin, 2026-06-13). NO se codea ahora; corresponde al **harness (eje 2)** +
-  **Fase 2 `facts`** + **Fase 3 grafos**. Norte y decomposición en `SPEC.md` §"Vaio se nutre solo" + memoria
-  `vaio-self-nourishing-memory-vision`. Conecta con "Vaio como harness personal" (abajo) y la curación agéntica.
-> Cerrados el 2026-06-13 (→ Historial): **Observabilidad (App Attribution + persistencia de traza) mergeada y
+- _(vacío — sin ítems abiertos)_
+> **Diferido/registrado (no es WIP, vive en su fase):** visión **"Vaio se nutre solo"** (memoria viva
+> auto-curada + self-awareness + fuentes crudas/tiempo-real) → `SPEC.md` §"Vaio se nutre solo" + memoria
+> `vaio-self-nourishing-memory-vision`; corresponde al **harness (eje 2)** + Fase 2 `facts` + Fase 3 grafos.
+> Cerrados el 2026-06-13 (→ Historial): **Grounding (voz≠hechos) mergeado en `main`** + **ritual refinado en
+> CLAUDE.md** · **Observabilidad (App Attribution + persistencia de traza) mergeada y
 > EN PRODUCCIÓN** (migraciones 0002+0003 aplicadas, `trace_events` escribiendo) · **Multimodal fases 1+2 mergeado en `main`** (entrada audio/voz+imágenes,
 > STT/visión/TTS por modalidad, salida de voz Telegram, observabilidad de media; e2e Kevin) · `OWNER_TELEGRAM_ID` (local+Railway) · e2e Telegram (owner/visitante + 2
 > topics aislados) · **merge de `feat/conversational-core-telegram` a `main`** · **ahorro de tokens de compresión
@@ -46,6 +41,17 @@
 ---
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
+
+**🟢 GROUNDING (voz ≠ hechos) — MERGEADO en `main`** (2026-06-13, ex `feat/grounding-voice-not-facts`).
+Cierra el bug donde Vaio inventaba origen/fútbol sobre Kevin (§"Hallazgos del bot real" #1-4): `prompt.ts` con
+voz = estilo (voseo valluno) **sin biografía** (quitada la identidad geográfica = vector de fuga); **grounding
+duro + stop-rule** (hechos de Kevin SOLO de `searchMemory` este turno); **fallback por audiencia**; **no
+over-imperar** (condicional, excluye saludos). `tools.ts`: descripción de `searchMemory` con categorías + sin
+"SIEMPRE". **151 tests**; typecheck/biome/build limpios. **e2e (con trazas):** "¿de dónde es Kevin?" →
+`searchMemory` → Bucaramanga (CV), no "caleño"; "hola" → no dispara la tool; voz intacta. Specs →
+`2026-06-13-grounding-voice-not-facts-{design,plan}.md`. Junto: **refinamiento del ritual** en `CLAUDE.md`
+(skills + subagentes como disciplina visible) y registro del norte **"Vaio se nutre solo"** en `SPEC.md`
+(diferido a harness/Fase 2/3). §Hallazgos #5 (ingerir hechos personales) queda futuro.
 
 **🟢 OBSERVABILIDAD — MERGEADO + EN PRODUCCIÓN** (2026-06-13, ex `feat/observability-traceability`).
 **(a) App Attribution:** `APP_NAME`(→`X-Title`)/`APP_URL`(→`HTTP-Referer`) al provider del AI SDK Y a las
