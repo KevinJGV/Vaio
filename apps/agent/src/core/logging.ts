@@ -106,7 +106,8 @@ export function toLogRecord(event: TraceEvent, opts: RedactOptions): LogRecord {
       // SIEMPRE visibles (causa para depurar); `detail` (status/excepción) solo con logPrompts.
       fields.component = event.component
       fields.reason = event.reason
-      if (opts.logPrompts && event.detail !== undefined) fields.detail = event.detail
+      if (opts.logPrompts && event.detail !== undefined)
+        fields.detail = event.detail
       return { level: "error", msg: "degraded", fields }
     }
   }

@@ -167,7 +167,10 @@ export function mountTelegram(
       update = await c.req.json()
     } catch (err) {
       // Webhook con body no-JSON: antes era invisible. Dejamos rastro (y ACK para que Telegram no reintente).
-      c.get("log")?.warn({ err: String(err) }, "tg: update no-JSON (ack sin procesar)")
+      c.get("log")?.warn(
+        { err: String(err) },
+        "tg: update no-JSON (ack sin procesar)"
+      )
       return c.json({ ok: true })
     }
     const norm = normalizeUpdate(update, deps.allowedIds)

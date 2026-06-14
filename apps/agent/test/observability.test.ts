@@ -1,14 +1,18 @@
 import type { TraceEvent } from "@vaio/contracts"
 import { describe, expect, it } from "vitest"
-import { reportDegraded } from "../src/core/observability.js"
 import { toLogRecord } from "../src/core/logging.js"
+import { reportDegraded } from "../src/core/observability.js"
 
 describe("reportDegraded", () => {
   it("emite un TraceEvent degraded con los campos", () => {
     const events: TraceEvent[] = []
     reportDegraded(
       { emit: (e) => events.push(e), ids: { requestId: "r", turnId: "t" } },
-      { component: "transcribe", reason: "transcribe falló", detail: "transcriptions 400" }
+      {
+        component: "transcribe",
+        reason: "transcribe falló",
+        detail: "transcriptions 400",
+      }
     )
     expect(events[0]).toMatchObject({
       type: "degraded",

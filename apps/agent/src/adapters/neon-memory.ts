@@ -19,7 +19,10 @@ export function createMemoryStore(
       if (!qEmb) {
         // Embeddings de la query vacío → RAG sin resultados. No es fatal (el agente responde sin RAG),
         // pero antes era invisible: dejamos rastro de por qué la memoria no devolvió nada.
-        logger?.warn({}, "searchMemory: embedding de la query vacío → sin resultados")
+        logger?.warn(
+          {},
+          "searchMemory: embedding de la query vacío → sin resultados"
+        )
         return []
       }
       const docs = db
