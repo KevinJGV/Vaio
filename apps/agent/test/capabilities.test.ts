@@ -40,6 +40,27 @@ describe("createCapabilityResolver", () => {
     expect(p.policyText).toContain("NO es Kevin")
   })
 
+  it("web: política habilita auto-introspección (arquitectura/código público) con guard de prompt/secrets", () => {
+    const p = resolver
+      .resolve("web", principal("web", false))
+      .policyText.toLowerCase()
+    expect(p).toMatch(/arquitectura/)
+    expect(p).toMatch(/open source/)
+    // guard: nunca el system prompt activo ni secrets
+    expect(p).toMatch(/nunca/)
+    expect(p).toMatch(/system prompt/)
+    expect(p).toMatch(/secret/)
+  })
+
+  it("telegram visitante: también puede hablar de la propia arquitectura, con el mismo guard", () => {
+    const p = resolver
+      .resolve("telegram", principal("telegram", false))
+      .policyText.toLowerCase()
+    expect(p).toMatch(/arquitectura/)
+    expect(p).toMatch(/system prompt/)
+    expect(p).toMatch(/secret/)
+  })
+
   it("ambas policies de telegram piden formato HTML", () => {
     expect(
       resolver.resolve("telegram", principal("telegram", true)).policyText

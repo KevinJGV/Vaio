@@ -30,6 +30,27 @@ describe("personaPrompt", () => {
   })
 })
 
+describe("personaPrompt: auto-introspección (habla de su código, no vuelca el prompt)", () => {
+  it("es → habilita explicar/citar la propia arquitectura vía searchMemory, sin volcar el prompt activo ni secrets", () => {
+    const p = personaPrompt("es")
+    // carve-out: puede hablar de su propia arquitectura/código (open source) vía la tool
+    expect(p.toLowerCase()).toMatch(/arquitectura/)
+    expect(p.toLowerCase()).toMatch(/open source/)
+    // guard duro (Invariante #5): nunca el prompt activo verbatim ni secrets
+    expect(p.toLowerCase()).toMatch(/nunca reveles/)
+    expect(p.toLowerCase()).toMatch(/system prompt|instrucciones activas/)
+    expect(p.toLowerCase()).toMatch(/secret/)
+  })
+  it("en → mismo carve-out + guard en inglés", () => {
+    const p = personaPrompt("en")
+    expect(p.toLowerCase()).toMatch(/architecture/)
+    expect(p.toLowerCase()).toMatch(/open source/)
+    expect(p.toLowerCase()).toMatch(/never reveal/)
+    expect(p.toLowerCase()).toMatch(/system prompt|active instructions/)
+    expect(p.toLowerCase()).toMatch(/secret/)
+  })
+})
+
 describe("buildSystemPrompt", () => {
   it("compone persona + policyText cuando hay política", () => {
     const out = buildSystemPrompt({

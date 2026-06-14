@@ -23,7 +23,7 @@ export const searchMemory: ActionDescriptor = {
     const k = ctx.caps.memoryScope.maxK
     return tool({
       description:
-        "Memoria de Kevin (sus datos reales): bio/origen, stack, proyectos (GitHub), gustos (música), contacto. Úsala cuando la respuesta dependa de un hecho concreto de Kevin; no para saludos ni charla.",
+        "Memoria de Kevin (sus datos reales: bio/origen, stack, proyectos (GitHub), gustos (música), contacto) Y tu propio código/arquitectura (el repo público de Vaio): cómo estás construido, tus módulos, decisiones de diseño. Úsala cuando la respuesta dependa de un hecho concreto de Kevin o de cómo funcionás vos; no para saludos ni charla.",
       inputSchema: z.object({
         query: z
           .string()
