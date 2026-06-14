@@ -6,6 +6,14 @@ para no repetirlas en próximas sesiones. Una línea por aprendizaje, concreta.
 > Esto es la memoria del **dev**. La memoria del **producto** (lo que el agente sabe de Kevin)
 > vive en Neon/pgvector — ver `docs/SPEC.md`.
 
+- **`openrouter/free` NO sirve para VISIÓN** (gotcha real jun-2026): el "free router" rota entre TODOS los
+  modelos gratis que aceptan la modalidad, y el pool de imagen incluye modelos que **aceptan imágenes pero no
+  describen** — p.ej. `nvidia/nemotron-3.5-content-safety:free` (moderación): devolvió `User Safety: unsafe /
+  PII/Privacy` como "descripción" → el chat se negó a analizar la foto. La vez anterior el router cayó en
+  `gemma-4` (bien); el resultado es **no determinista**. Fix = **fijar VLMs concretos** en `VISION_MODELS`, no
+  el router: gratis confiables = `google/gemma-4-26b-a4b-it:free` / `gemma-4-31b-it:free` /
+  `nvidia/nemotron-nano-12b-v2-vl:free`; o `google/gemini-2.5-flash-lite` (barato) + free de respaldo. El log
+  `media.vision` (con `response.modelId`) fue lo que permitió diagnosticarlo en una línea.
 - **OpenRouter — API surface real + cómo encontrarla** (verificado jun-2026, openapi.json): la **fuente
   autoritativa es `https://openrouter.ai/openapi.json`** (parsear con node; WebFetch lo trunca). La doc web es
   JS-rendered (404 al fetchear). ⚠️ `GET /api/v1/models` por default lista **solo texto** (337) → NO inferir
