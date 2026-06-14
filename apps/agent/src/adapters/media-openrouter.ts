@@ -55,6 +55,11 @@ export function createTranscriber(
         }),
       })
       if (!res.ok) {
+        const body = await res.text().catch(() => "")
+        logger.warn(
+          { status: res.status, body: body.slice(0, 500) },
+          "transcribe failed"
+        )
         throw new Error(`transcriptions ${res.status}`)
       }
       const json = (await res.json()) as { text?: string }

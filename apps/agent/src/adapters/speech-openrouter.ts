@@ -47,7 +47,13 @@ export function createSpeechSynthesizer(args: {
             continue
           }
           const raw = new Uint8Array(await res.arrayBuffer())
-          if (raw.byteLength === 0) continue
+          if (raw.byteLength === 0) {
+            logger.debug(
+              { model: entry.model },
+              "tts devolvió audio vacío → siguiente en la cadena"
+            )
+            continue
+          }
           // Observabilidad: qué entrada de la cadena sirvió + latencia.
           logger.info(
             {

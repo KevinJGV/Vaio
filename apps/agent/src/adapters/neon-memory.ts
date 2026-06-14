@@ -3,18 +3,25 @@
 // de distancia = más similar primero.
 
 import { and, asc, cosineDistance, eq, isNull, sql } from "drizzle-orm"
+import type { Logger } from "../ports/logger.js"
 import type { DocChunk, Embedder, MemoryStore } from "../ports/memory.js"
 import type { Database } from "./db/client.js"
 import { documents, facts } from "./db/schema.js"
 
 export function createMemoryStore(
   db: Database,
-  embedder: Embedder
+  embedder: Embedder,
+  logger?: Logger
 ): MemoryStore {
   return {
     async searchMemory(query: string, k = 6): Promise<DocChunk[]> {
       const [qEmb] = await embedder.embed([query])
-      if (!qEmb) return []
+      if (!qEmb) {
+        // Embeddings de la query vacío → RAG sin resultados. No es fatal (el agente responde sin RAG),
+        // pero antes era invisible: dejamos rastro de por qué la memoria no devolvió nada.
+        logger?.warn({}, "searchMemory: embedding de la query vacío → sin resultados")
+        return []
+      }
       const docs = db
         .select({
           source: documents.source,

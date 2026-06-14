@@ -87,6 +87,26 @@ describe("createTranscriber (REST /audio/transcriptions)", () => {
       })
     ).rejects.toThrow()
   })
+
+  it("no-2xx → loguea warn con status+body ANTES de lanzar (observabilidad)", async () => {
+    const warns: Record<string, unknown>[] = []
+    const spy: Logger = {
+      ...log,
+      warn: ((a: Record<string, unknown> | string) => {
+        if (typeof a === "object") warns.push(a)
+      }) as Logger["warn"],
+    }
+    globalThis.fetch = (async () =>
+      new Response("rate limited", { status: 429 })) as typeof fetch
+    await expect(
+      createTranscriber("k", "https://or/api/v1", "m", spy).transcribe({
+        data,
+        mediaType: "audio/ogg",
+      })
+    ).rejects.toThrow()
+    expect(warns[0]).toMatchObject({ status: 429 })
+    expect(String(warns[0]?.body)).toContain("rate limited")
+  })
 })
 
 describe("createMediaUnderstanding (visión, chat+file-part)", () => {

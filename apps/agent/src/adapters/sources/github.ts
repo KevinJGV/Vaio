@@ -31,7 +31,13 @@ async function githubApi<T>(path: string, token?: string): Promise<T> {
   }
   if (token) headers.authorization = `Bearer ${token}`
   const res = await fetch(`https://api.github.com${path}`, { headers })
-  if (!res.ok) throw new Error(`GitHub ${path} → ${res.status}`)
+  if (!res.ok) {
+    // El body de error de GitHub (rate-limit, permisos) va en el mensaje → visible al loguear aguas arriba.
+    const body = await res.text().catch(() => "")
+    throw new Error(
+      `GitHub ${path} → ${res.status}${body ? ` · ${body.slice(0, 200)}` : ""}`
+    )
+  }
   return (await res.json()) as T
 }
 

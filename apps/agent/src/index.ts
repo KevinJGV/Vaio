@@ -58,10 +58,10 @@ const loggerSink = createLoggerTraceSink(logger, {
 })
 const sink =
   dbHandle && env.TRACE_PERSIST
-    ? createCompositeTraceSink([
-        loggerSink,
-        createPgTraceSink(dbHandle.db, logger),
-      ])
+    ? createCompositeTraceSink(
+        [loggerSink, createPgTraceSink(dbHandle.db, logger)],
+        logger
+      )
     : loggerSink
 // App attribution para OpenRouter (dashboard): se pasa al provider y a las llamadas REST.
 const attribution = buildAttribution(env)
@@ -92,7 +92,7 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
         baseUrl: env.EMBEDDINGS_BASE_URL,
         dimensions: EMBEDDING_DIM,
       })
-      memory = createMemoryStore(db, embedder)
+      memory = createMemoryStore(db, embedder, logger)
       factStore = createFactStore(db, embedder)
       ragEnabled = true
     } else {
