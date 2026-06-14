@@ -302,12 +302,12 @@ cambiar de provider. *SPEC ya ajustado para no afirmar un caching inexistente; i
 batch de URLs/APIs de hoy (`adapters/sources/*`) es el **punto de partida a superar**, no el norte. Decomposición
 (detalle en [`SPEC.md`](SPEC.md) §"Vaio se nutre solo" + memoria `vaio-self-nourishing-memory-vision`):
 - ✅ **Paso 4 — Curación agéntica** (`saveFact` + HITL): **HECHO** (2026-06-14, ver Historial). El "decide qué guardar".
-- [ ] **Paso 1 — Fuentes crudas**: collectors que leen **repo md/código** (no HTML desplegado). Mismo patrón
-  `collectX()→DocChunk[]`. Su propio par design+plan.
-- [ ] **Paso 2 — Self-awareness**: Vaio ingiere **su propio repo** ("sus tripas"). ⚠️ excluir secrets/`.env`.
-- [ ] **Paso 3 — Acceso en tiempo real / on-demand**: retrieval como **read-action del harness** (eje 2, ya
-  existe la infra); sync continuo → Fase 3.
-- [ ] **Paso 5 — Grafos**: `facts` → Graphiti bi-temporal (Fase 3).
+- **Paso 1 — Fuentes crudas** (pendiente): collectors que leen **repo md/código** (no HTML desplegado). Mismo
+  patrón `collectX()→DocChunk[]`. Su propio par design+plan.
+- **Paso 2 — Self-awareness** (pendiente): Vaio ingiere **su propio repo** ("sus tripas"). ⚠️ excluir secrets/`.env`.
+- **Paso 3 — Acceso en tiempo real / on-demand** (pendiente): retrieval como **read-action del harness** (eje 2,
+  ya existe la infra); sync continuo → Fase 3.
+- **Paso 5 — Grafos** (pendiente, Fase 3): `facts` → Graphiti bi-temporal.
 > **Los pasos 1-3 son el corazón del "vivo" que falta** (paso 4 ya da la curación; 1-3 dan el acceso a lo crudo).
 > Cada paso = su propio `brainstorming` → design+plan cuando se priorice.
 
