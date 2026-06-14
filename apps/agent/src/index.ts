@@ -115,6 +115,8 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
           maxChunksPerRepo: env.RAW_REPO_MAX_CHUNKS,
         },
         logger,
+        freshnessTtlMs: env.FRESHNESS_TTL_MINUTES * 60 * 1000,
+        inlineMaxFiles: env.SYNC_INLINE_MAX_FILES,
       })
       ragEnabled = true
     } else {

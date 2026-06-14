@@ -1,6 +1,10 @@
-// Entrypoint de ingesta: asegura el schema (migraciones) → recolecta fuentes → reemplaza
-// idempotentemente por `source`. Cada collector degrada por separado (si una fuente falla,
-// se loguea y se sigue). Correr con `pnpm --filter @vaio/agent ingest` (a mano / cron Railway).
+// Entrypoint de ingesta de fuentes EXTERNAS no-repo: GitHub (catálogo de repos) + Last.fm (música).
+// Reemplaza idempotentemente por `source`. Cada collector degrada por separado.
+//   - cv/me/contact: DEPRECADOS → su contenido vive en el repo del portafolio (KevinJGV/KevinJGV: i18n + cv.ts),
+//     que se ingiere/mantiene fresco vía `sync.ts` (sync incremental). Acá se LIMPIAN los sources viejos.
+//   - repos (repo:*): los maneja `sync.ts` (sync incremental con frescura), NO este entrypoint (evita clobbear
+//     el manifest path/blob_sha del sync).
+// Correr con `pnpm --filter @vaio/agent ingest` (a mano / cron). Para repos: `pnpm --filter @vaio/agent sync`.
 
 import { createDb } from "./adapters/db/client.js"
 import { runMigrations } from "./adapters/db/migrate.js"
@@ -8,14 +12,14 @@ import { EMBEDDING_DIM } from "./adapters/db/schema.js"
 import { createEmbedder } from "./adapters/embeddings.js"
 import { createLogger } from "./adapters/logger.js"
 import { createMemoryStore } from "./adapters/neon-memory.js"
-import { collectCV } from "./adapters/sources/cv.js"
 import { collectGithub } from "./adapters/sources/github.js"
 import { collectLastfm } from "./adapters/sources/lastfm.js"
-import { collectPortfolio } from "./adapters/sources/portfolio.js"
-import { collectRawRepo } from "./adapters/sources/repo.js"
-import { loadConfig, rawSourceRepos } from "./config.js"
-import { DEFAULT_REPO_POLICY } from "./core/repo-ingest.js"
+import { loadConfig } from "./config.js"
 import type { DocChunk } from "./ports/memory.js"
+
+// Fuentes scrapeadas deprecadas (su contenido es duplicado del repo del portafolio, que sí tiene frescura).
+// Se limpian de `documents` para no dejar copias rancias huérfanas.
+const DEPRECATED_SOURCES = ["cv", "cv-en", "me", "contact"]
 
 async function main(): Promise<void> {
   const env = loadConfig()
@@ -43,9 +47,12 @@ async function main(): Promise<void> {
   })
   const memory = createMemoryStore(db, embedder)
 
+  // Limpieza one-shot de las fuentes scrapeadas deprecadas (idempotente: no-op si ya no existen).
+  for (const source of DEPRECATED_SOURCES) {
+    await memory.clearSource(source)
+  }
+
   const collectors: { name: string; run: () => Promise<DocChunk[]> }[] = [
-    { name: "cv", run: collectCV },
-    { name: "portfolio", run: collectPortfolio },
     {
       name: "github",
       run: () =>
@@ -61,27 +68,6 @@ async function main(): Promise<void> {
     })
   } else {
     logger.info("lastfm: sin LASTFM_API_KEY/USER, salto.")
-  }
-
-  // "Vaio se nutre solo" pasos 1+2: fuentes CRUDAS (md+código) de repos curados, incl. el propio.
-  const rawRepos = rawSourceRepos(env)
-  if (rawRepos.length > 0) {
-    collectors.push({
-      name: "raw-repos",
-      run: () =>
-        collectRawRepo({
-          repos: rawRepos,
-          token: env.GITHUB_TOKEN,
-          policy: {
-            ...DEFAULT_REPO_POLICY,
-            maxFileBytes: env.RAW_FILE_MAX_BYTES,
-            maxChunksPerRepo: env.RAW_REPO_MAX_CHUNKS,
-          },
-          logger,
-        }),
-    })
-  } else {
-    logger.info("raw-repos: sin RAW_SOURCE_REPOS, salto.")
   }
 
   for (const col of collectors) {
@@ -110,7 +96,7 @@ async function main(): Promise<void> {
   }
 
   await close()
-  logger.info("ingest listo")
+  logger.info("ingest listo (repos → usar `pnpm sync`)")
 }
 
 main().catch((e) => {

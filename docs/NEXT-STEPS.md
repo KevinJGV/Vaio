@@ -62,6 +62,24 @@
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
 
+**🟢 FRESHNESS GATE — no confiarse de embebidos viejos sobre Kevin — VERIFICADO** (2026-06-14, rama
+`feat/raw-repo-ingestion` — aún NO en `main`). Cierra el gap: antes Vaio respondía sobre Kevin por inercia con
+chunks viejos. Hook **determinístico** en `searchMemory` (`RepoSyncPort.ensureFresh`, **TTL 10 min** por repo en
+memoria): tras recuperar, si los chunks vienen de un `repo:*` stale → sincroniza ANTES de responder (inline si
+chico; background si grande); si refrescó inline, re-recupera. No depende del criterio del modelo. Coste casi nulo
+en el caso común (TTL cacheado → 0 requests). **Meta-conciencia** en el prompt (de dónde sale la data sobre Kevin).
+**Repo del portafolio = ÚNICA FUENTE DE VERDAD:** la salvaguarda **pasó** (inspección local de
+`KevinJGV/KevinJGV`: el contenido "sobre Kevin" vive LIMPIO en `src/i18n/{es,en}.ts` + `src/data/cv.ts` —"fuente
+única de verdad del CV"—, NO en el markup `.astro`) → **dropeado el scrape** `cv/cv-en/me/contact` (duplicados sin
+frescura): `ingest.ts` los `clearSource` y deja de scrapearlos; ahora `ingest.ts` solo corre fuentes externas
+(github, lastfm) y **los repos son exclusivos de `sync.ts`** (evita clobbear el manifest path/blob_sha). Nueva
+palanca `SYNC_FORCE_FULL` (re-index full no destructivo, para poblar archivos que un cap bajo dejó afuera o tras
+cambios de chunker). **255 tests** (+5 gate); typecheck/biome/build limpios. **e2e:** sync full de KevinJGV
+→ i18n/cv.ts indexados; `pnpm ingest` limpia cv/me/contact; `/chat` sobre Kevin cita el repo (no el scrape).
+Specs → [`…-freshness-gate-design.md`](superpowers/specs/2026-06-14-freshness-gate-design.md) ·
+[`…-plan.md`](superpowers/specs/2026-06-14-freshness-gate-plan.md). Decisión: directo (acoplado + hook typecheck).
+**Cierra el 🟠 freshness gate.** Pendiente menor: el sync full de ambos repos con cap normal (hoy quedó cap bajo del e2e).
+
 **🟢 MEMORIA VIVA DE REPOS — SYNC INCREMENTAL + FRESCURA AUTÓNOMA LAZY (paso 3, parte 1) — VERIFICADO**
 (2026-06-14, rama `feat/raw-repo-ingestion`, commit e8b09d8 — aún NO en `main`). El índice se mantiene fresco
 **solo, barato, lazy y autónomo**: Vaio detecta (1 request) si un repo relevante está desactualizado y, si lo está,
@@ -451,22 +469,24 @@ caveat+refresco-background, SIN reanudación), la **parte 2 del paso 3** (avisar
 nuevo), **`escalate`** (Fase 2) y **scheduler/recordatorios** (Nivel C). = el "Nivel C / turnos proactivos" ya anotado,
 ahora con forma concreta. **Su propio `brainstorming`→design+plan.** Relacionado: memoria `proactive-turns-vision`.
 
-### 🟠 Pendiente PRIORIZADO — "Freshness gate": no confiarse de embebidos viejos al responder sobre Kevin
-**Planteado por Kevin (2026-06-14).** El sync incremental (paso 3 parte 1) dejó la frescura como capacidad, PERO
-hoy es **oportunista (a criterio del modelo) y acotada a preguntas sobre "el estado ACTUAL del código/arquitectura
-de un repo"**. Para preguntas **sobre Kevin** (bio/stack/proyectos), Vaio **responde por inercia con los chunks
-indexados** — no chequea frescura. Gaps:
-- **A — cobertura parcial:** la frescura solo cubre `repo:*`. Las fuentes `cv/cv-en/me/contact/github/lastfm`
-  (batch `pnpm ingest`, scrape) **no tienen detección de staleness** → envejecen en silencio. `facts` tampoco.
-- **B — no determinístico:** aun para repos, depende de que el modelo decida llamar `checkRepoFreshness`.
-- **C — sin ritual forzado** + meta-conciencia solo implícita (Vaio ve los `source` tags, pero el prompt no le
-  declara "tu data sobre Kevin sale de estas fuentes").
-**Forma propuesta (su propio design+plan):** un **freshness gate determinístico dentro de `searchMemory`** — tras
-recuperar, detectar los `repo:*` de los chunks devueltos y, si alguno está stale (chequeo barato), sincronizar ANTES
-de devolver el contexto (no confiar en el criterio del modelo). Fuentes no-repo: su propia frescura (ETag/hash de
-contenido o re-ingesta periódica), o mover el contenido del portafolio al repo-sync y dejar de duplicar con el scrape.
-Meta-conciencia explícita en el prompt. ⚠️ Cuidar costo/latencia (gate solo cuando la respuesta dependa de un hecho;
-no en saludos) y no romper el Invariante #1.
+### ✅ Freshness gate — RESUELTO (2026-06-14, ver Historial "FRESHNESS GATE")
+Gate determinístico en `searchMemory` (TTL 10 min) + meta-conciencia + repo del portafolio como única fuente de
+verdad (scrape cv/me/contact dropeado; la salvaguarda confirmó que el contenido vive limpio en i18n/cv.ts).
+Las fuentes no-repo dejaron de ser un problema (se eliminaron; el repo las cubre, fresh-able). `facts` sin frescura
+sigue como parte del followup de adjudicación/staleness de facts (🟠 abajo).
+
+### 🆕 Gaps estratégicos para "Vaio vivo, al día, del día a día" (identificados 2026-06-14, sin diseñar aún)
+Surgidos al diseñar el freshness gate; cada uno su propio par design+plan cuando se priorice:
+- **Sentido del AHORA + actividad del día a día (el más grande para "del día a día").** Vaio hoy NO tiene noción del
+  tiempo presente (ni se le inyecta la fecha al prompt) ni un feed de actividad reciente (commits de hoy, now-playing,
+  qué cambió esta semana). Un agente "del día a día" debería poder decir "hoy hiciste X, estás con Y".
+- **Aprendizaje automático** (extracción de facts post-conversación con confianza/HITL) — hoy "se nutre solo" solo
+  vía `saveFact` explícito; elevar para que aprenda de la charla sin que se lo digan.
+- **Memoria episódica** (continuidad cross-conversación más allá del resumen rodante por hilo: "¿seguimos con lo de ayer?").
+- **Guardrails de costo/loops** en el core al volverse autónomo+proactivo (hoy el rate-limit vive solo en el proxy).
+- **Calidad de chunks** — ✅ resuelto para el portafolio (la salvaguarda confirmó que el contenido vive limpio en
+  `i18n/{es,en}.ts` + `cv.ts`, no en el markup). Queda como principio general: si a futuro un repo trocea pobre
+  (Astro/MDX/JSON ruidoso) → mejor extracción/chunking consciente de estructura.
 
 ### 🔵 Pendiente FUTURO — Neon como DB reactiva estilo Convex
 El **hot-sync de esquema** (`db:push`) ya da la DX de "el esquema sigue al código". La **reactividad real**

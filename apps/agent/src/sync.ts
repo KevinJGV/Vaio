@@ -50,13 +50,11 @@ async function main(): Promise<void> {
   }
 
   for (const spec of repos) {
-    const report = await syncRepo(spec, {
-      memory,
-      tracker,
-      token: env.GITHUB_TOKEN,
-      policy,
-      logger,
-    })
+    const report = await syncRepo(
+      spec,
+      { memory, tracker, token: env.GITHUB_TOKEN, policy, logger },
+      { forceFull: env.SYNC_FORCE_FULL }
+    )
     logger.info({ ...report }, "sync repo listo")
   }
 

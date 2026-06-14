@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { syncRepo } from "../src/adapters/sources/repo-sync.js"
+import { createRepoSync, syncRepo } from "../src/adapters/sources/repo-sync.js"
 import { DEFAULT_REPO_POLICY } from "../src/core/repo-ingest.js"
 import type { DocChunk, IndexedFile, MemoryStore } from "../src/ports/memory.js"
 import type { RepoTracker, TrackedRepo } from "../src/ports/repo-tracker.js"
@@ -195,5 +195,83 @@ describe("syncRepo", () => {
     )
     expect(r.mode).toBe("deferred")
     expect(calls.replaceFile).toEqual([]) // no aplicó nada
+  })
+})
+
+describe("createRepoSync.ensureFresh (freshness gate)", () => {
+  function trackedFresh(): TrackedRepo {
+    return {
+      source: "repo:kev/vaio",
+      owner: "kev",
+      repo: "vaio",
+      branch: "main",
+      lastCommitSha: "c1",
+      lastTreeSha: "t",
+      policyVersion: 1,
+    }
+  }
+
+  it("ignora sources que no sean repo:* (sin fetch)", async () => {
+    let fetches = 0
+    mockGithub(() => {
+      fetches++
+      return {}
+    })
+    const { mem } = fakeMemory()
+    const { tracker } = fakeTracker(null)
+    const rs = createRepoSync({
+      memory: mem,
+      tracker,
+      policy: DEFAULT_REPO_POLICY,
+    })
+    const r = await rs.ensureFresh(["cv", "lastfm", "fact"])
+    expect(r.refreshed).toBe(false)
+    expect(fetches).toBe(0)
+  })
+
+  it("fresh → refreshed:false; y el TTL evita un 2º chequeo", async () => {
+    let commitFetches = 0
+    mockGithub((url) => {
+      if (url.includes("/commits/")) {
+        commitFetches++
+        return { json: { sha: "c1" } } // == lastCommitSha → fresh
+      }
+      return {}
+    })
+    const { mem } = fakeMemory({
+      "repo:kev/vaio": [{ path: "a", blobSha: "x" }],
+    })
+    const { tracker } = fakeTracker(trackedFresh())
+    const rs = createRepoSync({
+      memory: mem,
+      tracker,
+      policy: DEFAULT_REPO_POLICY,
+      freshnessTtlMs: 60_000,
+    })
+    expect((await rs.ensureFresh(["repo:kev/vaio"])).refreshed).toBe(false)
+    expect((await rs.ensureFresh(["repo:kev/vaio"])).refreshed).toBe(false)
+    expect(commitFetches).toBe(1) // 2ª llamada cae en el TTL → no rechequea
+  })
+
+  it("stale → sincroniza inline → refreshed:true", async () => {
+    mockGithub((url) => {
+      if (url.includes("/commits/")) return { json: { sha: "c2" } } // != c1 → stale
+      if (url.includes("/git/trees/"))
+        return { json: tree([{ path: "README.md", sha: "a2" }]) }
+      if (url.includes("/contents/")) return { text: "# nuevo" }
+      return {}
+    })
+    const { mem, calls } = fakeMemory({
+      "repo:kev/vaio": [{ path: "README.md", blobSha: "a" }],
+    })
+    const { tracker } = fakeTracker(trackedFresh())
+    const rs = createRepoSync({
+      memory: mem,
+      tracker,
+      policy: DEFAULT_REPO_POLICY,
+    })
+    const r = await rs.ensureFresh(["repo:kev/vaio"])
+    expect(r.refreshed).toBe(true)
+    expect(calls.replaceFile).toEqual(["README.md"])
   })
 })

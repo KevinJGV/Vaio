@@ -52,26 +52,42 @@ export const searchMemory: ActionDescriptor = {
           // 2ª etapa del RAG: si hay reranker, recuperar un K ANCHO por vector → rerankear → recortar al
           // top-K del canal. Degrada SIEMPRE (Invariante #1): sin reranker, o si devuelve [], o si no hay
           // candidatos → vector top-K como antes. El reranker nunca tira (devuelve [] ante fallo).
-          let docs: DocChunk[]
-          if (reranker) {
+          // Recuperación (vector wide-K → rerank → trim). Extraída para poder re-recuperar tras el freshness gate.
+          const retrieve = async (): Promise<DocChunk[]> => {
+            if (!reranker) return memory.searchMemory(query, k)
             const cands = await memory.searchMemory(query, rerankCandidates)
-            if (cands.length === 0) {
-              docs = []
-            } else {
-              const ranked = await reranker.rerank(
-                query,
-                cands.map((c) => c.chunk),
-                k
+            if (cands.length === 0) return []
+            const ranked = await reranker.rerank(
+              query,
+              cands.map((c) => c.chunk),
+              k
+            )
+            return ranked.length > 0
+              ? ranked
+                  .map((r) => cands[r.index])
+                  .filter((d): d is (typeof cands)[number] => d != null)
+              : cands.slice(0, k)
+          }
+
+          let docs = await retrieve()
+          // FRESHNESS GATE (determinístico, TTL interno): si los chunks vienen de un repo:* stale, sincronizar
+          // ANTES de responder (no a criterio del modelo). Si algo se sincronizó inline → re-recuperar una vez.
+          // Degrada SIEMPRE (Invariante #1): sin repoSync o ante error → responde con lo indexado.
+          const repoSources = [
+            ...new Set(
+              docs.map((d) => d.source).filter((s) => s.startsWith("repo:"))
+            ),
+          ]
+          if (repoSources.length > 0 && ctx.repoSync) {
+            try {
+              const { refreshed } = await ctx.repoSync.ensureFresh(repoSources)
+              if (refreshed) docs = await retrieve()
+            } catch (err) {
+              logger.warn(
+                { err: errMsg(err) },
+                "freshness gate falló (se responde con lo indexado)"
               )
-              docs =
-                ranked.length > 0
-                  ? ranked
-                      .map((r) => cands[r.index])
-                      .filter((d): d is (typeof cands)[number] => d != null)
-                  : cands.slice(0, k)
             }
-          } else {
-            docs = await memory.searchMemory(query, k)
           }
           const output =
             docs.length === 0

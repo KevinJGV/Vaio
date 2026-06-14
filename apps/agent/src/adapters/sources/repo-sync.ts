@@ -36,6 +36,18 @@ export interface SyncRepoDeps {
   token?: string
   policy?: RepoIngestPolicy
   logger?: Logger
+  /** TTL del freshness gate (ms): no rechequea un repo si lo hizo hace menos. Default 10 min. */
+  freshnessTtlMs?: number
+  /** Umbral de archivos para sync inline vs diferido en el gate. Default 20. */
+  inlineMaxFiles?: number
+}
+
+/** Parsea un source `repo:owner/repo` → spec; null si no es un source de repo. */
+function parseRepoSource(source: string): RawRepoSpec | null {
+  if (!source.startsWith("repo:")) return null
+  const [owner, repo] = source.slice("repo:".length).split("/")
+  if (!owner || !repo) return null
+  return { owner, repo }
 }
 
 export type SyncMode =
@@ -104,7 +116,7 @@ export async function repoFreshness(
 export async function syncRepo(
   spec: RawRepoSpec,
   deps: SyncRepoDeps,
-  opts?: { inlineMaxFiles?: number }
+  opts?: { inlineMaxFiles?: number; forceFull?: boolean }
 ): Promise<SyncReport> {
   const { memory, tracker, token, logger } = deps
   const policy = deps.policy ?? DEFAULT_REPO_POLICY
@@ -124,7 +136,7 @@ export async function syncRepo(
       compareFreshness(head, tracked?.lastCommitSha).state === "fresh"
     const samePolicy =
       (tracked?.policyVersion ?? POLICY_VERSION) === POLICY_VERSION
-    if (fresh && samePolicy) {
+    if (fresh && samePolicy && !opts?.forceFull) {
       return {
         source,
         mode: "skipped-fresh",
@@ -149,7 +161,7 @@ export async function syncRepo(
     // Manifest + reconciliación legacy: si está vacío pero el source tiene filas viejas (path NULL), clearSource
     // one-shot y full. (clearSource sobre un source vacío es no-op → seguro para repos nuevos.)
     const manifest = await memory.listIndexedFiles(source)
-    const isFull = manifest.length === 0 || !samePolicy
+    const isFull = manifest.length === 0 || !samePolicy || opts?.forceFull === true
     if (isFull) await memory.clearSource(source)
 
     const diff = diffRepoTree(
@@ -285,6 +297,10 @@ export async function syncRepo(
 
 /** Implementación del puerto `RepoSyncPort` con las deps atadas (para inyectar a las tools del harness). */
 export function createRepoSync(deps: SyncRepoDeps): RepoSyncPort {
+  const ttlMs = deps.freshnessTtlMs ?? 10 * 60 * 1000
+  const inlineMaxFiles = deps.inlineMaxFiles ?? 20
+  // Cache TTL del freshness gate (vida de proceso): source → último chequeo (ms epoch via performance.now base).
+  const lastChecked = new Map<string, number>()
   return {
     async freshness(spec) {
       const r = await repoFreshness(spec, {
@@ -306,6 +322,37 @@ export function createRepoSync(deps: SyncRepoDeps): RepoSyncPort {
       return (
         (await deps.tracker.get(`repo:${spec.owner}/${spec.repo}`)) !== null
       )
+    },
+    async ensureFresh(sources) {
+      let refreshed = false
+      const now = Date.now()
+      for (const source of sources) {
+        const spec = parseRepoSource(source)
+        if (!spec) continue // no-repo (cv/me/github/lastfm/fact) → no fresh-able acá
+        const seen = lastChecked.get(source)
+        if (seen != null && now - seen < ttlMs) continue // TTL: chequeado hace poco → confiar
+        lastChecked.set(source, now)
+        try {
+          const f = await repoFreshness(spec, {
+            tracker: deps.tracker,
+            token: deps.token,
+          })
+          if (f.state !== "stale") continue
+          const r = await syncRepo(spec, deps, { inlineMaxFiles })
+          if (r.mode === "incremental" || r.mode === "full") {
+            refreshed = true // se aplicó inline → re-recuperar para incluir lo fresco
+          } else if (r.mode === "deferred") {
+            // Diff grande → refresco completo en background (sin reanudación proactiva = incremento 2).
+            void syncRepo(spec, deps).catch(() => {})
+          }
+        } catch (err) {
+          deps.logger?.warn(
+            { source, err: err instanceof Error ? err.message : "?" },
+            "ensureFresh: chequeo de frescura falló (se ignora)"
+          )
+        }
+      }
+      return { refreshed }
     },
   }
 }

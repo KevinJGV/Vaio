@@ -35,4 +35,9 @@ export interface RepoSyncPort {
   ): Promise<RepoSyncResult>
   /** ¿El repo ya está trackeado? (los repos nuevos/arbitrarios se deniegan en parte 1). */
   isTracked(spec: RepoSyncSpec): Promise<boolean>
+  /** Freshness GATE (determinístico, con TTL interno): por cada source `repo:owner/repo`, si no se chequeó dentro
+   *  del TTL, verifica frescura y, si está stale, sincroniza (inline si chico; background si grande). Los sources
+   *  que no sean `repo:*` se ignoran. Devuelve `refreshed:true` si algún repo se sincronizó INLINE (→ re-recuperar).
+   *  Nunca tira. */
+  ensureFresh(sources: string[]): Promise<{ refreshed: boolean }>
 }

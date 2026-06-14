@@ -117,6 +117,14 @@ const envSchema = z.object({
   RERANK_CANDIDATES: positiveIntWithDefault(30),
   // Sync incremental de repos: umbral de archivos cambiados para hacerlo INLINE en el chat; más → background. Default 20.
   SYNC_INLINE_MAX_FILES: positiveIntWithDefault(20),
+  // Freshness gate: TTL (minutos) — no rechequea la frescura de un repo si lo hizo hace menos. Default 10.
+  FRESHNESS_TTL_MINUTES: positiveIntWithDefault(10),
+  // Fuerza re-index FULL en `sync.ts` (clearSource + re-embeber todo) ignorando frescura. Para re-index puntual
+  // (cambio de chunker/policy, o poblar archivos que un cap bajo dejó afuera). ON con "true"/"1".
+  SYNC_FORCE_FULL: z
+    .string()
+    .optional()
+    .transform((v) => v === "true" || v === "1"),
   // Límite defensivo de tamaño de media (descarga Telegram / base64 web). Default 20MB.
   MEDIA_MAX_BYTES: z.coerce
     .number()

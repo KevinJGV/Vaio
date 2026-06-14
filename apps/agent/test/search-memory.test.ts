@@ -156,6 +156,64 @@ describe("searchMemory (descriptor migrado)", () => {
     expect(out.indexOf("c2")).toBeLessThan(out.indexOf("c1"))
   })
 
+  it("freshness gate: si ensureFresh refresca, re-recupera (searchMemory 2 veces)", async () => {
+    let calls = 0
+    const memory: MemoryStore = {
+      searchMemory: async () => {
+        calls++
+        return [{ source: "repo:kev/vaio", url: "u", chunk: "c" }]
+      },
+      upsertDocuments: async () => {},
+      clearSource: async () => {},
+      listIndexedFiles: async () => [],
+      deleteFiles: async () => {},
+      replaceFile: async () => {},
+    }
+    const repoSync = {
+      freshness: async () => ({ state: "stale" as const }),
+      sync: async () => ({
+        mode: "incremental" as const,
+        embedded: 1,
+        deleted: 0,
+        unchanged: 0,
+      }),
+      isTracked: async () => true,
+      ensureFresh: async () => ({ refreshed: true }),
+    }
+    const t = searchMemory.build(ctx({ memory, repoSync }))
+    await t.execute?.({ query: "kevin" }, { toolCallId: "tc", messages: [] })
+    expect(calls).toBe(2) // recuperó, gate refrescó, re-recuperó
+  })
+
+  it("freshness gate: si NO refresca, recupera 1 sola vez", async () => {
+    let calls = 0
+    const memory: MemoryStore = {
+      searchMemory: async () => {
+        calls++
+        return [{ source: "repo:kev/vaio", url: "u", chunk: "c" }]
+      },
+      upsertDocuments: async () => {},
+      clearSource: async () => {},
+      listIndexedFiles: async () => [],
+      deleteFiles: async () => {},
+      replaceFile: async () => {},
+    }
+    const repoSync = {
+      freshness: async () => ({ state: "fresh" as const }),
+      sync: async () => ({
+        mode: "skipped-fresh" as const,
+        embedded: 0,
+        deleted: 0,
+        unchanged: 0,
+      }),
+      isTracked: async () => true,
+      ensureFresh: async () => ({ refreshed: false }),
+    }
+    const t = searchMemory.build(ctx({ memory, repoSync }))
+    await t.execute?.({ query: "kevin" }, { toolCallId: "tc", messages: [] })
+    expect(calls).toBe(1)
+  })
+
   it("con reranker que devuelve [] (falló): degrada a vector top-K", async () => {
     const cands: DocChunk[] = [
       { source: "a", url: "", chunk: "v0" },
