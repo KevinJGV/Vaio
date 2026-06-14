@@ -38,9 +38,9 @@
 > Historial. ⚠️ La ingesta corrió contra la DB real (los chunks YA están), pero el código aún no está en `main`/deploy.
 > ✅ **Followup de grounding (auto-introspección) RESUELTO el mismo día** (ver Historial): Vaio ya habla de su
 > arquitectura/código público; prompt-dump y secret-extraction siguen rechazados (e2e adversarial).
-> **Próximos candidatos (eligen Kevin/yo):** **rerank** (trigger disparado por esta ingesta — ver §Evolución
-> multimodal), el **paso 3** (acceso on-demand como read-action del harness), la **adjudicación de conflictos de
-> `facts`** (§🟠 priorizado), el **Nivel C** (scheduler + push) y/o `escalate` (Fase 2). El **portafolio** va DESPUÉS.
+> **Próximos candidatos (eligen Kevin/yo):** el **paso 3** (acceso on-demand a repos como read-action del harness),
+> la **adjudicación de conflictos de `facts`** (§🟠 priorizado), el **Nivel C** (scheduler + push) y/o `escalate`
+> (Fase 2). El **portafolio** va DESPUÉS. *(Rerank ✅ hecho 2026-06-14.)*
 
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
@@ -61,6 +61,21 @@
 ---
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
+
+**🟢 RERANK (2ª etapa del RAG) — VERIFICADO** (2026-06-14, rama `feat/raw-repo-ingestion` — aún NO en `main`).
+Trigger disparado por la ingesta de fuentes crudas (corpus ~29 → ~1600, mucho código → similitud vectorial
+ruidosa). `searchMemory` ahora: recupera **wide-K** por vector (`RERANK_CANDIDATES`, default 30) → **rerankea**
+(OpenRouter `/rerank`, single-provider REST, cross-encoder query+chunk) → **recorta al maxK** del canal (6 web /
+8 telegram). **Degrada siempre** (Invariante #1): sin `RERANK_MODELS`, o si el reranker devuelve [], o sin
+candidatos → vector top-K como antes. Nuevo puerto `Reranker` + adapter `rerank-openrouter` (espeja
+`speech-openrouter`: cadena client-side, attribution, quirk OpenRouter-200-con-error, log `media.rerank`); config
+`RERANK_MODELS` (csv) + `RERANK_CANDIDATES`; orquestación en la action `searchMemory` (`ActionContext` +
+wiring `index.ts`/`agent.ts`). **Sin migración.** **232 tests** (+10: rerank-openrouter 5, config +3, search-memory
++2); typecheck/biome/build limpios. **e2e ✅:** `/chat` con `RERANK_MODELS=cohere/rerank-v3.5` → traza `media.rerank
+{model, candidates:30, returned:6, latencyMs:~1500}`, sigue citando el repo. ON en `.env.example`
+(`cohere/rerank-v3.5`), candidatos=30. Estrategia: 1 subagente (puerto+adapter+config) + directo (orquestación+wiring).
+Specs → [`…-rerank-design.md`](superpowers/specs/2026-06-14-rerank-design.md) ·
+[`…-plan.md`](superpowers/specs/2026-06-14-rerank-plan.md). **Cierra el followup "rerank" de §Evolución multimodal.**
 
 **🟢 GROUNDING: AUTO-INTROSPECCIÓN — VERIFICADO** (2026-06-14, rama `feat/raw-repo-ingestion` — aún NO en `main`).
 Followup del e2e de pasos 1+2: la política del prompt bloqueaba que Vaio hablara de su propio código (se negaba y ni
@@ -295,14 +310,10 @@ principal** en el core (hoy solo en el proxy); identidad **cross-canal** + facts
 prompt** = capacidades de E/S reales. Todo por OpenRouter REST → single-provider (ver `openrouter-api-surface`).
 
 **Queda pendiente (futuro):**
-- **Rerank — precisión de retrieval para el grounding** (OpenRouter `/rerank`, single-provider REST — el provider
-  del AI SDK NO lo envuelve, ver memoria `openrouter-api-surface`): segunda etapa del RAG = recuperar un K
-  **ancho** por vectores → rerankear (cross-encoder, query+chunk juntos) → recortar al top-N. Mejora QUÉ entra al
-  contexto (mejor grounding). **🟢 TRIGGER DISPARADO (2026-06-14):** la nota decía "~29 chunks → prematuro"; la
-  **ingesta de fuentes crudas** subió el corpus a **~1600+ chunks** (Vaio 800 + KevinJGV 800 + cv/portfolio/
-  github/lastfm), y son **chunks de CÓDIGO** (similitud vectorial más ruidosa → el rerank rinde especialmente).
-  El timing previsto ("el valor escala con el corpus") **se cumplió** → pasa de prematuro a **candidato fuerte del
-  próximo paso** (junto con el paso 3). Seam: `searchMemory` con K ancho opcional → `/rerank` → trim. Su propio par design+plan.
+- ✅ **Rerank — IMPLEMENTADO/VERIFICADO (2026-06-14, ver Historial "RERANK").** Segunda etapa del RAG: `searchMemory`
+  recupera wide-K por vector → `/rerank` (OpenRouter REST, cross-encoder query+chunk) → recorta al maxK del canal;
+  degrada a vector si OFF/falla. El trigger ("el valor escala con el corpus") se cumplió con la ingesta de fuentes
+  crudas (~1600 chunks de código). e2e confirmó `media.rerank` (candidates 30 → returned 6). ON en `.env.example`.
 - **TTS en web `/chat`** (hoy solo Telegram; el `/chat` es stream de texto → necesita canal de audio).
 
 ### 🔬 Hallazgos del bot real (jun-2026) → followups de grounding / meta-prompting (espera el "go" de Kevin)

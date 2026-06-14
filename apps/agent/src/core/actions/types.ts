@@ -9,6 +9,7 @@ import type { Compressor, Intensity } from "../../ports/compress.js"
 import type { FactStore } from "../../ports/facts.js"
 import type { Logger } from "../../ports/logger.js"
 import type { MemoryStore } from "../../ports/memory.js"
+import type { Reranker } from "../../ports/rerank.js"
 import type { CapabilityProfile, Principal, ToolName } from "../capabilities.js"
 
 /** Ids base de traza del turno (se esparcen en cada evento emitido por una acción). */
@@ -36,6 +37,10 @@ export interface ActionContext {
   ragIntensity?: Intensity
   /** Memoria de hechos curados (write-actions). null = sin DB → las acciones degradan. */
   factStore?: FactStore | null
+  /** Rerank de la 2ª etapa del RAG. null = sin rerank → searchMemory cae a vector top-K. */
+  reranker?: Reranker | null
+  /** Pool de candidatos (wide-K) a recuperar por vector antes de rerankear. Default 30. */
+  rerankCandidates?: number
 }
 
 /** Descriptor de una acción: metadata de gating + cómo construir su tool del AI SDK.

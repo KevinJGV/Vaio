@@ -4,6 +4,7 @@
 
 import { tool } from "ai"
 import { z } from "zod"
+import type { DocChunk } from "../../ports/memory.js"
 import { compressOrRaw, errMsg } from "../util.js"
 import type { ActionContext, ActionDescriptor } from "./types.js"
 
@@ -19,6 +20,8 @@ export const searchMemory: ActionDescriptor = {
       logger,
       compressor = null,
       ragIntensity = "full",
+      reranker = null,
+      rerankCandidates = 30,
     } = ctx
     const k = ctx.caps.memoryScope.maxK
     return tool({
@@ -46,7 +49,30 @@ export const searchMemory: ActionDescriptor = {
           return output
         }
         try {
-          const docs = await memory.searchMemory(query, k)
+          // 2ª etapa del RAG: si hay reranker, recuperar un K ANCHO por vector → rerankear → recortar al
+          // top-K del canal. Degrada SIEMPRE (Invariante #1): sin reranker, o si devuelve [], o si no hay
+          // candidatos → vector top-K como antes. El reranker nunca tira (devuelve [] ante fallo).
+          let docs: DocChunk[]
+          if (reranker) {
+            const cands = await memory.searchMemory(query, rerankCandidates)
+            if (cands.length === 0) {
+              docs = []
+            } else {
+              const ranked = await reranker.rerank(
+                query,
+                cands.map((c) => c.chunk),
+                k
+              )
+              docs =
+                ranked.length > 0
+                  ? ranked
+                      .map((r) => cands[r.index])
+                      .filter((d): d is (typeof cands)[number] => d != null)
+                  : cands.slice(0, k)
+            }
+          } else {
+            docs = await memory.searchMemory(query, k)
+          }
           const output =
             docs.length === 0
               ? "Sin resultados relevantes en memoria."

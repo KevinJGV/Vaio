@@ -109,4 +109,63 @@ describe("searchMemory (descriptor migrado)", () => {
     )
     expect(String(out)).toContain("memoria")
   })
+
+  it("con reranker: recupera wide-K, reordena por relevancia y recorta al maxK", async () => {
+    let calledWithK = -1
+    const cands: DocChunk[] = [
+      { source: "a", url: "", chunk: "c0" },
+      { source: "b", url: "", chunk: "c1" },
+      { source: "c", url: "", chunk: "c2" },
+    ]
+    const memory: MemoryStore = {
+      searchMemory: async (_q, k) => {
+        calledWithK = k ?? -1
+        return cands
+      },
+      upsertDocuments: async () => {},
+      clearSource: async () => {},
+    }
+    // reranker que invierte la relevancia: el último candidato es el más relevante.
+    const reranker = {
+      rerank: async (_q: string, docs: string[], topN: number) =>
+        docs
+          .map((_d, index) => ({ index, score: index }))
+          .sort((a, b) => b.score - a.score)
+          .slice(0, topN),
+    }
+    const t = searchMemory.build(
+      ctx({ caps: caps(2), memory, reranker, rerankCandidates: 30 })
+    )
+    const out = String(
+      await t.execute?.({ query: "x" }, { toolCallId: "tc", messages: [] })
+    )
+    expect(calledWithK).toBe(30) // recuperó el pool ancho, no el maxK
+    // top-2 reordenado: c2 (más relevante) antes que c1; c0 queda fuera
+    expect(out).toContain("c2")
+    expect(out).toContain("c1")
+    expect(out).not.toContain("c0")
+    expect(out.indexOf("c2")).toBeLessThan(out.indexOf("c1"))
+  })
+
+  it("con reranker que devuelve [] (falló): degrada a vector top-K", async () => {
+    const cands: DocChunk[] = [
+      { source: "a", url: "", chunk: "v0" },
+      { source: "b", url: "", chunk: "v1" },
+      { source: "c", url: "", chunk: "v2" },
+    ]
+    const memory: MemoryStore = {
+      searchMemory: async () => cands,
+      upsertDocuments: async () => {},
+      clearSource: async () => {},
+    }
+    const reranker = { rerank: async () => [] }
+    const t = searchMemory.build(ctx({ caps: caps(2), memory, reranker }))
+    const out = String(
+      await t.execute?.({ query: "x" }, { toolCallId: "tc", messages: [] })
+    )
+    // fallback = orden vector, recortado a maxK (2): v0 y v1, sin v2
+    expect(out).toContain("v0")
+    expect(out).toContain("v1")
+    expect(out).not.toContain("v2")
+  })
 })

@@ -29,6 +29,7 @@ import type {
   Transcriber,
 } from "../ports/media.js"
 import type { MemoryStore } from "../ports/memory.js"
+import type { Reranker } from "../ports/rerank.js"
 import type { Summarizer } from "../ports/summary.js"
 import type { TraceSink } from "../ports/trace.js"
 import { buildTools } from "./actions/registry.js"
@@ -71,6 +72,10 @@ export interface AgentDeps {
   nativeImages?: boolean
   /** Memoria de hechos curados (para listar pendientes y pasarlos a buildTools). null = sin DB. */
   factStore?: FactStore | null
+  /** Rerank de la 2ª etapa del RAG. null = sin rerank → searchMemory cae a vector top-K. */
+  reranker?: Reranker | null
+  /** Pool de candidatos (wide-K) para el rerank. Default 30. */
+  rerankCandidates?: number
 }
 
 /** Contexto de observabilidad de un turno (lo arma el adapter de canal por request). */
@@ -132,6 +137,8 @@ export function createAgent(deps: AgentDeps) {
     mediaUnderstanding = null,
     nativeImages = false,
     factStore = null,
+    reranker = null,
+    rerankCandidates = 30,
   } = deps
 
   return {
@@ -273,6 +280,8 @@ export function createAgent(deps: AgentDeps) {
           logger: ctx.logger,
           compressor,
           ragIntensity,
+          reranker,
+          rerankCandidates,
         }),
         onChunk({ chunk }) {
           if (chunk.type === "tool-call") {

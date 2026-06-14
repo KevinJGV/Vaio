@@ -111,6 +111,10 @@ const envSchema = z.object({
   //   SPEECH_MODELS=hexgrad/kokoro-82m|af_bella|mp3,google/gemini-3.1-flash-tts-preview|Zephyr|pcm
   // pcm se envuelve en WAV (Telegram no reproduce pcm crudo). Vacío → Vaio solo habla por texto.
   SPEECH_MODELS: z.string().optional(),
+  // Rerank (2ª etapa del RAG): csv de fallback client-side. Vacío → OFF (cae a vector top-K).
+  RERANK_MODELS: z.string().optional(),
+  // Pool de candidatos (wide-K) que se recupera por vector y se manda a rerankear. Default 30.
+  RERANK_CANDIDATES: positiveIntWithDefault(30),
   // Límite defensivo de tamaño de media (descarga Telegram / base64 web). Default 20MB.
   MEDIA_MAX_BYTES: z.coerce
     .number()
@@ -206,6 +210,11 @@ export function speechChain(env: Env): SpeechEntry[] {
       } satisfies SpeechEntry
     })
     .filter((e): e is SpeechEntry => e !== null)
+}
+
+/** Cadena de RERANK (fallback client-side, /rerank single-model REST). Vacía → rerank OFF (vector top-K). */
+export function rerankChain(env: Env): string[] {
+  return csv(env.RERANK_MODELS)
 }
 
 /** Spec de un repo a ingerir como fuente cruda (parseado de RAW_SOURCE_REPOS). */

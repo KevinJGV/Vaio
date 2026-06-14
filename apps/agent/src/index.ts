@@ -18,6 +18,7 @@ import { createConversationStore } from "./adapters/neon-conversation.js"
 import { createFactStore } from "./adapters/neon-facts.js"
 import { createMemoryStore } from "./adapters/neon-memory.js"
 import { createModel } from "./adapters/openrouter.js"
+import { createReranker } from "./adapters/rerank-openrouter.js"
 import { createSpeechSynthesizer } from "./adapters/speech-openrouter.js"
 import { createSummarizer } from "./adapters/summarizer.js"
 import { createTelegramClient } from "./adapters/telegram/client.js"
@@ -30,6 +31,7 @@ import {
   attribution as buildAttribution,
   loadConfig,
   modelChain,
+  rerankChain,
   speechChain,
   summaryChain,
   telegramAllowedIds,
@@ -42,6 +44,7 @@ import type { ConversationStore } from "./ports/conversation.js"
 import type { FactStore } from "./ports/facts.js"
 import type { MediaUnderstanding, Transcriber } from "./ports/media.js"
 import type { MemoryStore } from "./ports/memory.js"
+import type { Reranker } from "./ports/rerank.js"
 import type { SpeechSynthesizer } from "./ports/speech.js"
 import type { Summarizer } from "./ports/summary.js"
 
@@ -78,6 +81,7 @@ let summarizer: Summarizer | null = null
 let transcriber: Transcriber | null = null
 let mediaUnderstanding: MediaUnderstanding | null = null
 let speech: SpeechSynthesizer | null = null
+let reranker: Reranker | null = null
 if (env.OPENROUTER_API_KEY && models.length > 0) {
   let memory: MemoryStore | null = null
   // La memoria conversacional (conversations/messages) solo necesita DB; el RAG necesita además
@@ -148,6 +152,19 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
   } else {
     logger.warn("Sin VISION_MODELS → visión OFF.")
   }
+  // Rerank (2ª etapa del RAG): cadena REST client-side. Vacía → searchMemory cae a vector top-K.
+  const rrChain = rerankChain(env)
+  if (rrChain.length > 0) {
+    reranker = createReranker({
+      apiKey: env.OPENROUTER_API_KEY,
+      baseURL: env.OPENROUTER_BASE_URL,
+      chain: rrChain,
+      logger,
+      attribution,
+    })
+  } else {
+    logger.warn("Sin RERANK_MODELS → rerank OFF (vector top-K).")
+  }
   agent = createAgent({
     model,
     memory,
@@ -162,6 +179,8 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
     transcriber,
     mediaUnderstanding,
     nativeImages: env.MULTIMODAL_NATIVE_IMAGES,
+    reranker,
+    rerankCandidates: env.RERANK_CANDIDATES,
   })
   // Salida de voz (TTS) — cadena de fallback (model|voice|format). Vacía → Vaio solo habla por texto.
   const ttsChain = speechChain(env)
@@ -234,6 +253,7 @@ logger.info(
     transcribe: transcriber !== null,
     vision: mediaUnderstanding !== null,
     speech: speech !== null,
+    rerank: reranker !== null,
     nativeImages: env.MULTIMODAL_NATIVE_IMAGES,
     telegram: telegram !== undefined,
     models,

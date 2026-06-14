@@ -5,6 +5,7 @@ import {
   loadConfig,
   modelChain,
   rawSourceRepos,
+  rerankChain,
   speechChain,
   summaryChain,
   telegramAllowedIds,
@@ -95,6 +96,20 @@ describe("envs por modalidad (fase 2)", () => {
   })
 })
 
+describe("rerankChain", () => {
+  it("csv → lista (trim, sin vacíos)", () => {
+    expect(rerankChain({ RERANK_MODELS: "a, b ,c" } as Env)).toEqual([
+      "a",
+      "b",
+      "c",
+    ])
+  })
+  it("vacío/ausente → [] (rerank OFF)", () => {
+    expect(rerankChain({} as Env)).toEqual([])
+    expect(rerankChain({ RERANK_MODELS: "" } as Env)).toEqual([])
+  })
+})
+
 describe("loadConfig: caps numéricos toleran string vacío", () => {
   const saved = { ...process.env }
   afterEach(() => {
@@ -115,6 +130,13 @@ describe("loadConfig: caps numéricos toleran string vacío", () => {
     const env = loadConfig()
     expect(env.RAW_FILE_MAX_BYTES).toBe(2048)
     expect(env.RAW_REPO_MAX_CHUNKS).toBe(50)
+  })
+
+  it("RERANK_CANDIDATES vacío → default 30; explícito → se respeta", () => {
+    process.env.RERANK_CANDIDATES = ""
+    expect(loadConfig().RERANK_CANDIDATES).toBe(30)
+    process.env.RERANK_CANDIDATES = "15"
+    expect(loadConfig().RERANK_CANDIDATES).toBe(15)
   })
 })
 
