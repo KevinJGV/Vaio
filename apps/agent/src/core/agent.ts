@@ -30,6 +30,8 @@ import type {
 import type { MemoryStore } from "../ports/memory.js"
 import type { Summarizer } from "../ports/summary.js"
 import type { TraceSink } from "../ports/trace.js"
+import { buildTools } from "./actions/registry.js"
+import type { TraceIds } from "./actions/types.js"
 import {
   type CapabilityResolver,
   createCapabilityResolver,
@@ -38,8 +40,6 @@ import {
 import { buildUserContent } from "./modality.js"
 import { type Audience, buildSystemPrompt } from "./prompt.js"
 import { buildSummaryPrompt, shouldSummarize } from "./summary.js"
-import { buildTools } from "./actions/registry.js"
-import type { TraceIds } from "./actions/types.js"
 import { compressOrRaw, errMsg, preview } from "./util.js"
 
 export interface AgentDeps {

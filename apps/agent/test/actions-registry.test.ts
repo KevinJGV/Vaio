@@ -80,9 +80,10 @@ describe("seam HITL — clearance 'owner' deniega en runtime", () => {
 
   it("principal no-trusted: la tool se expone pero su execute deniega (ok:false, denied:true) sin ejecutar", async () => {
     const events: TraceEvent[] = []
-    const tools = buildTools(ctx(["searchMemory"], false, (e) => events.push(e)), [
-      ownerOnly,
-    ])
+    const tools = buildTools(
+      ctx(["searchMemory"], false, (e) => events.push(e)),
+      [ownerOnly]
+    )
     const out = await tools.searchMemory?.execute?.(
       {},
       { toolCallId: "tc", messages: [] }
