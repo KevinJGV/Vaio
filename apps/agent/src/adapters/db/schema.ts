@@ -1,5 +1,5 @@
 // Schema Drizzle de la memoria del producto: `documents` (RAG) + memoria CONVERSACIONAL
-// (`conversations` + `messages`). La tabla `facts` (extracción semántica) llega en otra iteración.
+// (`conversations` + `messages`) + `facts` (hechos curados, write-actions con HITL).
 // El índice HNSW con `vector_cosine_ops` acelera la búsqueda por distancia coseno (<=>).
 
 import type { TraceEvent } from "@vaio/contracts"
