@@ -39,6 +39,7 @@ import {
   type Principal,
 } from "./capabilities.js"
 import { buildUserContent } from "./modality.js"
+import { reportDegraded } from "./observability.js"
 import { type Audience, buildSystemPrompt } from "./prompt.js"
 import { buildSummaryPrompt, shouldSummarize } from "./summary.js"
 import { compressOrRaw, errMsg, preview } from "./util.js"
@@ -205,6 +206,7 @@ export function createAgent(deps: AgentDeps) {
         understanding: mediaUnderstanding,
         nativeImages,
         locale,
+        onDegrade: (d) => reportDegraded({ emit, ids }, d),
       })
 
       emit({

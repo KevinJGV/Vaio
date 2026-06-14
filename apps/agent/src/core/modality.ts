@@ -13,6 +13,8 @@ import type {
   ResolvedMedia,
   Transcriber,
 } from "../ports/media.js"
+import type { DegradeReport } from "./observability.js"
+import { errMsg } from "./util.js"
 
 export interface BuiltUserContent {
   /** Lo que se manda al modelo: string si todo terminó en texto, o parts si hay media nativa. */
@@ -51,9 +53,19 @@ export async function buildUserContent(args: {
   understanding: MediaUnderstanding | null
   nativeImages: boolean
   locale: Locale
+  /** Reporta una degradación por-adjunto (transcribe/visión falló). El wiring (agent.ts) lo conecta a
+   *  log + TraceEvent; ausente (p.ej. tests) → degrada sin reportar. */
+  onDegrade?: (d: DegradeReport) => void
 }): Promise<BuiltUserContent> {
-  const { userText, media, transcriber, understanding, nativeImages, locale } =
-    args
+  const {
+    userText,
+    media,
+    transcriber,
+    understanding,
+    nativeImages,
+    locale,
+    onDegrade,
+  } = args
   const m = markersFor(locale)
 
   // `pieces` alimenta TANTO el texto del modelo COMO el texto persistido (son idénticos: el modelo
@@ -64,7 +76,7 @@ export async function buildUserContent(args: {
 
   for (const item of media) {
     if (item.kind === "audio") {
-      const text = await safe(() =>
+      const text = await safe("transcribe", onDegrade, () =>
         transcriber?.transcribe({
           data: item.data,
           mediaType: item.mediaType,
@@ -84,7 +96,7 @@ export async function buildUserContent(args: {
       pieces.push(item.caption ? `${m.image} ${item.caption}` : m.image)
       continue
     }
-    const desc = await safe(() =>
+    const desc = await safe("vision", onDegrade, () =>
       understanding?.describe({
         data: item.data,
         mediaType: item.mediaType,
@@ -105,14 +117,24 @@ export async function buildUserContent(args: {
   return { content: text, derivedText: text }
 }
 
-/** Ejecuta una llamada opcional a un puerto, devolviendo null si el puerto no existe o lanza. */
+/**
+ * Ejecuta una llamada opcional a un puerto. Devuelve null si el puerto no existe (off por config → NO se
+ * reporta degradación) o si LANZA (fallo real → se reporta vía onDegrade con la causa, antes de degradar).
+ */
 async function safe(
+  component: string,
+  onDegrade: ((d: DegradeReport) => void) | undefined,
   fn: () => Promise<string> | undefined
 ): Promise<string | null> {
   try {
     const r = await fn()
     return r && r.trim().length > 0 ? r.trim() : null
-  } catch {
+  } catch (err) {
+    onDegrade?.({
+      component,
+      reason: `${component} falló`,
+      detail: errMsg(err),
+    })
     return null
   }
 }

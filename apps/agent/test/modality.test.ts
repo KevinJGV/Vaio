@@ -146,4 +146,39 @@ describe("buildUserContent (núcleo puro multimodal)", () => {
     })
     expect(out.derivedText).toContain("[voice]")
   })
+
+  it("reporta degraded cuando el transcriber lanza, y cae al marcador", async () => {
+    const reports: { component: string; detail?: string }[] = []
+    const failing: Transcriber = {
+      transcribe: async () => {
+        throw new Error("transcriptions 400")
+      },
+    }
+    const out = await buildUserContent({
+      userText: "",
+      media: [media({ kind: "audio", mediaType: "audio/ogg", ref: "v1" })],
+      transcriber: failing,
+      understanding: null,
+      nativeImages: false,
+      locale: "es",
+      onDegrade: (d) => reports.push(d),
+    })
+    expect(out.derivedText).toContain("[audio no procesable]")
+    expect(reports[0]).toMatchObject({ component: "transcribe" })
+    expect(reports[0]?.detail).toContain("400")
+  })
+
+  it("NO reporta degraded si el puerto es null (off por config)", async () => {
+    const reports: unknown[] = []
+    await buildUserContent({
+      userText: "",
+      media: [media({ kind: "audio", mediaType: "audio/ogg", ref: "v1" })],
+      transcriber: null,
+      understanding: null,
+      nativeImages: false,
+      locale: "es",
+      onDegrade: () => reports.push(1),
+    })
+    expect(reports).toHaveLength(0)
+  })
 })
