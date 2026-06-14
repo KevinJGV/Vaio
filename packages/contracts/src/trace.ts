@@ -64,6 +64,9 @@ export const traceEventSchema = z.discriminatedUnion("type", [
     hits: z.number().int().optional(),
     latencyMs: z.number().optional(),
     ok: z.boolean().optional(),
+    /** true si la tool se denegó por clearance (seam HITL). ok:false + denied:true = denegación;
+     *  ok:false sin denied = fallo de ejecución. */
+    denied: z.boolean().optional(),
   }),
   z.object({
     ...base,
