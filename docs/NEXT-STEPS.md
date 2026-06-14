@@ -20,33 +20,23 @@
 > e2e: "¿de dónde es Kevin?"→Bucaramanga (no caleño), saludo no dispara la tool. Detalle → Historial.
 > **Ritual refinado** (`CLAUDE.md`): skills + subagentes = disciplina visible (considerar siempre, decir si se
 > salta + por qué; default a desplegar agentes en lo grande, incl. diseño). **Sin WIP abierto.**
-> **Harness de tools (eje 2) — INFRA EN RAMA** (2026-06-13, `feat/tools-harness-registry`, pend. verificación de
-> Kevin + merge): registry de acciones + gating de 2 capas + seam HITL delgado; `searchMemory` migrado. Detalle
-> en la lista WIP abajo. **Próximo:** sobre esta base enchufan las **write-actions** (1ª candidata: `escalate`/
-> `saveFact`) con el seam HITL **async** (HITL nativo del AI SDK v6) — ahí entra la **curación agéntica** del
-> norte "Vaio se nutre solo". **El portafolio va DESPUÉS.**
+> **Harness de tools (eje 2) — MERGEADO en `main`** (2026-06-13): registry de acciones (`core/actions/`) + gating
+> de 2 capas (canal oculta / principal deniega) + seam HITL delgado; `searchMemory` migrado; `denied?` en
+> `tool.result`. Detalle → Historial. **Sin WIP abierto.**
+> **Foco / "go" pendiente (próximo paso):** sobre la base del harness enchufan las **write-actions** (1ª
+> candidata: `escalate`/`saveFact`) con el seam HITL **async** (HITL nativo del AI SDK v6) — ahí entra la
+> **curación agéntica** del norte "Vaio se nutre solo". **El portafolio va DESPUÉS.**
 
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [?] **Harness de tools/acciones (eje 2) — SOLO INFRA + seam HITL delgado** (rama `feat/tools-harness-registry`,
-  2026-06-13). Generalizado `ToolName` (unión cerrada de 1 tool) → registry de `ActionDescriptor`s
-  (`core/actions/`: `types.ts`/`registry.ts`/`search-memory.ts`) con gating de 2 capas (canal oculta vía
-  `allowedTools` / principal deniega en runtime con traza `ok:false,denied:true`) + seam HITL **delgado** (tipos
-  + punto de decisión `deniedTool`, sin async). `searchMemory` migrado como prueba (comportamiento idéntico);
-  **sin write-actions** (próxima iteración). `trusted` binario (no RBAC). Campo `denied?` en `tool.result`
-  (contracts). `core/tools.ts` eliminado. Par de specs →
-  [`2026-06-13-tools-harness-registry-design.md`](superpowers/specs/2026-06-13-tools-harness-registry-design.md)
-  · [`…-plan.md`](superpowers/specs/2026-06-13-tools-harness-registry-plan.md). Ejecución: directa/inline
-  (feature chica y secuencialmente acoplada). **156 tests** (136 agente + 20 compress; +5 registry, +1 deny path,
-  +1 degradación); typecheck/biome/build limpios. **e2e propio ✅:** `/chat` real → `searchMemory` se dispara vía
-  el registry (`tool.call`+`tool.result`), cita el CV, voz intacta, sin denegaciones (correcto: clearance
-  "anyone"). **Pend. verificación de Kevin + merge a `main`.**
+- _(vacío — sin ítems abiertos)_
 > **Diferido/registrado (no es WIP, vive en su fase):** visión **"Vaio se nutre solo"** (memoria viva
 > auto-curada + self-awareness + fuentes crudas/tiempo-real) → `SPEC.md` §"Vaio se nutre solo" + memoria
 > `vaio-self-nourishing-memory-vision`; corresponde al **harness (eje 2)** + Fase 2 `facts` + Fase 3 grafos.
-> Cerrados el 2026-06-13 (→ Historial): **Grounding (voz≠hechos) mergeado en `main`** + **ritual refinado en
-> CLAUDE.md** · **Observabilidad (App Attribution + persistencia de traza) mergeada y
+> Cerrados el 2026-06-13 (→ Historial): **Harness de tools (eje 2) — infra mergeada en `main`** (registry +
+> gating 2 capas + seam HITL delgado; searchMemory migrado) · **Grounding (voz≠hechos) mergeado en `main`** +
+> **ritual refinado en CLAUDE.md** · **Observabilidad (App Attribution + persistencia de traza) mergeada y
 > EN PRODUCCIÓN** (migraciones 0002+0003 aplicadas, `trace_events` escribiendo) · **Multimodal fases 1+2 mergeado en `main`** (entrada audio/voz+imágenes,
 > STT/visión/TTS por modalidad, salida de voz Telegram, observabilidad de media; e2e Kevin) · `OWNER_TELEGRAM_ID` (local+Railway) · e2e Telegram (owner/visitante + 2
 > topics aislados) · **merge de `feat/conversational-core-telegram` a `main`** · **ahorro de tokens de compresión
@@ -55,6 +45,22 @@
 ---
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
+
+**🟢 HARNESS DE TOOLS (eje 2) — SOLO INFRA + seam HITL delgado — MERGEADO en `main`** (2026-06-13, ex
+`feat/tools-harness-registry`). Generaliza `ToolName` (unión cerrada de 1 tool) → **registry de acciones**
+(`core/actions/`: `types.ts` = `ActionDescriptor{name,sideEffecting,clearance,build(ctx):Tool}` + `ActionContext`;
+`registry.ts` = `ACTIONS` + `buildTools(ctx, actions=ACTIONS)`; `search-memory.ts` = migración). **Gating de 2
+capas:** (1) canal **oculta** vía `caps.allowedTools` (la tool no entra al ToolSet); (2) principal **deniega en
+runtime** si no cumple `clearance` → `deniedTool` emite `tool.result {ok:false,denied:true}` y devuelve cortesía
+(punto de decisión del **seam HITL delgado**, sin async). `searchMemory` migrado **sin cambio de comportamiento**
+(`clearance:"anyone"`); `trusted` binario (no RBAC); campo `denied?` en `tool.result` (contracts); `core/tools.ts`
+eliminado. **156 tests** (136 agente + 20 compress); typecheck/biome/build limpios. **e2e real ✅:** `/chat` →
+`searchMemory` se dispara vía el registry (`tool.call`+`tool.result`), cita el CV, voz intacta, sin denegaciones.
+Specs → [`…-tools-harness-registry-design.md`](superpowers/specs/2026-06-13-tools-harness-registry-design.md) ·
+[`…-plan.md`](superpowers/specs/2026-06-13-tools-harness-registry-plan.md). **Camino de upgrade (futuro):** las
+write-actions *side-effecting* + el seam HITL **async** se construyen sobre el HITL **nativo del AI SDK v6** (tool
+sin `execute` → confirmación); `sideEffecting`/`clearance` ya son los disparadores. Encaja con `escalate` (Fase 2)
+y `saveFact` ("Vaio se nutre solo").
 
 **🟢 GROUNDING (voz ≠ hechos) — MERGEADO en `main`** (2026-06-13, ex `feat/grounding-voice-not-facts`).
 Cierra el bug donde Vaio inventaba origen/fútbol sobre Kevin (§"Hallazgos del bot real" #1-4): `prompt.ts` con
@@ -330,8 +336,10 @@ fase 2 estén activos a la vez, o aparezcan ≥2 síntomas de que el `SPEC.md` m
 2. **Iteración 2 + compresión + refinamiento Telegram + hot-sync + fix grounding** → **✅ MERGEADO en `main`** (2026-06-13).
 3. **(Kevin)** `OWNER_TELEGRAM_ID` + e2e real (2 topics, owner/visitante) → **✅ HECHO**; queda solo **ver el ahorro de tokens** en logs.
 4. **Review + merge** de `feat/conversational-core-telegram` → **✅ HECHO** (2026-06-13).
-5. **Próximo paso mayor** (espera "go"): contrato de entrada **multimodal** + framework de **tools/harness**
-   (§ "Próximo paso mayor") y los **followups de grounding** (§ "Hallazgos del bot real").
-6. **Después:** integración del portafolio (`ChatSheet.tsx` + proxy → dominio público de Railway). Luego `apps/web`.
+5. **Próximo paso mayor** — ejes foundational: **multimodal** → **✅ MERGEADO**; **framework de tools/harness
+   (infra)** → **✅ MERGEADO** (2026-06-13). Quedan los **followups de grounding** (§ "Hallazgos del bot real").
+6. **Próximo (espera "go"):** las **write-actions** + seam HITL **async** sobre el harness (1ª candidata:
+   `escalate`/`saveFact`; curación "Vaio se nutre solo") — su propio par `brainstorming`→design+plan.
+7. **Después:** integración del portafolio (`ChatSheet.tsx` + proxy → dominio público de Railway). Luego `apps/web`.
 
 > Definition of Done por tarea y verificación: ver `../CLAUDE.md`.
