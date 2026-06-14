@@ -20,21 +20,28 @@
 > e2e: "¿de dónde es Kevin?"→Bucaramanga (no caleño), saludo no dispara la tool. Detalle → Historial.
 > **Ritual refinado** (`CLAUDE.md`): skills + subagentes = disciplina visible (considerar siempre, decir si se
 > salta + por qué; default a desplegar agentes en lo grande, incl. diseño). **Sin WIP abierto.**
-> **Foco / "go" pendiente (próximo paso):** el **framework de tools/harness** (eje 2 del próximo paso mayor) —
-> grande/foundational → arrancar con `superpowers:brainstorming` + **panel de agentes de diseño en paralelo**;
-> ahí enchufa la **curación agéntica** del norte "Vaio se nutre solo" (write-actions + HITL). **El portafolio va DESPUÉS.**
+> **Harness de tools (eje 2) — INFRA EN RAMA** (2026-06-13, `feat/tools-harness-registry`, pend. verificación de
+> Kevin + merge): registry de acciones + gating de 2 capas + seam HITL delgado; `searchMemory` migrado. Detalle
+> en la lista WIP abajo. **Próximo:** sobre esta base enchufan las **write-actions** (1ª candidata: `escalate`/
+> `saveFact`) con el seam HITL **async** (HITL nativo del AI SDK v6) — ahí entra la **curación agéntica** del
+> norte "Vaio se nutre solo". **El portafolio va DESPUÉS.**
 
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [~] **Harness de tools/acciones (eje 2) — SOLO INFRA + seam HITL delgado** (rama `feat/tools-harness-registry`,
-  2026-06-13). Generalizar `ToolName` (unión cerrada de 1 tool) → registry de `ActionDescriptor`s con gating de
-  2 capas (canal oculta vía `allowedTools` / principal deniega en runtime con traza) + seam HITL **delgado**
-  (tipos + punto de decisión, sin async). `searchMemory` migra como prueba (sin cambio de comportamiento); **sin
-  write-actions** (próxima iteración). `trusted` binario (no RBAC). Par de specs →
+- [?] **Harness de tools/acciones (eje 2) — SOLO INFRA + seam HITL delgado** (rama `feat/tools-harness-registry`,
+  2026-06-13). Generalizado `ToolName` (unión cerrada de 1 tool) → registry de `ActionDescriptor`s
+  (`core/actions/`: `types.ts`/`registry.ts`/`search-memory.ts`) con gating de 2 capas (canal oculta vía
+  `allowedTools` / principal deniega en runtime con traza `ok:false,denied:true`) + seam HITL **delgado** (tipos
+  + punto de decisión `deniedTool`, sin async). `searchMemory` migrado como prueba (comportamiento idéntico);
+  **sin write-actions** (próxima iteración). `trusted` binario (no RBAC). Campo `denied?` en `tool.result`
+  (contracts). `core/tools.ts` eliminado. Par de specs →
   [`2026-06-13-tools-harness-registry-design.md`](superpowers/specs/2026-06-13-tools-harness-registry-design.md)
   · [`…-plan.md`](superpowers/specs/2026-06-13-tools-harness-registry-plan.md). Ejecución: directa/inline
-  (feature chica y secuencialmente acoplada). Estado: diseño+plan escritos; implementación en curso.
+  (feature chica y secuencialmente acoplada). **156 tests** (136 agente + 20 compress; +5 registry, +1 deny path,
+  +1 degradación); typecheck/biome/build limpios. **e2e propio ✅:** `/chat` real → `searchMemory` se dispara vía
+  el registry (`tool.call`+`tool.result`), cita el CV, voz intacta, sin denegaciones (correcto: clearance
+  "anyone"). **Pend. verificación de Kevin + merge a `main`.**
 > **Diferido/registrado (no es WIP, vive en su fase):** visión **"Vaio se nutre solo"** (memoria viva
 > auto-curada + self-awareness + fuentes crudas/tiempo-real) → `SPEC.md` §"Vaio se nutre solo" + memoria
 > `vaio-self-nourishing-memory-vision`; corresponde al **harness (eje 2)** + Fase 2 `facts` + Fase 3 grafos.
@@ -169,10 +176,13 @@ retro-ajustar, decidir primero):
 1. ✅ **Contrato de entrada multimodal** (audio/voz + imágenes) — **IMPLEMENTADO** (2026-06-13, rama
    `feat/multimodal-input`; híbrido como se recomendó). Ver el WIP `[?]` arriba + specs
    `2026-06-13-multimodal-input-{design,plan}.md`. Followups de evolución → § "Evolución multimodal" abajo.
-2. **Framework de tools/acciones (el "harness")**. Hoy `ToolName` es unión cerrada de **una** tool
-   (`searchMemory`, read-only). Generalizar a un **registry de acciones**: descriptor (name/description/
-   inputSchema/execute), flag *side-effecting*, gating por capacidad **y por principal**, y seam de
-   **confirmación / human-in-the-loop** antes de acciones reservadas (encaja con el `escalate` de fase 2).
+2. ✅ **Framework de tools/acciones (el "harness") — INFRA** (2026-06-13, rama `feat/tools-harness-registry`,
+   pend. verificación + merge). Generalizado a un **registry de acciones** (`ActionDescriptor`: name/
+   sideEffecting/clearance/build), gating de 2 capas (canal **y** principal), seam HITL **delgado** (deny path
+   con traza). Ver el WIP `[?]` arriba + specs `2026-06-13-tools-harness-registry-{design,plan}.md`.
+   **Pendiente (próxima iteración, su propio par):** las **write-actions** *side-effecting* + el seam HITL
+   **async** (confirmación/notificación/reanudación, sobre el HITL nativo del AI SDK v6) — encaja con el
+   `escalate` de fase 2 y la curación de "Vaio se nutre solo".
 
 **Diferibles (ya hay seam, no urgen):** ventana de contexto **por tokens** (hoy por conteo de mensajes);
 persistencia de **adjuntos** (referencias de media + transcripción); **persona/policies como dato**

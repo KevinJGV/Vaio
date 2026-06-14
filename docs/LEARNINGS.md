@@ -310,3 +310,21 @@ El código typecheckeó sin cambios de API salvo **dos rupturas reales**:
   sale 1 → NO uses `|| echo 0` (duplica); capturá `open=$(grep -c …)` y `open=${open:-0}`.
 - **Límite honesto**: ninguna automatización valida si "el próximo paso es correcto" o si la prosa refleja
   la intención. Eso es criterio + minimizar la superficie que puede pudrirse. Hooks/CI = red fina, no la cura.
+
+### Harness de tools — registry de acciones + seam HITL (jun-2026)
+- **HITL nativo del AI SDK v6** (verificado con context7, `ai@6.0.0-beta.128`): una tool **sin** `execute`
+  (con `outputSchema`) hace que el SDK NO la ejecute y requiera confirmación humana. Es el **camino de upgrade**
+  para el seam HITL **async** (confirmación/notificación/reanudación) cuando llegue la 1ª write-action. Hoy el
+  seam es **delgado** (deny path con traza, sin async): el descriptor declara `sideEffecting`/`clearance` y esos
+  serán los disparadores del flujo nativo a futuro.
+- **Gating de 2 capas** (`core/actions/registry.ts`): (1) **canal OCULTA** vía `caps.allowedTools` — si el canal
+  no la tiene, la tool ni entra al `ToolSet` (el modelo no la ve); (2) **principal DENIEGA** — si no cumple el
+  `clearance` del descriptor, la tool SÍ se expone pero su `execute` deniega limpio y emite
+  `tool.result {ok:false, denied:true}`. Distinguir en la traza: `denied:true` = denegación de permiso;
+  `ok:false` sin `denied` = fallo de ejecución.
+- **Descriptor con `build(ctx): Tool`** (no `inputSchema`/`execute` planos): el helper `tool()` liga el
+  `inputSchema` (zod) al tipo del input de `execute` por inferencia; un descriptor genérico con schema `unknown`
+  perdería ese typing. Encapsular la construcción en `build` mantiene el typing **por-tool** y deja el registry
+  agnóstico (solo `name` + metadata de gating + `build`).
+- **`buildTools(ctx, actions = ACTIONS)`**: el 2º parámetro (registry inyectable) permite **testear el deny path**
+  con un descriptor owner-only de prueba, sin tener que enviar una write-action real. En prod siempre usa `ACTIONS`.
