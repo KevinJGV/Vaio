@@ -1,6 +1,6 @@
 # Pendientes — Vaio (para retomar)
 
-> **ESTADO ACTUAL (2026-06-13) — fuente de verdad viva.**
+> **ESTADO ACTUAL (2026-06-14) — fuente de verdad viva.**
 > **Fase 1: completa y DESPLEGADA** (Railway/Docker; RAG real Neon+pgvector; observabilidad pino) — en `main`.
 > **Iteración 2 — MERGEADA en `main`:** núcleo *stateful* + capacidades por canal + Telegram `/tg`,
 > **compresión cavemem** (`@vaio/compress`), **refinamiento Telegram** (hilos/topics, HTML, identidad/owner),
@@ -28,21 +28,17 @@
 > Verificado por Kevin (flujo owner e2e). Detalle → Historial.
 > **Observabilidad de fallos silenciosos — MERGEADA en `main`** (2026-06-14): TraceEvent `degraded` +
 > `reportDegraded` + `onDegrade` (core puro) + barrido de adapters. e2e diagnosticó un bug real. Detalle → Historial.
-> **Foco actual:** **uniformar el parseo de fallback en TODOS los env de modelos** (el bug que la observabilidad
-> destapó: `TRANSCRIBE_MODELS` no acepta cadena CSV como `VISION_MODELS`/`SPEECH_MODELS`). Ver WIP abajo.
-> **Después / diferido:** Nivel C (scheduler + push proactivo) y/o `escalate` (Fase 2); el portafolio va DESPUÉS.
+> **Fallback uniforme en env de modelos — MERGEADO + EN PROD** (2026-06-14): `TRANSCRIBE_MODELS`/`SUMMARY_MODELS`
+> aceptan cadena (fallback client/server-side); `EMBEDDINGS_MODEL` único a propósito; plural por consistencia.
+> Arregla el bug del audio. Detalle → Historial. **Sin WIP abierto.**
+> **Próximos candidatos (eligen Kevin/yo):** los **pasos 1-3 de "Vaio se nutre solo"** (fuentes CRUDAS de
+> código/repos — ver §Pendiente FUTURO), el **Nivel C** (scheduler + push proactivo) y/o `escalate` (Fase 2).
+> El **portafolio** (ChatSheet + proxy) va DESPUÉS.
 
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [?] **Uniformar el parseo de fallback en los env de modelos** (rama `fix/model-env-fallback`, 2026-06-14).
-  **`TRANSCRIBE_MODELS`** ahora csv → **fallback CLIENT-SIDE** en el transcriber (el endpoint `/audio/transcriptions`
-  es single-model; prueba cada uno en orden). **`SUMMARY_MODELS`** csv → fallback server-side. **`EMBEDDINGS_MODEL`**
-  queda ÚNICO a propósito (mezclar modelos = vectores incompatibles; documentado). Renombre a **plural** por
-  consistencia con `VISION_MODELS`/`SPEECH_MODELS` (schema + `.env`/`.env.example`). **173 tests** (153 agente + 20
-  compress); typecheck/biome/build limpios. **e2e ✅:** audio basura por `/chat` → prueba cada modelo en orden
-  (3 intentos con fallback), no el CSV entero; HTTP 200. **Pend. verificación de Kevin:** un audio REAL transcribe
-  (slugs válidos) + merge a `main`.
+- _(vacío — sin ítems abiertos)_
 > **Diferido/registrado (no es WIP, vive en su fase):** norte **"Vaio se nutre solo"** — fuentes **CRUDAS
 > (código/repos, NO webs)** + self-awareness + tiempo real. **Paso 4 (curación/`saveFact`) ✅ hecho; pasos 1-3
 > (lo crudo) pendientes** → ítem rastreable en **§"🔵 Pendiente FUTURO — Vaio se nutre solo"** (abajo) +
@@ -58,6 +54,17 @@
 ---
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
+
+**🟢 FALLBACK UNIFORME EN ENV DE MODELOS — MERGEADO + EN PROD** (2026-06-14, ex `fix/model-env-fallback`).
+Fix del bug que la observabilidad destapó: `TRANSCRIBE_MODEL` (singular) mandaba la cadena CSV entera como un
+modelo al endpoint single-model `/audio/transcriptions` → `400 "Model a,b,c does not exist"` → TODO audio fallaba.
+**`TRANSCRIBE_MODELS`** ahora csv → **fallback CLIENT-SIDE** (el adapter prueba cada modelo en orden; el endpoint
+no tiene el fallback server-side del chat). **`SUMMARY_MODELS`** csv → fallback server-side (createModel).
+**`EMBEDDINGS_MODEL`** queda ÚNICO a propósito (mezclar modelos = vectores incompatibles con lo indexado; cambiarlo
+exige reingestar) — documentado, es la excepción correcta. Renombre a **plural** por consistencia con
+`VISION_MODELS`/`SPEECH_MODELS` (schema + `.env`/`.env.example`). **173 tests** (153 agente + 20 compress);
+typecheck/biome/build limpios; e2e (audio → prueba cada modelo en orden). Decisión: fix directo (causa ya dada por
+systematic-debugging; patrón existente). Patrón en `LEARNINGS.md`.
 
 **🟢 OBSERVABILIDAD DE FALLOS SILENCIOSOS — MERGEADO en `main`** (2026-06-14, ex `feat/backend-failure-observability`).
 Que todo fallo/degradación del backend deje rastro de su causa (antes degradaba "a ciegas"). TraceEvent nuevo
