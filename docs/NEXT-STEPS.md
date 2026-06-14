@@ -45,13 +45,7 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [~] **Memoria viva de repos — sync incremental + frescura autónoma lazy (paso 3, parte 1)** (en progreso,
-  2026-06-14, sobre `feat/raw-repo-ingestion`). Engine incremental (diff por blob-SHA → re-embebe SOLO lo cambiado) +
-  frescura barata (1 request) + tools autónomas en chat (`checkRepoFreshness`/`syncRepo`, sin HITL, mención natural
-  solo al owner, silencio en web/visitante) + entrypoint `sync.ts`. Schema: `documents`+`path`/`blob_sha` +
-  `tracked_repos` (migración). Caso rápido inline; largo → caveat + refresco background. Specs →
-  [`…-repo-incremental-sync-design.md`](superpowers/specs/2026-06-14-repo-incremental-sync-design.md) ·
-  [`…-plan.md`](superpowers/specs/2026-06-14-repo-incremental-sync-plan.md). Verificación = 2ª corrida `skipped-fresh`.
+- _(vacío — sin ítems abiertos)_
 > **Diferido/registrado (no es WIP, vive en su fase):** norte **"Vaio se nutre solo"** — fuentes **CRUDAS
 > (código/repos, NO webs)** + self-awareness + tiempo real. **Paso 4 (curación/`saveFact`) ✅ hecho; pasos 1-3
 > (lo crudo) pendientes** → ítem rastreable en **§"🔵 Pendiente FUTURO — Vaio se nutre solo"** (abajo) +
@@ -67,6 +61,27 @@
 ---
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
+
+**🟢 MEMORIA VIVA DE REPOS — SYNC INCREMENTAL + FRESCURA AUTÓNOMA LAZY (paso 3, parte 1) — VERIFICADO**
+(2026-06-14, rama `feat/raw-repo-ingestion`, commit e8b09d8 — aún NO en `main`). El índice se mantiene fresco
+**solo, barato, lazy y autónomo**: Vaio detecta (1 request) si un repo relevante está desactualizado y, si lo está,
+**sincroniza incrementalmente** (re-embebe SOLO lo cambiado por blob-SHA). **Engine puro** (`core/repo-sync.ts`:
+`diffRepoTree`/`compareFreshness`/`isInlineSync`). **Schema** (migración `0005`, aplicada a Neon): `documents` +=
+`path`/`blob_sha` + índice; tabla `tracked_repos` (frescura por repo). El manifest **es** `documents` (DISTINCT
+path,blob_sha) → una fuente de verdad. `MemoryStore` += `listIndexedFiles`/`deleteFiles`/`replaceFile` (tx atómica
+por archivo); puerto `RepoTracker` + adapter; orquestador `syncRepo`/`repoFreshness`/`createRepoSync`; entrypoint
+`sync.ts`. **Tools autónomas** (`checkRepoFreshness` read + `syncRepo` write, todos los canales, sin HITL): diff
+chico → inline; grande → caveat + refresco background (la **reanudación proactiva = incremento 2**, ver ⭐). Política
+por audiencia (mención natural solo al owner, silencio en web/visitante; NO bloquea preguntas técnicas). Repo
+nuevo/arbitrario → denegado (parte 2). **Reconciliación legacy auto-sanante** (manifest vacío → clearSource + full).
+**250 tests** (+18); typecheck/biome/build limpios. **e2e ✅:** migración aplicada; 2ª corrida offline `skipped-fresh`
+(0 embeddings) = incremental anda; chat autónomo (`checkRepoFreshness`→stale→`syncRepo` en la traza); camino
+`deferred`→background; **idempotencia ante corte** (sync interrumpido → corrida siguiente converge → ambos fresh).
+Estrategia: directo+secuencial (el hook global de typecheck hace que un puerto roto bloquee todo edit → subagentes
+en paralelo se pisarían; decisión consciente). Specs →
+[`…-repo-incremental-sync-design.md`](superpowers/specs/2026-06-14-repo-incremental-sync-design.md) ·
+[`…-plan.md`](superpowers/specs/2026-06-14-repo-incremental-sync-plan.md). **Cierra el paso 3 parte 1 de "Vaio se
+nutre solo".** Pendiente: **incremento 2 (turnos proactivos ⭐)**, parte 2 (ingesta on-demand de repo nuevo), cron/webhook.
 
 **🟢 RERANK (2ª etapa del RAG) — VERIFICADO** (2026-06-14, rama `feat/raw-repo-ingestion` — aún NO en `main`).
 Trigger disparado por la ingesta de fuentes crudas (corpus ~29 → ~1600, mucho código → similitud vectorial
@@ -392,9 +407,9 @@ batch de URLs/APIs de hoy (`adapters/sources/*`) es el **punto de partida a supe
 - ✅ **Paso 4 — Curación agéntica** (`saveFact` + HITL): **HECHO** (2026-06-14, ver Historial). El "decide qué guardar".
 - **Paso 3 — Acceso en tiempo real / on-demand** → **REENCAUZADO (2026-06-14):** el "leer en caliente" se **descartó**
   (lo indexado+vectorizado le gana en costo/velocidad/precisión + alimenta grafos). El norte real = **mantener el
-  índice al día, barato**: sync **incremental lazy autónomo**. **Parte 1 EN PROGRESO** (ver WIP arriba): engine
-  incremental + frescura + tools autónomas. **Parte 2 (followup):** on-demand ingest de repo nuevo/arbitrario
-  (owner+background+notify). Depende de los **turnos proactivos** (abajo ★).
+  índice al día, barato**: sync **incremental lazy autónomo**. ✅ **Parte 1 HECHA/VERIFICADA (2026-06-14, ver
+  Historial):** engine incremental + frescura + tools autónomas. **Parte 2 (followup):** on-demand ingest de repo
+  nuevo/arbitrario (owner+background+notify). Depende de los **turnos proactivos** (abajo ⭐).
 - **Paso 5 — Grafos** (pendiente, Fase 3): `facts` → Graphiti bi-temporal.
 > ✅ **Followup de grounding — RESUELTO/VERIFICADO (2026-06-14, ver Historial "GROUNDING: AUTO-INTROSPECCIÓN").**
 > Pasos 1+2 dejaron el código de Vaio en la memoria pero la política del prompt lo tapaba; se distinguió en el
