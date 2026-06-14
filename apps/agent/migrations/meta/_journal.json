@@ -29,6 +29,13 @@
       "when": 1781394015420,
       "tag": "0003_flat_morlun",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781408350717,
+      "tag": "0004_lucky_winter_soldier",
+      "breakpoints": true
     }
   ]
 }

@@ -3,6 +3,7 @@
 // El índice HNSW con `vector_cosine_ops` acelera la búsqueda por distancia coseno (<=>).
 
 import type { TraceEvent } from "@vaio/contracts"
+import { sql } from "drizzle-orm"
 import {
   bigint,
   bigserial,
@@ -113,5 +114,33 @@ export const traceEvents = pgTable(
   (t) => [
     index("trace_events_conv_idx").on(t.conversationId, t.id),
     index("trace_events_turn_idx").on(t.turnId, t.seq),
+  ]
+)
+
+/** Hechos curados sobre Kevin (memoria que se nutre). Una propuesta y un hecho confirmado son la MISMA
+ *  fila en distinto `status`. Bi-temporal: valid_at/invalid_at = valid time; created_at/expired_at = tx time.
+ *  Invalidar = marcar invalid_at (NUNCA borrar). searchMemory lee solo status='confirmed' AND invalid_at IS NULL. */
+export const facts = pgTable(
+  "facts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    statement: text("statement").notNull(),
+    status: text("status").notNull().default("pending"), // 'pending'|'confirmed'|'rejected'
+    embedding: vector("embedding", { dimensions: EMBEDDING_DIM }), // nullable: se llena al confirmar
+    principalId: text("principal_id").notNull(),
+    channel: text("channel").notNull(),
+    conversationId: uuid("conversation_id"),
+    turnId: text("turn_id"),
+    validAt: timestamp("valid_at", { withTimezone: true }),
+    invalidAt: timestamp("invalid_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    expiredAt: timestamp("expired_at", { withTimezone: true }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("facts_embedding_idx")
+      .using("hnsw", t.embedding.op("vector_cosine_ops"))
+      .where(sql`${t.status} = 'confirmed' and ${t.invalidAt} is null`),
+    index("facts_pending_idx").on(t.principalId, t.status),
   ]
 )
