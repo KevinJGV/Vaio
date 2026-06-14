@@ -27,7 +27,14 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- _(vacío — sin ítems abiertos)_
+- [~] **Harness de tools/acciones (eje 2) — SOLO INFRA + seam HITL delgado** (rama `feat/tools-harness-registry`,
+  2026-06-13). Generalizar `ToolName` (unión cerrada de 1 tool) → registry de `ActionDescriptor`s con gating de
+  2 capas (canal oculta vía `allowedTools` / principal deniega en runtime con traza) + seam HITL **delgado**
+  (tipos + punto de decisión, sin async). `searchMemory` migra como prueba (sin cambio de comportamiento); **sin
+  write-actions** (próxima iteración). `trusted` binario (no RBAC). Par de specs →
+  [`2026-06-13-tools-harness-registry-design.md`](superpowers/specs/2026-06-13-tools-harness-registry-design.md)
+  · [`…-plan.md`](superpowers/specs/2026-06-13-tools-harness-registry-plan.md). Ejecución: directa/inline
+  (feature chica y secuencialmente acoplada). Estado: diseño+plan escritos; implementación en curso.
 > **Diferido/registrado (no es WIP, vive en su fase):** visión **"Vaio se nutre solo"** (memoria viva
 > auto-curada + self-awareness + fuentes crudas/tiempo-real) → `SPEC.md` §"Vaio se nutre solo" + memoria
 > `vaio-self-nourishing-memory-vision`; corresponde al **harness (eje 2)** + Fase 2 `facts` + Fase 3 grafos.
