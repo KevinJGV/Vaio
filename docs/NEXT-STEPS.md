@@ -24,7 +24,15 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- _(vacío — sin ítems abiertos)_
+- [~] **Grounding: voz ≠ hechos** — EN CURSO en `feat/grounding-voice-not-facts`. Hardening del system prompt
+  (§"Hallazgos del bot real" #1-4): voz=estilo sin biografía (quitar "caleño de Palmira"), grounding duro +
+  stop-rule, fallback por audiencia, no over-imperar; + anclar `searchMemory` en `tools.ts` (categorías). Diseño →
+  [`…-grounding-voice-not-facts-design.md`](superpowers/specs/2026-06-13-grounding-voice-not-facts-design.md) ·
+  plan → [`…-plan.md`](superpowers/specs/2026-06-13-grounding-voice-not-facts-plan.md).
+- [ ] **Visión REGISTRADA (diferida): "Vaio se nutre solo"** — memoria viva auto-curada + self-awareness +
+  fuentes crudas/tiempo-real (Kevin, 2026-06-13). NO se codea ahora; corresponde al **harness (eje 2)** +
+  **Fase 2 `facts`** + **Fase 3 grafos**. Norte y decomposición en `SPEC.md` §"Vaio se nutre solo" + memoria
+  `vaio-self-nourishing-memory-vision`. Conecta con "Vaio como harness personal" (abajo) y la curación agéntica.
 > Cerrados el 2026-06-13 (→ Historial): **Observabilidad (App Attribution + persistencia de traza) mergeada y
 > EN PRODUCCIÓN** (migraciones 0002+0003 aplicadas, `trace_events` escribiendo) · **Multimodal fases 1+2 mergeado en `main`** (entrada audio/voz+imágenes,
 > STT/visión/TTS por modalidad, salida de voz Telegram, observabilidad de media; e2e Kevin) · `OWNER_TELEGRAM_ID` (local+Railway) · e2e Telegram (owner/visitante + 2

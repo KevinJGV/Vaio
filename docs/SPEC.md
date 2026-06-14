@@ -191,6 +191,23 @@ Diseño/plan → [`superpowers/specs/2026-06-12-cavemem-compression-{design,plan
   (`valid_at`/`invalid_at` + `created_at`/`expired_at`; invalidar al INGERIR, no borrar — ver
   `NEXT-STEPS.md` "Grafos"). La compresión de facts es seam futuro (el `Compressor` Tier 1 ya existe).
 - Tool `escalate(question)` con umbral de confianza → cola `unknown_questions`.
+
+### Norte: "Vaio se nutre solo" — memoria viva auto-curada + self-awareness (visión, 2026-06-13)
+Materializa el **Invariante #3** (crecimiento orgánico > prompt estático) y el norte "Vaio como harness
+personal". Hoy la ingesta es **pull batch de URLs/APIs** (`adapters/sources/*`). El norte: Vaio **accede a las
+fuentes CRUDAS (repos, incl. EL SUYO) y en tiempo real, y DECIDE qué vale la pena guardar** en memoria (DB →
+grafos) → "se siente vivo". Decomposición y fase:
+1. **Fuentes crudas** (repo md/código, no HTML desplegado) — collectors `collectX()→DocChunk[]` en
+   `adapters/sources/`; cercano e independiente del harness.
+2. **Self-awareness**: Vaio ingiere su propio repo ("sus tripas") — collector local (⚠️ excluir secrets/`.env`).
+3. **Acceso en tiempo real / on-demand**: retrieval como **read-action del harness** (eje 2); sync continuo → Fase 3.
+4. **Curación agéntica** ("Vaio decide qué guardar"): **write-action** (`recordar`/`saveFact`) con flag
+   side-effecting + **HITL** → escribe `facts`. **Corazón del "vivo"**; depende del **harness (eje 2)** + esta
+   Fase 2. El feedback correctivo del panel de conversaciones se ata acá (confirmed/corrected/rejected).
+5. **Grafos**: `facts` → Graphiti bi-temporal (Fase 3).
+> Conexión con el grounding (hecho): el prompt deja los hechos en la MEMORIA; esto es **cómo la memoria crece
+> sola**. Al diseñar el **harness** (eje 2), las write-actions + HITL son el seam de "Vaio decide qué recordar".
+> Detalle/decomposición → `docs/superpowers/specs/2026-06-13-grounding-voice-not-facts-design.md` (§visión).
 - **Telegram bot** (webhook): te notifica la duda y por ahí respondés/charlás con el agente.
 - **Correo saliente** (Resend, ya está) para notificarte.
 - Tu respuesta (Telegram/correo) → se ingiere como `fact` → la próxima vez responde sin escalar.
