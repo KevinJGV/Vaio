@@ -162,9 +162,14 @@ export function createAgent(deps: AgentDeps) {
           : "public"
 
       // Retomar propuestas de hechos pendientes (solo si el perfil puede commitear → owner).
+      // Best-effort: es contexto accesorio → un hipo de DB no debe costar el turno del owner.
       let pendingFacts: PendingFact[] = []
       if (factStore && caps.allowedTools.includes("commitFact")) {
-        pendingFacts = await factStore.listPending(principal.id)
+        try {
+          pendingFacts = await factStore.listPending(principal.id)
+        } catch (err) {
+          ctx.logger.warn({ err: errMsg(err) }, "listPending falló (best-effort)")
+        }
       }
 
       // Historial server-side (el canal NO manda todo el historial). Sin DB → stateless single-turn.
