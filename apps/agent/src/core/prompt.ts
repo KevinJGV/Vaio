@@ -8,6 +8,7 @@
 // prompt minimiza ese error.
 
 import type { Locale } from "@vaio/contracts"
+import type { PendingFact } from "../ports/facts.js"
 
 function personaEs(): string {
   return [
@@ -73,6 +74,8 @@ export function buildSystemPrompt(args: {
   policyText: string
   /** Resumen rodante de turnos previos. "" si la conversación es nueva/corta. */
   summary: string
+  /** Propuestas de hechos pendientes de confirmación por el owner (HITL). */
+  pendingFacts?: PendingFact[]
 }): string {
   const summary = args.summary.trim()
   const summaryBlock = summary
@@ -80,11 +83,23 @@ export function buildSystemPrompt(args: {
       ? `Earlier context of this conversation (summary — treat it as already-said facts):\n${summary}`
       : `Contexto previo de esta conversación (resumen, tratalo como hechos ya dichos):\n${summary}`
     : ""
+  const pend = args.pendingFacts ?? []
+  const pendingBlock =
+    pend.length > 0
+      ? (args.locale === "en"
+          ? "Memory proposals awaiting your confirmation:\n"
+          : "Propuestas de memoria pendientes de tu confirmación:\n") +
+        pend.map((p) => `- [${p.id}] «${p.statement}»`).join("\n") +
+        (args.locale === "en"
+          ? "\nIf the user confirms one, call commitFact with its id; if they reject it, commitFact with decision:reject."
+          : "\nSi el usuario confirma una, llamá commitFact con su id; si la rechaza, commitFact con decision:reject.")
+      : ""
   return [
     personaPrompt(args.locale),
     identityBlock(args.audience, args.locale),
     args.policyText.trim(),
     summaryBlock,
+    pendingBlock,
   ]
     .filter(Boolean)
     .join("\n\n")

@@ -21,6 +21,7 @@ import type {
   ConversationStore,
   StoredAttachment,
 } from "../ports/conversation.js"
+import type { FactStore, PendingFact } from "../ports/facts.js"
 import type { Logger } from "../ports/logger.js"
 import type {
   MediaUnderstanding,
@@ -67,6 +68,8 @@ export interface AgentDeps {
   mediaUnderstanding?: MediaUnderstanding | null
   /** true → imágenes se pasan NATIVAS al modelo de chat (la cadena debe ser vision-capaz). */
   nativeImages?: boolean
+  /** Memoria de hechos curados (para listar pendientes y pasarlos a buildTools). null = sin DB. */
+  factStore?: FactStore | null
 }
 
 /** Contexto de observabilidad de un turno (lo arma el adapter de canal por request). */
@@ -127,6 +130,7 @@ export function createAgent(deps: AgentDeps) {
     transcriber = null,
     mediaUnderstanding = null,
     nativeImages = false,
+    factStore = null,
   } = deps
 
   return {
@@ -156,6 +160,12 @@ export function createAgent(deps: AgentDeps) {
             ? "owner"
             : "visitor"
           : "public"
+
+      // Retomar propuestas de hechos pendientes (solo si el perfil puede commitear → owner).
+      let pendingFacts: PendingFact[] = []
+      if (factStore && caps.allowedTools.includes("commitFact")) {
+        pendingFacts = await factStore.listPending(principal.id)
+      }
 
       // Historial server-side (el canal NO manda todo el historial). Sin DB → stateless single-turn.
       let conversationId: string | undefined
@@ -239,6 +249,7 @@ export function createAgent(deps: AgentDeps) {
           audience,
           policyText: caps.policyText,
           summary: compressedSummary,
+          pendingFacts,
         }),
         messages,
         stopWhen: stepCountIs(10),
@@ -246,6 +257,7 @@ export function createAgent(deps: AgentDeps) {
           caps,
           principal,
           memory,
+          factStore,
           emit,
           ids,
           logger: ctx.logger,

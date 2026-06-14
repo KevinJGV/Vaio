@@ -79,6 +79,18 @@ describe("buildSystemPrompt", () => {
     expect(owner).toContain("Kevin (Vin) himself")
   })
 
+  it("inyecta el bloque de propuestas pendientes con sus ids", () => {
+    const p = buildSystemPrompt({ locale: "es", audience: "owner", policyText: "", summary: "",
+      pendingFacts: [{ id: "f1", statement: "A Kevin no le gusta el fútbol", createdAt: null }] })
+    expect(p).toContain("pendientes de tu confirmación")
+    expect(p).toContain("[f1]")
+    expect(p).toContain("commitFact")
+  })
+  it("sin pendientes, no agrega el bloque", () => {
+    const p = buildSystemPrompt({ locale: "es", audience: "owner", policyText: "", summary: "" })
+    expect(p).not.toContain("pendientes de tu confirmación")
+  })
+
   it("bloque de resumen localizado y solo cuando no está vacío", () => {
     const es = buildSystemPrompt({
       locale: "es",
