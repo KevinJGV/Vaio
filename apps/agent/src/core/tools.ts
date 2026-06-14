@@ -42,7 +42,7 @@ function searchMemoryTool({
   const k = caps.memoryScope.maxK
   return tool({
     description:
-      "Busca en la memoria de Kevin (CV, perfil, repos de GitHub, gustos musicales) los fragmentos más relevantes para responder con datos reales. Úsala SIEMPRE que la pregunta sea sobre Kevin.",
+      "Memoria de Kevin (sus datos reales): bio/origen, stack, proyectos (GitHub), gustos (música), contacto. Úsala cuando la respuesta dependa de un hecho concreto de Kevin; no para saludos ni charla.",
     inputSchema: z.object({
       query: z
         .string()

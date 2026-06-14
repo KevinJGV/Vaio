@@ -24,11 +24,15 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [~] **Grounding: voz ≠ hechos** — EN CURSO en `feat/grounding-voice-not-facts`. Hardening del system prompt
-  (§"Hallazgos del bot real" #1-4): voz=estilo sin biografía (quitar "caleño de Palmira"), grounding duro +
-  stop-rule, fallback por audiencia, no over-imperar; + anclar `searchMemory` en `tools.ts` (categorías). Diseño →
+- [?] **Grounding: voz ≠ hechos** — IMPLEMENTADO en `feat/grounding-voice-not-facts` (sin mergear). Hardening
+  del system prompt (§"Hallazgos del bot real" #1-4): voz=estilo sin biografía (quitada "caleño de Palmira"),
+  grounding duro + stop-rule, fallback por audiencia, no over-imperar; + `searchMemory` anclado en `tools.ts`
+  (categorías, sin "SIEMPRE"). **151 tests**; typecheck/biome/build limpios. **e2e ✅** (verificado con las
+  trazas): "¿de dónde es Kevin?" → disparó `searchMemory` → respondió **Bucaramanga** (del CV), NO "caleño";
+  "hola" → **no** disparó `searchMemory` (sin over-trigger); voz (voseo) intacta. Diseño →
   [`…-grounding-voice-not-facts-design.md`](superpowers/specs/2026-06-13-grounding-voice-not-facts-design.md) ·
-  plan → [`…-plan.md`](superpowers/specs/2026-06-13-grounding-voice-not-facts-plan.md).
+  plan → [`…-plan.md`](superpowers/specs/2026-06-13-grounding-voice-not-facts-plan.md). **Pendiente:** review +
+  merge. (§Hallazgos #5 —ingerir hechos personales— queda futuro; el CV ya ancla el origen.)
 - [ ] **Visión REGISTRADA (diferida): "Vaio se nutre solo"** — memoria viva auto-curada + self-awareness +
   fuentes crudas/tiempo-real (Kevin, 2026-06-13). NO se codea ahora; corresponde al **harness (eje 2)** +
   **Fase 2 `facts`** + **Fase 3 grafos**. Norte y decomposición en `SPEC.md` §"Vaio se nutre solo" + memoria

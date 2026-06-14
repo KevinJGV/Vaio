@@ -59,6 +59,24 @@ describe("buildTools (registry gated por capacidad)", () => {
     expect(disabled.searchMemory).toBeUndefined()
   })
 
+  it("la descripción de searchMemory ancla categorías y NO sobre-impera ('SIEMPRE')", () => {
+    const tools = buildTools({
+      caps: caps(["searchMemory"], 6),
+      memory: {
+        searchMemory: async () => [],
+        upsertDocuments: async () => {},
+        clearSource: async () => {},
+      },
+      emit: () => {},
+      ids,
+      logger: noopLogger(),
+    })
+    const desc = (tools.searchMemory as { description?: string }).description ?? ""
+    expect(desc).toContain("proyectos")
+    expect(desc).toContain("contacto")
+    expect(desc).not.toContain("SIEMPRE")
+  })
+
   it("searchMemory usa el maxK del perfil y emite tool.result con los hits", async () => {
     let calledWithK = -1
     const docs: DocChunk[] = [

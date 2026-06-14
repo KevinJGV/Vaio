@@ -2,20 +2,31 @@ import { describe, expect, it } from "vitest"
 import { buildSystemPrompt, personaPrompt } from "../src/core/prompt.js"
 
 describe("personaPrompt", () => {
-  it("es → persona en español: nombre 'Vaio' desambiguado + origen palmireño", () => {
+  it("es → persona en español: nombre desambiguado + voz (voseo) + grounding duro", () => {
     const p = personaPrompt("es")
     expect(p).toContain("Vaio")
     expect(p).toContain("Tu nombre es Vaio") // no más "Sos Vaio" (el modelo leía "Sos" como apellido)
-    expect(p).toContain("Palmira")
+    expect(p).toContain("voseo") // la VOZ (estilo) se conserva
     expect(p).toContain("searchMemory")
     expect(p).not.toContain("You are")
+    // grounding duro: hechos de Kevin SOLO de searchMemory (constraint de fuente, no "no inventes")
+    expect(p.toLowerCase()).toMatch(/solo con lo que/)
   })
-  it("en → persona en inglés (no en español)", () => {
+  it("es → voz ≠ hechos: NO afirma origen/ciudad como biografía (raíz del bug 'caleño')", () => {
+    const p = personaPrompt("es")
+    expect(p).not.toContain("caleño")
+    expect(p).not.toContain("Palmira")
+    expect(p).not.toContain("Cali")
+  })
+  it("en → persona en inglés (no en español) + grounding duro, sin biografía", () => {
     const p = personaPrompt("en")
     expect(p).toContain("Vaio")
     expect(p).toContain("Your name is Vaio")
     expect(p).toContain("searchMemory")
     expect(p).not.toContain("Tu nombre es Vaio")
+    expect(p.toLowerCase()).toMatch(/only what/)
+    expect(p).not.toContain("Palmira")
+    expect(p).not.toContain("Cali")
   })
 })
 
