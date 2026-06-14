@@ -12,27 +12,21 @@
 > texto-derivado), STT/visión/TTS por modalidad vía OpenRouter REST (single-provider), salida de voz en
 > Telegram (espejo / a pedido), observabilidad de media. e2e confirmado por Kevin. 142 tests + extras de Kevin
 > (`stepCountIs 10`, voces TTS). Detalle → Historial.
-> **Único WIP abierto:** confirmar que la migración `0002` (`messages.attachments`) está aplicada en Neon.
+> **Observabilidad — MERGEADA + EN PRODUCCIÓN** (2026-06-13): App Attribution (dashboard ya no "unknown") +
+> persistencia de traza por turno (`trace_events`). Migraciones `0002`+`0003` aplicadas en Neon (verificado:
+> `trace_events` con filas, `messages.attachments` existe). Detalle → Historial.
+> **Sin WIP abierto.**
 > **Foco / "go" pendiente (próximo paso):** quedan los dos frentes —
 > **(a)** followups de **grounding** (§ "Hallazgos del bot real": voz≠hechos duro, raíz del bug "Kevin es
-> caleño") y **(b)** el **framework de tools/harness** (eje 2 del próximo paso mayor). **El portafolio va DESPUÉS.**
+> caleño"; ahora **verificable** con los traces persistidos) y **(b)** el **framework de tools/harness** (eje 2
+> del próximo paso mayor). **El portafolio va DESPUÉS.**
 
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [?] **Observabilidad: App Attribution + DB traceability** — IMPLEMENTADO en `feat/observability-traceability`
-  (sin mergear). **(a)** App Attribution: `APP_NAME`(→X-Title)/`APP_URL`(→HTTP-Referer) al provider y a las
-  REST → el dashboard ya no muestra "unknown". **(b)** Persistencia de traza: tabla `trace_events` (append-only,
-  jsonb + seq), `PgTraceSink` best-effort (nunca rompe el turno) + composite (stdout+pg) + flag `TRACE_PERSIST`;
-  habilita el panel futuro y hace verificable el grounding. **149 tests**; typecheck/biome/build limpios.
-  **e2e:** boot `tracePersist:true`; degradación OK (tabla ausente → inserts fallan best-effort, turno responde).
-  Specs → [`…-trace-persistence-design.md`](superpowers/specs/2026-06-13-trace-persistence-design.md) ·
-  [`…-plan.md`](superpowers/specs/2026-06-13-trace-persistence-plan.md). **Pendiente:** review + merge.
-- [?] **Migraciones `0002` (`messages.attachments`) + `0003` (`trace_events`) aplicadas en Neon** — additivas;
-  el deploy las corre vía `railway.json preDeployCommand` (`db:migrate:prod`). Confirmar (sin las tablas/columnas
-  el turno responde igual, solo fallan las persistencias en background → logs `persist/summary falló` /
-  `trace persist falló`).
-> Cerrados el 2026-06-13 (→ Historial): **Multimodal fases 1+2 mergeado en `main`** (entrada audio/voz+imágenes,
+- _(vacío — sin ítems abiertos)_
+> Cerrados el 2026-06-13 (→ Historial): **Observabilidad (App Attribution + persistencia de traza) mergeada y
+> EN PRODUCCIÓN** (migraciones 0002+0003 aplicadas, `trace_events` escribiendo) · **Multimodal fases 1+2 mergeado en `main`** (entrada audio/voz+imágenes,
 > STT/visión/TTS por modalidad, salida de voz Telegram, observabilidad de media; e2e Kevin) · `OWNER_TELEGRAM_ID` (local+Railway) · e2e Telegram (owner/visitante + 2
 > topics aislados) · **merge de `feat/conversational-core-telegram` a `main`** · **ahorro de tokens de compresión
 > verificado en logs** (RAG ~3.5% / conv ~0.6%; persona intacta).
@@ -40,6 +34,20 @@
 ---
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
+
+**🟢 OBSERVABILIDAD — MERGEADO + EN PRODUCCIÓN** (2026-06-13, ex `feat/observability-traceability`).
+**(a) App Attribution:** `APP_NAME`(→`X-Title`)/`APP_URL`(→`HTTP-Referer`) al provider del AI SDK Y a las
+llamadas REST (`attributionHeaders`) → el dashboard de OpenRouter atribuye la app (antes "unknown"). **(b)
+Persistencia de traza:** tabla `trace_events` (append-only; `request/conversation/turn id` + `seq` por turno +
+`payload jsonb`; migración `0003`), `PgTraceSink` best-effort/fire-and-forget (un fallo NUNCA rompe el turno) +
+`CompositeTraceSink` (stdout+pg) + flag `TRACE_PERSIST`. Persiste los MISMOS `TraceEvent` del sink de stdout
+(event-stream; Convex = norte, no clon). Habilita el panel de conversaciones futuro y hace **verificable** el
+grounding. **149 tests**; typecheck/biome/build limpios. **Verificado en prod:** `trace_events` escribiendo +
+`messages.attachments` aplicada. Specs →
+[`…-trace-persistence-design.md`](superpowers/specs/2026-06-13-trace-persistence-design.md) ·
+[`…-plan.md`](superpowers/specs/2026-06-13-trace-persistence-plan.md). Gotcha registrado: `openrouter/free` no
+sirve para visión (rutea a content-safety) → fijar VLMs en `VISION_MODELS`. Follow-ups (en el design): panel de
+conversaciones, `media.*` como TraceEvent, enriquecer `messages`, retención/TTL.
 
 **🟢 MULTIMODAL (fases 1+2) — MERGEADO en `main`** (2026-06-13, ex `feat/multimodal-input`). **Fase 1:**
 contrato de entrada multimodal (audio/voz + imágenes), estrategia híbrida (puertos `Transcriber`/
