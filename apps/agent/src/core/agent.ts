@@ -38,7 +38,8 @@ import {
 import { buildUserContent } from "./modality.js"
 import { type Audience, buildSystemPrompt } from "./prompt.js"
 import { buildSummaryPrompt, shouldSummarize } from "./summary.js"
-import { buildTools, type TraceIds } from "./tools.js"
+import { buildTools } from "./actions/registry.js"
+import type { TraceIds } from "./actions/types.js"
 import { compressOrRaw, errMsg, preview } from "./util.js"
 
 export interface AgentDeps {
@@ -243,6 +244,7 @@ export function createAgent(deps: AgentDeps) {
         stopWhen: stepCountIs(10),
         tools: buildTools({
           caps,
+          principal,
           memory,
           emit,
           ids,
