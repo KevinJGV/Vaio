@@ -8,6 +8,7 @@ import { chunkText } from "../../core/chunking.js"
 import { chunkCode, withProvenanceHeader } from "../../core/code-chunking.js"
 import {
   DEFAULT_REPO_POLICY,
+  ingestPriority,
   isProbablyText,
   isProseFile,
   languageOf,
@@ -161,7 +162,8 @@ export async function syncRepo(
     // Manifest + reconciliación legacy: si está vacío pero el source tiene filas viejas (path NULL), clearSource
     // one-shot y full. (clearSource sobre un source vacío es no-op → seguro para repos nuevos.)
     const manifest = await memory.listIndexedFiles(source)
-    const isFull = manifest.length === 0 || !samePolicy || opts?.forceFull === true
+    const isFull =
+      manifest.length === 0 || !samePolicy || opts?.forceFull === true
     if (isFull) await memory.clearSource(source)
 
     const diff = diffRepoTree(
@@ -196,9 +198,10 @@ export async function syncRepo(
       await memory.deleteFiles(source, diff.toDelete)
     }
 
-    // Re-embeber solo lo cambiado (prosa primero → el cap prioriza docs). Best-effort por archivo.
+    // Re-embeber solo lo cambiado. Orden por prioridad: contenido (prosa→código) ANTES que los docs de proceso
+    // (`docs/superpowers/`), para que el cap por repo no descarte el contenido real (i18n/cv.ts) por los logs de dev.
     const ordered = [...diff.toEmbed].sort(
-      (a, b) => Number(isProseFile(b.path)) - Number(isProseFile(a.path))
+      (a, b) => ingestPriority(a.path) - ingestPriority(b.path)
     )
     let embedded = 0
     let chunkCount = 0
