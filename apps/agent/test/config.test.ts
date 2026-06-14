@@ -4,9 +4,10 @@ import {
   attribution,
   modelChain,
   speechChain,
+  summaryChain,
   telegramAllowedIds,
   telegramEnabled,
-  transcribeModel,
+  transcribeChain,
   visionChain,
 } from "../src/config.js"
 
@@ -51,12 +52,23 @@ describe("envs por modalidad (fase 2)", () => {
     expect(visionChain({ OPENROUTER_MODELS: "c/1,c/2" } as Env)).toEqual([])
     expect(visionChain({} as Env)).toEqual([])
   })
-  it("transcribeModel = TRANSCRIBE_MODEL explícito; vacío → undefined (STT OFF)", () => {
-    expect(transcribeModel({ TRANSCRIBE_MODEL: " stt/x " } as Env)).toBe(
-      "stt/x"
-    )
-    expect(transcribeModel({ OPENROUTER_MODELS: "c/1" } as Env)).toBeUndefined()
-    expect(transcribeModel({} as Env)).toBeUndefined()
+  it("transcribeChain = TRANSCRIBE_MODELS csv (fallback client-side); vacío → [] (STT OFF)", () => {
+    expect(transcribeChain({ TRANSCRIBE_MODELS: " stt/x " } as Env)).toEqual([
+      "stt/x",
+    ])
+    // csv → cadena de fallback (el bug que motivó esto: antes mandaba la cadena entera como un modelo)
+    expect(
+      transcribeChain({ TRANSCRIBE_MODELS: "stt/a, stt/b ,stt/c" } as Env)
+    ).toEqual(["stt/a", "stt/b", "stt/c"])
+    expect(transcribeChain({ OPENROUTER_MODELS: "c/1" } as Env)).toEqual([])
+    expect(transcribeChain({} as Env)).toEqual([])
+  })
+  it("summaryChain = SUMMARY_MODELS csv (fallback server-side); vacío → []", () => {
+    expect(summaryChain({ SUMMARY_MODELS: "s/a, s/b" } as Env)).toEqual([
+      "s/a",
+      "s/b",
+    ])
+    expect(summaryChain({} as Env)).toEqual([])
   })
   it("speechChain: parsea model|voice|format por entrada (fallback client-side)", () => {
     expect(

@@ -95,7 +95,7 @@ Adapter `apps/agent/src/adapters/neon-conversation.ts` (Drizzle, espejo de `neon
   token-based = refinamiento futuro). `buildSummaryPrompt({priorSummary, olderMessages, locale})`
   (LLM: condensa summary previo + turnos que salen de la ventana en un running summary terso de hechos).
 - Puerto `apps/agent/src/ports/summary.ts` `Summarizer.summarize(input): Promise<string>`; adapter
-  `adapters/summarizer.ts` usa `generateText` (no-streaming) con **modelo barato** (`SUMMARY_MODEL` o
+  `adapters/summarizer.ts` usa `generateText` (no-streaming) con **modelo barato** (`SUMMARY_MODELS` o
   la cola de la cadena), sobre el provider OpenRouter (con su fallback array). Falla → log + mantener
   ventana cruda; nunca rompe el turno (corre en el `persist()` de background).
 
@@ -126,7 +126,7 @@ CapabilityProfile/Principal/Summarizer` quedan **internos** al agente.
 
 ## 7. Config/env — `config.ts` + `.env.example` (modificar)
 Opcionales: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_ALLOWED_USER_IDS` (csv),
-`SUMMARY_MODEL`, `SUMMARY_THRESHOLD` (default 12), `CONVERSATION_RECENT_LIMIT` (default 10). Helpers:
+`SUMMARY_MODELS`, `SUMMARY_THRESHOLD` (default 12), `CONVERSATION_RECENT_LIMIT` (default 10). Helpers:
 `telegramAllowedIds(env): Set<number>`, `telegramEnabled(env): boolean` (token && secret && ids>0).
 
 ## 8. Canales (adapters)

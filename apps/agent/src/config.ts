@@ -48,6 +48,9 @@ const envSchema = z.object({
   DATABASE_URL: z.string().optional(),
   EMBEDDINGS_API_KEY: z.string().optional(),
   // Embeddings vía OpenRouter (mismo provider que el chat). Verificar slug en openrouter.ai/models.
+  // UN solo modelo a propósito (NO cadena/fallback): la query debe embeberse con el MISMO modelo que indexó
+  // los documentos; mezclar modelos da vectores incompatibles (la distancia coseno pierde sentido). Cambiarlo
+  // exige reingestar todo (`pnpm ingest`). Por eso no lleva fallback como los demás env de modelos.
   EMBEDDINGS_MODEL: z.string().default("google/gemini-embedding-2"),
   EMBEDDINGS_BASE_URL: z.string().url().default("https://openrouter.ai/api/v1"),
 
@@ -58,7 +61,7 @@ const envSchema = z.object({
   LASTFM_USER: z.string().optional(),
 
   // Memoria conversacional.
-  SUMMARY_MODEL: z.string().optional(), // modelo barato del resumen; default = cola de la cadena.
+  SUMMARY_MODELS: z.string().optional(), // modelo barato del resumen; default = cola de la cadena.
   SUMMARY_THRESHOLD: z.coerce.number().int().positive().default(12),
   CONVERSATION_RECENT_LIMIT: z.coerce.number().int().positive().default(10),
 
@@ -76,7 +79,7 @@ const envSchema = z.object({
   // Visión (imagen→texto o nativa): cadena csv de chat con file-part. Vacía → visión OFF.
   VISION_MODELS: z.string().optional(),
   // STT dedicado (audio→texto) vía POST /audio/transcriptions. Vacío → STT OFF.
-  TRANSCRIBE_MODEL: z.string().optional(),
+  TRANSCRIBE_MODELS: z.string().optional(),
   // true → imágenes se pasan NATIVAS al modelo de chat (la cadena de chat DEBE ser vision-capaz).
   // false (default) → se describen a texto con VISION_MODELS (robusto con cualquier cadena de chat).
   MULTIMODAL_NATIVE_IMAGES: z
@@ -150,9 +153,17 @@ export function visionChain(env: Env): string[] {
   return csv(env.VISION_MODELS)
 }
 
-/** Modelo de TRANSCRIPCIÓN (STT, /audio/transcriptions). `TRANSCRIBE_MODEL` explícito o undefined → STT OFF. */
-export function transcribeModel(env: Env): string | undefined {
-  return env.TRANSCRIBE_MODEL?.trim() || undefined
+/** Cadena de TRANSCRIPCIÓN (STT, /audio/transcriptions). `TRANSCRIBE_MODELS` = csv → fallback CLIENT-SIDE:
+ *  el endpoint es single-model (no tiene el fallback server-side de OpenRouter que sí tiene el chat), así que
+ *  el adapter prueba cada modelo en orden hasta que uno transcriba. Vacía → STT OFF. */
+export function transcribeChain(env: Env): string[] {
+  return csv(env.TRANSCRIBE_MODELS)
+}
+
+/** Cadena del RESUMEN (chat). `SUMMARY_MODELS` = csv → fallback server-side (createModel). Vacía → el llamador
+ *  cae a la cola de la cadena de chat (modelo barato de respaldo). */
+export function summaryChain(env: Env): string[] {
+  return csv(env.SUMMARY_MODELS)
 }
 
 export interface SpeechEntry {

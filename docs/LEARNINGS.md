@@ -41,7 +41,7 @@ para no repetirlas en próximas sesiones. Una línea por aprendizaje, concreta.
 - **Multimodal (AI SDK v6) — decisión nativo-vs-normalizar por CONFIG, no por sniffing**: el core recibe un
   `LanguageModel` opaco y OpenRouter capa la cadena a 3 modelos server-side (`extraBody.models`) → el core NO
   sabe cuál respondió ni si soporta visión. Por eso la decisión se lee de config (`MULTIMODAL_NATIVE_IMAGES`)
-  y cada modalidad tiene su modelo EXPLÍCITO (`VISION_MODELS`/`TRANSCRIBE_MODEL`; sin cadena compartida ni
+  y cada modalidad tiene su modelo EXPLÍCITO (`VISION_MODELS`/`TRANSCRIBE_MODELS`; sin cadena compartida ni
   fallback al chat) — así la cadena de chat (barata/free) no tiene que ser vision-capaz y el invariante
   "siempre responde" no depende de visión.
   Parts en v6: `UserContent = string | Array<TextPart|ImagePart|FilePart>`; `FilePart {type:"file", data:
@@ -368,8 +368,8 @@ El código typecheckeó sin cambios de API salvo **dos rupturas reales**:
   del fetch; el core emite el `degraded` semántico. Dos niveles de la misma causa, no ruido.
 - **🔎 La observabilidad DIAGNOSTICÓ un bug real al instante (2026-06-14):** un audio por Telegram fallaba la
   transcripción sin rastro. Con el fix, el log reveló `transcribe failed status:400 "Model
-  openai/whisper-large-v3-turbo,google/chirp-3,... does not exist"`. **Causa:** `TRANSCRIBE_MODEL` se configuró
+  openai/whisper-large-v3-turbo,google/chirp-3,... does not exist"`. **Causa:** `TRANSCRIBE_MODELS` se configuró
   como **lista CSV** de modelos, pero el endpoint `/audio/transcriptions` espera **UN solo modelo** (a diferencia
   de `VISION_MODELS`/`SPEECH_MODELS`, que SÍ son cadenas con fallback) → OpenRouter rechaza la cadena entera.
   **Follow-up pendiente:** o el transcriber soporta cadena de fallback (como vision/speech), o se valida/documenta
-  que `TRANSCRIBE_MODEL` es un único modelo. (Bug aparte del de observabilidad; ver NEXT-STEPS.)
+  que `TRANSCRIBE_MODELS` es un único modelo. (Bug aparte del de observabilidad; ver NEXT-STEPS.)

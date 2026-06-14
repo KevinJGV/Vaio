@@ -163,7 +163,7 @@ ref:string; caption?:string }`; `TurnRecord += userAttachments?: StoredAttachmen
 
 ### Config / wiring
 > **Superado por Fase 2:** esta fase introdujo una cadena única `MULTIMODAL_MODELS` (nunca desplegada). La
-> Fase 2 la reemplazó por envs **por modalidad** (`VISION_MODELS`/`TRANSCRIBE_MODEL`/`SPEECH_MODELS`, cada uno
+> Fase 2 la reemplazó por envs **por modalidad** (`VISION_MODELS`/`TRANSCRIBE_MODELS`/`SPEECH_MODELS`, cada uno
 > explícito o OFF). Ver `## Fase 2`. Lo de abajo queda como registro histórico del primer corte.
 
 `config.ts` += `MULTIMODAL_MODELS` (csv, cap 3; default = 1er modelo de `OPENROUTER_MODELS` con warn),
@@ -190,7 +190,7 @@ camino; 400 solo si no hay texto NI attachments.
   default `[]` sin backfill.
 - Secret: el bot token arma URLs de descarga pero jamás se loguea (test lo verifica).
 - Constraint cadena-de-3: transcripción/visión usan su propia config (Fase 2: `VISION_MODELS`/
-  `TRANSCRIBE_MODEL`); el chat conserva su cadena barata/free. El modo nativo (opt-in
+  `TRANSCRIBE_MODELS`); el chat conserva su cadena barata/free. El modo nativo (opt-in
   `MULTIMODAL_NATIVE_IMAGES`) es la única vía que exige chat vision-capaz.
 
 ---
@@ -212,7 +212,7 @@ El `@openrouter/ai-sdk-provider` NO expone `transcription()/speech()/reranking()
 directo** → Vaio sigue **single-provider**. Slugs/precios: galería `openrouter.ai/models` (cambian mensual).
 
 ### Cambios de diseño
-- **Config por modalidad** (`config.ts`): `TRANSCRIBE_MODEL` (STT), `VISION_MODELS` (csv, chat+file-part),
+- **Config por modalidad** (`config.ts`): `TRANSCRIBE_MODELS` (STT), `VISION_MODELS` (csv, chat+file-part),
   `SPEECH_MODELS` (cadena TTS `model|voice|format`; voz omitida→"alloy", formato→"mp3"). **Cada modalidad es
   explícita o queda OFF** — NO hay `MULTIMODAL_MODELS` ni fallback implícito al modelo de chat (visión necesita
   un VLM y STT un modelo de `/audio/transcriptions`: un modelo compartido sería semánticamente incorrecto).

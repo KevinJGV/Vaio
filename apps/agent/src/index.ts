@@ -31,9 +31,10 @@ import {
   loadConfig,
   modelChain,
   speechChain,
+  summaryChain,
   telegramAllowedIds,
   telegramEnabled,
-  transcribeModel,
+  transcribeChain,
   visionChain,
 } from "./config.js"
 import { type Agent, createAgent } from "./core/agent.js"
@@ -104,28 +105,39 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
     logger.warn("Sin DATABASE_URL → sin memoria conversacional ni RAG.")
   }
   const model = createModel(env.OPENROUTER_API_KEY, models, logger, attribution)
-  // Resumidor: modelo barato. SUMMARY_MODEL o la cola de la cadena (el más barato/de respaldo).
-  const summaryModel =
-    env.SUMMARY_MODEL ?? models[models.length - 1] ?? models[0]
-  if (summaryModel) {
+  // Resumidor: cadena de SUMMARY_MODELS (fallback server-side); vacía → cola de la cadena de chat (respaldo barato).
+  const summaryModels = summaryChain(env)
+  const summaryFallback = models[models.length - 1] ?? models[0]
+  const summaryModelsResolved =
+    summaryModels.length > 0
+      ? summaryModels
+      : summaryFallback
+        ? [summaryFallback]
+        : []
+  if (summaryModelsResolved.length > 0) {
     summarizer = createSummarizer(
-      createModel(env.OPENROUTER_API_KEY, [summaryModel], logger, attribution)
+      createModel(
+        env.OPENROUTER_API_KEY,
+        summaryModelsResolved,
+        logger,
+        attribution
+      )
     )
   }
   // Comprensión de media POR MODALIDAD (cada una su modelo/endpoint; no la cadena de chat):
-  //  - STT: REST /audio/transcriptions con TRANSCRIBE_MODEL.
+  //  - STT: REST /audio/transcriptions con la cadena TRANSCRIBE_MODELS (fallback client-side).
   //  - Visión: chat+file-part con la cadena VISION_MODELS.
-  const sttModel = transcribeModel(env)
-  if (sttModel) {
+  const sttChain = transcribeChain(env)
+  if (sttChain.length > 0) {
     transcriber = createTranscriber(
       env.OPENROUTER_API_KEY,
       env.OPENROUTER_BASE_URL,
-      sttModel,
+      sttChain,
       logger,
       attribution
     )
   } else {
-    logger.warn("Sin TRANSCRIBE_MODEL → STT OFF.")
+    logger.warn("Sin TRANSCRIBE_MODELS → STT OFF.")
   }
   const visChain = visionChain(env)
   if (visChain.length > 0) {

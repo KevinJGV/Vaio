@@ -57,7 +57,7 @@ worktree** (una sola línea de trabajo, rama `feat/multimodal-input`). TDD en la
 ## Riesgos / a verificar en vivo
 
 - **Slugs/precios de modelos multimodales en OpenRouter** cambian mensual → verificar en `openrouter.ai/models`
-  al fijar `VISION_MODELS`/`TRANSCRIBE_MODEL`/`SPEECH_MODELS`. No hardcodear suposiciones de training.
+  al fijar `VISION_MODELS`/`TRANSCRIBE_MODELS`/`SPEECH_MODELS`. No hardcodear suposiciones de training.
 - **Tamaño de payloads base64** (web) vs límites del proxy/Hono → `MEDIA_MAX_BYTES` defensivo + nota en contrato.
 - **Costo**: audio siempre transcribe (barato); imagen nativa OFF por default (aísla el costo de vision).
 
@@ -66,7 +66,7 @@ worktree** (una sola línea de trabajo, rama `feat/multimodal-input`). TDD en la
 Misma feature, expansión pedida por Kevin para **construir la base completa** de multimodalidad. Detalle
 técnico (firmas, endpoints REST de OpenRouter, edge-cases) → design `## Fase 2`.
 
-**Entregables:** (1) envs por modalidad (`TRANSCRIBE_MODEL`/`VISION_MODELS`/`SPEECH_MODELS`, cada uno explícito
+**Entregables:** (1) envs por modalidad (`TRANSCRIBE_MODELS`/`VISION_MODELS`/`SPEECH_MODELS`, cada uno explícito
 o OFF; sin `MULTIMODAL_MODELS`); (2) STT por `POST /audio/transcriptions` (modelo dedicado); (3) **salida de voz (TTS)**
 por `POST /audio/speech` → Telegram `sendAudio`, con policy `shouldSpeak` (default texto; voz si entró voz o se
 pide); (4) grounding del prompt = declarar capacidades de E/S reales; (5) rerank = **documentado como pendiente

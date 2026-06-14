@@ -27,45 +27,52 @@ function audioFormat(mediaType: string): string {
   return sub // ogg, mp3, wav, webm, m4a, flac…
 }
 
-/** STT vía REST. `baseURL` ya incluye `/api/v1`; pegamos `/audio/transcriptions`. */
+/** STT vía REST. `baseURL` ya incluye `/api/v1`; pegamos `/audio/transcriptions`. `chain` = modelos a probar
+ *  en orden (fallback CLIENT-SIDE: el endpoint es single-model, no tiene el fallback server-side del chat). El
+ *  1º que transcribe gana; si todos fallan, lanza (el core degrada → evento `degraded`). */
 export function createTranscriber(
   apiKey: string,
   baseURL: string,
-  model: string,
+  chain: string[],
   logger: Logger,
   attribution?: Attribution
 ): Transcriber {
   return {
     async transcribe({ data, mediaType, locale = "es" }) {
-      const t0 = Date.now()
-      const res = await fetch(`${baseURL}/audio/transcriptions`, {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${apiKey}`,
-          "content-type": "application/json",
-          ...attributionHeaders(attribution),
-        },
-        body: JSON.stringify({
-          model,
-          input_audio: {
-            data: Buffer.from(data).toString("base64"),
-            format: audioFormat(mediaType),
+      const base64 = Buffer.from(data).toString("base64")
+      const format = audioFormat(mediaType)
+      let lastErr = "sin modelos de transcripción"
+      for (const model of chain) {
+        const t0 = Date.now()
+        const res = await fetch(`${baseURL}/audio/transcriptions`, {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${apiKey}`,
+            "content-type": "application/json",
+            ...attributionHeaders(attribution),
           },
-          language: locale,
-        }),
-      })
-      if (!res.ok) {
-        const body = await res.text().catch(() => "")
-        logger.warn(
-          { status: res.status, body: body.slice(0, 500) },
-          "transcribe failed"
-        )
-        throw new Error(`transcriptions ${res.status}`)
+          body: JSON.stringify({
+            model,
+            input_audio: { data: base64, format },
+            language: locale,
+          }),
+        })
+        if (!res.ok) {
+          const body = await res.text().catch(() => "")
+          lastErr = `transcriptions ${res.status}`
+          logger.warn(
+            { model, status: res.status, body: body.slice(0, 500) },
+            "transcribe failed → siguiente en la cadena"
+          )
+          continue
+        }
+        const json = (await res.json()) as { text?: string }
+        // Observabilidad: qué modelo de la cadena sirvió (con fallback, no siempre el primario) + latencia.
+        logger.info({ model, latencyMs: Date.now() - t0 }, "media.transcribe")
+        return (json.text ?? "").trim()
       }
-      const json = (await res.json()) as { text?: string }
-      // Observabilidad: STT usa un modelo fijo (TRANSCRIBE_MODEL), sin fallback → sabemos cuál fue.
-      logger.info({ model, latencyMs: Date.now() - t0 }, "media.transcribe")
-      return (json.text ?? "").trim()
+      // Toda la cadena falló → lanza; el core lo captura (onDegrade) y degrada con la causa.
+      throw new Error(lastErr)
     },
   }
 }

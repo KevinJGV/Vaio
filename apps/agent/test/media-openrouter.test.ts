@@ -44,7 +44,7 @@ describe("createTranscriber (REST /audio/transcriptions)", () => {
     const t = createTranscriber(
       "SECRET-KEY",
       "https://openrouter.ai/api/v1",
-      "stt/model",
+      ["stt/model"],
       log
     )
     const out = await t.transcribe({
@@ -70,7 +70,7 @@ describe("createTranscriber (REST /audio/transcriptions)", () => {
         .format
       return new Response(JSON.stringify({ text: "x" }), { status: 200 })
     }) as typeof fetch
-    await createTranscriber("k", "https://or/api/v1", "m", log).transcribe({
+    await createTranscriber("k", "https://or/api/v1", ["m"], log).transcribe({
       data,
       mediaType: "audio/mpeg",
     })
@@ -81,7 +81,7 @@ describe("createTranscriber (REST /audio/transcriptions)", () => {
     globalThis.fetch = (async () =>
       new Response("nope", { status: 401 })) as typeof fetch
     await expect(
-      createTranscriber("k", "https://or/api/v1", "m", log).transcribe({
+      createTranscriber("k", "https://or/api/v1", ["m"], log).transcribe({
         data,
         mediaType: "audio/ogg",
       })
@@ -99,13 +99,32 @@ describe("createTranscriber (REST /audio/transcriptions)", () => {
     globalThis.fetch = (async () =>
       new Response("rate limited", { status: 429 })) as typeof fetch
     await expect(
-      createTranscriber("k", "https://or/api/v1", "m", spy).transcribe({
+      createTranscriber("k", "https://or/api/v1", ["m"], spy).transcribe({
         data,
         mediaType: "audio/ogg",
       })
     ).rejects.toThrow()
     expect(warns[0]).toMatchObject({ status: 429 })
     expect(String(warns[0]?.body)).toContain("rate limited")
+  })
+
+  it("cadena: el 1er modelo falla (400) → prueba el 2º (fallback client-side)", async () => {
+    const used: string[] = []
+    globalThis.fetch = (async (_u: string, init?: RequestInit) => {
+      const model = JSON.parse(String(init?.body)).model as string
+      used.push(model)
+      return model === "bad/model"
+        ? new Response("does not exist", { status: 400 })
+        : new Response(JSON.stringify({ text: "transcrito" }), { status: 200 })
+    }) as typeof fetch
+    const out = await createTranscriber(
+      "k",
+      "https://or/api/v1",
+      ["bad/model", "good/model"],
+      log
+    ).transcribe({ data, mediaType: "audio/ogg" })
+    expect(out).toBe("transcrito")
+    expect(used).toEqual(["bad/model", "good/model"]) // probó en orden hasta que uno sirvió
   })
 })
 

@@ -29,18 +29,18 @@
 > **Observabilidad de fallos silenciosos — MERGEADA en `main`** (2026-06-14): TraceEvent `degraded` +
 > `reportDegraded` + `onDegrade` (core puro) + barrido de adapters. e2e diagnosticó un bug real. Detalle → Historial.
 > **Foco actual:** **uniformar el parseo de fallback en TODOS los env de modelos** (el bug que la observabilidad
-> destapó: `TRANSCRIBE_MODEL` no acepta cadena CSV como `VISION_MODELS`/`SPEECH_MODELS`). Ver WIP abajo.
+> destapó: `TRANSCRIBE_MODELS` no acepta cadena CSV como `VISION_MODELS`/`SPEECH_MODELS`). Ver WIP abajo.
 > **Después / diferido:** Nivel C (scheduler + push proactivo) y/o `escalate` (Fase 2); el portafolio va DESPUÉS.
 
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
 - [~] **Uniformar el parseo de fallback en TODOS los env de modelos** (foco 2026-06-14, descubierto por la
-  observabilidad). **Bug detonante:** `TRANSCRIBE_MODEL` se manda al endpoint `/audio/transcriptions` (que espera
+  observabilidad). **Bug detonante:** `TRANSCRIBE_MODELS` se manda al endpoint `/audio/transcriptions` (que espera
   UN modelo) tal cual; con una lista CSV → OpenRouter `400 "Model … does not exist"` → TODO audio falla. **Alcance
-  (Kevin):** que `TRANSCRIBE_MODEL` acepte **cadena de fallback** como `VISION_MODELS`/`SPEECH_MODELS`, **y revisar
+  (Kevin):** que `TRANSCRIBE_MODELS` acepte **cadena de fallback** como `VISION_MODELS`/`SPEECH_MODELS`, **y revisar
   TODOS los env de modelos** (`OPENROUTER_API_KEY`/cadena de chat, `VISION_MODELS`, `SPEECH_MODELS`,
-  `TRANSCRIBE_MODEL`, `EMBEDDINGS_MODEL`, `SUMMARY_MODEL`) para que el fallback se parsee/aplique consistente.
+  `TRANSCRIBE_MODELS`, `EMBEDDINGS_MODEL`, `SUMMARY_MODELS`) para que el fallback se parsee/aplique consistente.
   Decisión de ejecución: directo (cambio acotado en `config.ts` + el transcriber; `systematic-debugging` ya dio la
   causa → no requiere brainstorming). TDD en el parseo (lógica pura).
 > **Diferido/registrado (no es WIP, vive en su fase):** norte **"Vaio se nutre solo"** — fuentes **CRUDAS
@@ -67,7 +67,7 @@ que dejó de tener `catch {}` ciego; distinción "puerto null=off ≠ fallo"). *
 (status+body), neon-memory (query-emb vacío), sources (body-en-Error), speech (tts vacío), trace-composite (sink
 roto), telegram (webhook no-JSON); `embeddings` ya propagaba el status. **171 tests** (151 agente + 20 compress);
 6 tareas inline. **e2e real ✅** (audio basura → `transcribe failed status:400` + evento `degraded`, HTTP 200) que
-**diagnosticó al instante un bug real**: `TRANSCRIBE_MODEL` configurado como CSV → 400 (ver WIP "uniformar fallback").
+**diagnosticó al instante un bug real**: `TRANSCRIBE_MODELS` configurado como CSV → 400 (ver WIP "uniformar fallback").
 Specs → [`…-backend-failure-observability-design.md`](superpowers/specs/2026-06-14-backend-failure-observability-design.md)
 · [`…-plan.md`](superpowers/specs/2026-06-14-backend-failure-observability-plan.md). **Decisión de diseño:** `emit`
 ya loguea vía el sink → `reportDegraded` solo emite (no duplica log). **Futuro:** alertas/métricas sobre `degraded`.
@@ -132,7 +132,7 @@ conversaciones, `media.*` como TraceEvent, enriquecer `messages`, retención/TTL
 contrato de entrada multimodal (audio/voz + imágenes), estrategia híbrida (puertos `Transcriber`/
 `MediaUnderstanding` + parts nativos por flag `MULTIMODAL_NATIVE_IMAGES`), núcleo puro `core/modality`,
 Telegram normalize+descarga (token nunca en logs), persistencia texto-derivado+ref (`messages.attachments`
-jsonb, migración `0002`). **Fase 2:** modelos POR MODALIDAD (`VISION_MODELS`/`TRANSCRIBE_MODEL`/`SPEECH_MODELS`,
+jsonb, migración `0002`). **Fase 2:** modelos POR MODALIDAD (`VISION_MODELS`/`TRANSCRIBE_MODELS`/`SPEECH_MODELS`,
 explícito o OFF), STT dedicado (`/audio/transcriptions`), **salida de voz/TTS** (`/audio/speech` → Telegram
 `sendAudio`, policy `shouldSpeak`, cadena `model|voice|format` con fallback client-side, pcm→WAV@24k),
 grounding del prompt (capacidades E/S), observabilidad de media (`media.vision/transcribe/speak` con el modelo
@@ -238,7 +238,7 @@ principal** en el core (hoy solo en el proxy); identidad **cross-canal** + facts
 **turnos proactivos** (no iniciados por el usuario).
 
 ### 🎙️ Evolución multimodal
-**✅ HECHO en Fase 2** (ver el WIP `[?]` arriba): **envs por modalidad** (`VISION_MODELS`/`TRANSCRIBE_MODEL`/
+**✅ HECHO en Fase 2** (ver el WIP `[?]` arriba): **envs por modalidad** (`VISION_MODELS`/`TRANSCRIBE_MODELS`/
 `SPEECH_MODELS`, cada uno explícito o OFF — sin `MULTIMODAL_MODELS`); **STT dedicado** (`/audio/transcriptions`);
 **salida de voz / TTS** (`/audio/speech` → Telegram, cadena `model|voice|format`, pcm→WAV); **grounding del
 prompt** = capacidades de E/S reales. Todo por OpenRouter REST → single-provider (ver `openrouter-api-surface`).

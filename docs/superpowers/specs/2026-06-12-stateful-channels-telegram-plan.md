@@ -98,7 +98,7 @@ adapters, Telegram, wiring, verificación. El plan los integra igual (escribir/r
 - [ ] **Verificar:** test (normalize) + typecheck. **Commit:** `feat(telegram): canal webhook (/tg) con allowlist + entrega no-streaming`.
 
 ### Fase 7 — Config + wiring  *(design §7, §9)*
-- [ ] `config.ts`: env `TELEGRAM_*`, `SUMMARY_MODEL`, `SUMMARY_THRESHOLD`, `CONVERSATION_RECENT_LIMIT` +
+- [ ] `config.ts`: env `TELEGRAM_*`, `SUMMARY_MODELS`, `SUMMARY_THRESHOLD`, `CONVERSATION_RECENT_LIMIT` +
       helpers `telegramAllowedIds`/`telegramEnabled` (+ casos en `config.test.ts`). `.env.example` documentado.
 - [ ] `index.ts`: construir `conversations`/`summarizer`/`capabilities`, inyectar en `createAgent`,
       montar `/tg` solo si `telegramEnabled`, ampliar el boot log (on/off). `buildApp` crece.
