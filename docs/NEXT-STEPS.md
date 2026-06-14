@@ -451,6 +451,23 @@ caveat+refresco-background, SIN reanudación), la **parte 2 del paso 3** (avisar
 nuevo), **`escalate`** (Fase 2) y **scheduler/recordatorios** (Nivel C). = el "Nivel C / turnos proactivos" ya anotado,
 ahora con forma concreta. **Su propio `brainstorming`→design+plan.** Relacionado: memoria `proactive-turns-vision`.
 
+### 🟠 Pendiente PRIORIZADO — "Freshness gate": no confiarse de embebidos viejos al responder sobre Kevin
+**Planteado por Kevin (2026-06-14).** El sync incremental (paso 3 parte 1) dejó la frescura como capacidad, PERO
+hoy es **oportunista (a criterio del modelo) y acotada a preguntas sobre "el estado ACTUAL del código/arquitectura
+de un repo"**. Para preguntas **sobre Kevin** (bio/stack/proyectos), Vaio **responde por inercia con los chunks
+indexados** — no chequea frescura. Gaps:
+- **A — cobertura parcial:** la frescura solo cubre `repo:*`. Las fuentes `cv/cv-en/me/contact/github/lastfm`
+  (batch `pnpm ingest`, scrape) **no tienen detección de staleness** → envejecen en silencio. `facts` tampoco.
+- **B — no determinístico:** aun para repos, depende de que el modelo decida llamar `checkRepoFreshness`.
+- **C — sin ritual forzado** + meta-conciencia solo implícita (Vaio ve los `source` tags, pero el prompt no le
+  declara "tu data sobre Kevin sale de estas fuentes").
+**Forma propuesta (su propio design+plan):** un **freshness gate determinístico dentro de `searchMemory`** — tras
+recuperar, detectar los `repo:*` de los chunks devueltos y, si alguno está stale (chequeo barato), sincronizar ANTES
+de devolver el contexto (no confiar en el criterio del modelo). Fuentes no-repo: su propia frescura (ETag/hash de
+contenido o re-ingesta periódica), o mover el contenido del portafolio al repo-sync y dejar de duplicar con el scrape.
+Meta-conciencia explícita en el prompt. ⚠️ Cuidar costo/latencia (gate solo cuando la respuesta dependa de un hecho;
+no en saludos) y no romper el Invariante #1.
+
 ### 🔵 Pendiente FUTURO — Neon como DB reactiva estilo Convex
 El **hot-sync de esquema** (`db:push`) ya da la DX de "el esquema sigue al código". La **reactividad real**
 (queries que se actualizan solas, suscripciones) es otra cosa: Neon/Postgres no la trae. Opciones a futuro
