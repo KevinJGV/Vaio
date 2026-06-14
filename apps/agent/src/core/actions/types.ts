@@ -8,6 +8,7 @@ import type { Tool } from "ai"
 import type { Compressor, Intensity } from "../../ports/compress.js"
 import type { Logger } from "../../ports/logger.js"
 import type { MemoryStore } from "../../ports/memory.js"
+import type { FactStore } from "../../ports/facts.js"
 import type { CapabilityProfile, Principal, ToolName } from "../capabilities.js"
 
 /** Ids base de traza del turno (se esparcen en cada evento emitido por una acción). */
@@ -33,6 +34,8 @@ export interface ActionContext {
   /** Tier 1: comprime los chunks de RAG antes de inyectarlos al modelo. null = sin comprimir. */
   compressor?: Compressor | null
   ragIntensity?: Intensity
+  /** Memoria de hechos curados (write-actions). null = sin DB → las acciones degradan. */
+  factStore?: FactStore | null
 }
 
 /** Descriptor de una acción: metadata de gating + cómo construir su tool del AI SDK.

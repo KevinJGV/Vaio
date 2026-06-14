@@ -6,7 +6,7 @@
 import type { Channel } from "@vaio/contracts"
 
 /** Tools que el registry sabe construir. Unión extensible: sumar acciones futuras acá. */
-export type ToolName = "searchMemory"
+export type ToolName = "searchMemory" | "proposeFact" | "commitFact"
 
 export interface CapabilityProfile {
   channel: Channel
@@ -76,7 +76,7 @@ export function createCapabilityResolver(): CapabilityResolver {
         if (!principal.trusted) return untrustedTelegram()
         return {
           channel: "telegram",
-          allowedTools: ["searchMemory"],
+          allowedTools: ["searchMemory", "proposeFact", "commitFact"],
           memoryScope: { maxK: 8 },
           policyText: TELEGRAM_POLICY,
         }

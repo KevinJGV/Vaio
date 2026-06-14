@@ -108,4 +108,13 @@ describe("seam HITL — clearance 'owner' deniega en runtime", () => {
     const tools = buildTools(ctx(["searchMemory"], true), [built])
     expect(tools.searchMemory).toBeDefined()
   })
+
+  it("proposeFact/commitFact visibles solo si el perfil (owner) las habilita", () => {
+    const owner = buildTools(ctx(["searchMemory", "proposeFact", "commitFact"], true))
+    expect(owner.proposeFact).toBeDefined()
+    expect(owner.commitFact).toBeDefined()
+    const web = buildTools(ctx(["searchMemory"], false))
+    expect(web.proposeFact).toBeUndefined()
+    expect(web.commitFact).toBeUndefined()
+  })
 })

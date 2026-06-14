@@ -6,11 +6,13 @@
 
 import { type Tool, type ToolSet, tool } from "ai"
 import { z } from "zod"
+import { commitFact } from "./commit-fact.js"
+import { proposeFact } from "./propose-fact.js"
 import { searchMemory } from "./search-memory.js"
 import type { ActionContext, ActionDescriptor } from "./types.js"
 
 /** Único lugar donde se listan las acciones que el harness sabe construir. */
-export const ACTIONS: ActionDescriptor[] = [searchMemory]
+export const ACTIONS: ActionDescriptor[] = [searchMemory, proposeFact, commitFact]
 
 /** ¿El principal cumple el clearance de la acción? */
 function meetsClearance(
