@@ -15,6 +15,7 @@ import {
   createTranscriber,
 } from "./adapters/media-openrouter.js"
 import { createConversationStore } from "./adapters/neon-conversation.js"
+import { createFactStore } from "./adapters/neon-facts.js"
 import { createMemoryStore } from "./adapters/neon-memory.js"
 import { createModel } from "./adapters/openrouter.js"
 import { createSpeechSynthesizer } from "./adapters/speech-openrouter.js"
@@ -37,6 +38,7 @@ import {
 } from "./config.js"
 import { type Agent, createAgent } from "./core/agent.js"
 import type { ConversationStore } from "./ports/conversation.js"
+import type { FactStore } from "./ports/facts.js"
 import type { MediaUnderstanding, Transcriber } from "./ports/media.js"
 import type { MemoryStore } from "./ports/memory.js"
 import type { SpeechSynthesizer } from "./ports/speech.js"
@@ -70,6 +72,7 @@ const compressor = env.COMPRESS_ENABLED ? createCompressor() : null
 let agent: Agent | null = null
 let ragEnabled = false
 let conversations: ConversationStore | null = null
+let factStore: FactStore | null = null
 let summarizer: Summarizer | null = null
 let transcriber: Transcriber | null = null
 let mediaUnderstanding: MediaUnderstanding | null = null
@@ -90,6 +93,7 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
         dimensions: EMBEDDING_DIM,
       })
       memory = createMemoryStore(db, embedder)
+      factStore = createFactStore(db, embedder)
       ragEnabled = true
     } else {
       logger.warn(
@@ -135,6 +139,7 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
   agent = createAgent({
     model,
     memory,
+    factStore,
     conversations,
     summarizer,
     compressor,
@@ -209,6 +214,7 @@ logger.info(
     port: env.PORT,
     chat: agent !== null,
     rag: ragEnabled,
+    facts: factStore != null,
     conversations: conversations !== null,
     summarizer: summarizer !== null,
     compress: compressor !== null,
