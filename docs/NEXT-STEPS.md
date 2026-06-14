@@ -23,33 +23,25 @@
 > **Harness de tools (eje 2) — MERGEADO en `main`** (2026-06-13): registry de acciones (`core/actions/`) + gating
 > de 2 capas (canal oculta / principal deniega) + seam HITL delgado; `searchMemory` migrado; `denied?` en
 > `tool.result`. Detalle → Historial. **Sin WIP abierto.**
-> **saveFact (curación) + HITL persistido — INFRA EN RAMA** (2026-06-13, `feat/savefact-curation-hitl`, pend.
-> verificación de Kevin: migración `0004` + e2e por Telegram + merge): 1ª write-action sobre el harness; tabla
-> `facts` bi-temporal; ver la lista WIP abajo.
-> **Foco / "go" pendiente (próximo paso):** sobre esta base, el **Nivel C** (scheduler + push proactivo → Vaio
-> te pregunta primero por Telegram para cerrar pendientes) y/o `escalate` (Fase 2). **El portafolio va DESPUÉS.**
+> **saveFact (curación) + HITL persistido — MERGEADO en `main`** (2026-06-14): 1ª write-action sobre el harness
+> (`proposeFact`/`commitFact`, owner-only); tabla `facts` bi-temporal; `searchMemory` mergea documents+facts.
+> Verificado por Kevin (flujo owner e2e). Detalle → Historial.
+> **Foco actual:** **observabilidad de fallos silenciosos del backend** (barrido amplio — arranca con
+> `brainstorming`). Disparador: una transcripción de audio que falló sin dejar log de la causa (ver WIP abajo).
+> **Después / diferido:** Nivel C (scheduler + push proactivo) y/o `escalate` (Fase 2); el portafolio va DESPUÉS.
 
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [?] **saveFact (curación) + HITL persistido + facts bi-temporal** (rama `feat/savefact-curation-hitl`,
-  2026-06-13). 1ª **write-action** sobre el harness: `proposeFact`/`commitFact` (2-tool, HITL estructural —
-  commit exige un pending id real), tabla `facts` **bi-temporal** (`0004`, esquema día 1, motor mínimo:
-  pending→confirmed + invalidar≠borrar), `searchMemory` mergea `documents`+`facts` confirmados (`unionAll`),
-  **retomar pendientes** en el prompt (Nivel B: la propuesta sobrevive al corte de charla, best-effort), policy
-  del owner actualizada. owner-only (gating 2 capas verificado). **Fuera de alcance:** Nivel C (scheduler/push
-  proactivo), `escalate`, dedup/adjudicación, extracción automática. **166 tests** (146 agente + 20 compress);
-  typecheck/biome/build limpios; **review final ✅** (8 tareas subagent-driven). Par de specs →
-  [`2026-06-13-savefact-curation-hitl-design.md`](superpowers/specs/2026-06-13-savefact-curation-hitl-design.md)
-  · [`…-plan.md`](superpowers/specs/2026-06-13-savefact-curation-hitl-plan.md). **✅ Verificado por Kevin
-  (2026-06-14): probado y funcional** (migración `0004` aplicada; flujo owner e2e por Telegram). **Queda solo el
-  merge a `main`** (luego → Historial).
-- [ ] **Errores del backend más explícitos / observabilidad de fallos silenciosos** (hallazgo 2026-06-14; vive en
-  el path **multimodal**, ya en `main` — NO es de saveFact). Al probar con un visitante mandando un **audio** por
-  Telegram, la transcripción falló y el turno respondió `[audio no procesable]` **sin ningún log del error real**
-  (causa invisible → imposible depurar). Foco propuesto: (a) entender por qué se tragó el error de STT
-  (systematic-debugging), (b) endurecer la observabilidad de fallos (que las degradaciones de media emitan la
-  CAUSA —status HTTP/excepción— no solo el marcador). Espera definir alcance con Kevin.
+- [~] **Observabilidad de fallos silenciosos del backend — BARRIDO AMPLIO** (foco actual, 2026-06-14; arranca con
+  `brainstorming`). **Causa raíz ya diagnosticada** (systematic-debugging): el path de media degrada **a ciegas** —
+  `core/modality.ts:108-118` `safe()` tiene un `catch {}` que devuelve `null` SIN loguear/emitir; el adapter
+  `media-openrouter.ts:57-59` lanza `transcriptions <status>` pero no loguea el status/detalle. Por eso un audio
+  de un visitante respondió `[audio no procesable]` sin rastro (ni `media.transcribe` en el log). El patrón
+  correcto YA existe en `searchMemory` (catch → `logger.error` + `tool.result {ok:false}`); falta replicarlo.
+  **Alcance (def. con Kevin):** además de media, **auditar TODOS los catch silenciosos del backend** + definir una
+  política/patrón reusable de observabilidad de fallos (emitir la CAUSA, persistir en `trace_events` donde aplique).
+  Produce su par design+plan.
 > **Diferido/registrado (no es WIP, vive en su fase):** visión **"Vaio se nutre solo"** (memoria viva
 > auto-curada + self-awareness + fuentes crudas/tiempo-real) → `SPEC.md` §"Vaio se nutre solo" + memoria
 > `vaio-self-nourishing-memory-vision`; corresponde al **harness (eje 2)** + Fase 2 `facts` + Fase 3 grafos.
@@ -64,6 +56,21 @@
 ---
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
+
+**🟢 saveFact (CURACIÓN) + HITL PERSISTIDO + facts BI-TEMPORAL — MERGEADO en `main`** (2026-06-14, ex
+`feat/savefact-curation-hitl`). 1ª **write-action** sobre el harness, primer paso de "Vaio se nutre solo".
+`proposeFact`/`commitFact` (owner-only, gating de 2 capas): Vaio propone un hecho sobre Kevin y, tras
+confirmación, lo escribe. **HITL estructural** (`commitFact` exige un pending id real → no se fabrica inline).
+Tabla `facts` **bi-temporal** (migración `0004`; status pending/confirmed/rejected + valid/invalid + tx time;
+invalidar≠borrar; motor mínimo). `searchMemory` mergea `documents`+`facts` confirmados (`unionAll`, ranking
+global). **Propuestas persistidas (Nivel B)**: sobreviven al corte de charla y Vaio las retoma en el prompt
+(carga best-effort). Policy del owner actualizada para reflejar las tools. **166 tests** (146 agente + 20
+compress); typecheck/biome/build limpios; **8 tareas subagent-driven** + review final ✅. Verificado por Kevin
+(flujo owner e2e). Specs → [`…-savefact-curation-hitl-design.md`](superpowers/specs/2026-06-13-savefact-curation-hitl-design.md)
+· [`…-plan.md`](superpowers/specs/2026-06-13-savefact-curation-hitl-plan.md). **Pendiente futuro:** Nivel C
+(scheduler + push proactivo), `escalate` (Fase 2), dedup/adjudicación de conflictos, extracción automática
+post-conversación, facts desde web. ⚠️ Deploy: la migración `0004` debe aplicarse ANTES del código nuevo
+(`searchMemory` referencia `facts`); el release step la aplica.
 
 **🟢 HARNESS DE TOOLS (eje 2) — SOLO INFRA + seam HITL delgado — MERGEADO en `main`** (2026-06-13, ex
 `feat/tools-harness-registry`). Generaliza `ToolName` (unión cerrada de 1 tool) → **registry de acciones**
