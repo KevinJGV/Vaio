@@ -39,9 +39,13 @@
   `media-openrouter.ts:57-59` lanza `transcriptions <status>` pero no loguea el status/detalle. Por eso un audio
   de un visitante respondió `[audio no procesable]` sin rastro (ni `media.transcribe` en el log). El patrón
   correcto YA existe en `searchMemory` (catch → `logger.error` + `tool.result {ok:false}`); falta replicarlo.
-  **Alcance (def. con Kevin):** además de media, **auditar TODOS los catch silenciosos del backend** + definir una
-  política/patrón reusable de observabilidad de fallos (emitir la CAUSA, persistir en `trace_events` donde aplique).
-  Produce su par design+plan.
+  **Alcance (def. con Kevin):** TraceEvent nuevo `degraded {component,reason,detail}` + helper `reportDegraded`
+  (log + traza) + callback `onDegrade` para el core puro (`modality`) + barrido de los ~17 fallos del inventario.
+  Dos niveles: log SIEMPRE; TraceEvent persistido donde afecte la respuesta. Par de specs (rama
+  `feat/backend-failure-observability`) →
+  [`2026-06-14-backend-failure-observability-design.md`](superpowers/specs/2026-06-14-backend-failure-observability-design.md)
+  · [`…-plan.md`](superpowers/specs/2026-06-14-backend-failure-observability-plan.md). Estado: diseño+plan
+  escritos; implementación por arrancar (6 tareas TDD).
 > **Diferido/registrado (no es WIP, vive en su fase):** norte **"Vaio se nutre solo"** — fuentes **CRUDAS
 > (código/repos, NO webs)** + self-awareness + tiempo real. **Paso 4 (curación/`saveFact`) ✅ hecho; pasos 1-3
 > (lo crudo) pendientes** → ítem rastreable en **§"🔵 Pendiente FUTURO — Vaio se nutre solo"** (abajo) +
