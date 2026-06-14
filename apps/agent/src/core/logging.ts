@@ -101,5 +101,13 @@ export function toLogRecord(event: TraceEvent, opts: RedactOptions): LogRecord {
       fields.where = event.where
       return { level: "error", msg: "turn.error", fields }
     }
+    case "degraded": {
+      // Degradación no-fatal: el turno siguió, pero un componente accesorio falló. component/reason
+      // SIEMPRE visibles (causa para depurar); `detail` (status/excepción) solo con logPrompts.
+      fields.component = event.component
+      fields.reason = event.reason
+      if (opts.logPrompts && event.detail !== undefined) fields.detail = event.detail
+      return { level: "error", msg: "degraded", fields }
+    }
   }
 }

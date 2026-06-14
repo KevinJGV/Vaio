@@ -90,6 +90,16 @@ export const traceEventSchema = z.discriminatedUnion("type", [
     message: z.string(),
     where: z.string(),
   }),
+  z.object({
+    ...base,
+    type: z.literal("degraded"),
+    /** Qué se degradó: "transcribe" | "vision" | "embeddings" | "tts" | "source" | … */
+    component: z.string(),
+    /** Causa corta, legible. SIEMPRE visible. */
+    reason: z.string(),
+    /** Detalle técnico (status/excepción). Se redacta según LOG_PROMPTS. */
+    detail: z.string().optional(),
+  }),
 ])
 
 export type TraceEvent = z.infer<typeof traceEventSchema>
