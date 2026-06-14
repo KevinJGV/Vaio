@@ -35,14 +35,14 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [~] **Uniformar el parseo de fallback en TODOS los env de modelos** (foco 2026-06-14, descubierto por la
-  observabilidad). **Bug detonante:** `TRANSCRIBE_MODELS` se manda al endpoint `/audio/transcriptions` (que espera
-  UN modelo) tal cual; con una lista CSV → OpenRouter `400 "Model … does not exist"` → TODO audio falla. **Alcance
-  (Kevin):** que `TRANSCRIBE_MODELS` acepte **cadena de fallback** como `VISION_MODELS`/`SPEECH_MODELS`, **y revisar
-  TODOS los env de modelos** (`OPENROUTER_API_KEY`/cadena de chat, `VISION_MODELS`, `SPEECH_MODELS`,
-  `TRANSCRIBE_MODELS`, `EMBEDDINGS_MODEL`, `SUMMARY_MODELS`) para que el fallback se parsee/aplique consistente.
-  Decisión de ejecución: directo (cambio acotado en `config.ts` + el transcriber; `systematic-debugging` ya dio la
-  causa → no requiere brainstorming). TDD en el parseo (lógica pura).
+- [?] **Uniformar el parseo de fallback en los env de modelos** (rama `fix/model-env-fallback`, 2026-06-14).
+  **`TRANSCRIBE_MODELS`** ahora csv → **fallback CLIENT-SIDE** en el transcriber (el endpoint `/audio/transcriptions`
+  es single-model; prueba cada uno en orden). **`SUMMARY_MODELS`** csv → fallback server-side. **`EMBEDDINGS_MODEL`**
+  queda ÚNICO a propósito (mezclar modelos = vectores incompatibles; documentado). Renombre a **plural** por
+  consistencia con `VISION_MODELS`/`SPEECH_MODELS` (schema + `.env`/`.env.example`). **173 tests** (153 agente + 20
+  compress); typecheck/biome/build limpios. **e2e ✅:** audio basura por `/chat` → prueba cada modelo en orden
+  (3 intentos con fallback), no el CSV entero; HTTP 200. **Pend. verificación de Kevin:** un audio REAL transcribe
+  (slugs válidos) + merge a `main`.
 > **Diferido/registrado (no es WIP, vive en su fase):** norte **"Vaio se nutre solo"** — fuentes **CRUDAS
 > (código/repos, NO webs)** + self-awareness + tiempo real. **Paso 4 (curación/`saveFact`) ✅ hecho; pasos 1-3
 > (lo crudo) pendientes** → ítem rastreable en **§"🔵 Pendiente FUTURO — Vaio se nutre solo"** (abajo) +

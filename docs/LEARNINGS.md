@@ -373,3 +373,16 @@ El código typecheckeó sin cambios de API salvo **dos rupturas reales**:
   de `VISION_MODELS`/`SPEECH_MODELS`, que SÍ son cadenas con fallback) → OpenRouter rechaza la cadena entera.
   **Follow-up pendiente:** o el transcriber soporta cadena de fallback (como vision/speech), o se valida/documenta
   que `TRANSCRIBE_MODELS` es un único modelo. (Bug aparte del de observabilidad; ver NEXT-STEPS.)
+
+### Fallback uniforme en los env de modelos (jun-2026)
+- **Dos tipos de fallback según el endpoint:** el **chat** (`OPENROUTER_MODELS`, `VISION_MODELS`, `SUMMARY_MODELS`)
+  usa el fallback **server-side** de OpenRouter (se le pasa la cadena `models[]` y él rutea). Los endpoints REST
+  **single-model** (`/audio/transcriptions` = `TRANSCRIBE_MODELS`, `/audio/speech` = `SPEECH_MODELS`) NO tienen
+  ese fallback → el adapter hace **fallback CLIENT-SIDE** (prueba cada modelo en orden hasta que uno responde).
+- **El bug que lo destapó:** `TRANSCRIBE_MODEL` (singular, viejo) hacía `.trim()` y mandaba la cadena CSV ENTERA
+  como un solo `model` → OpenRouter `400 "Model a,b,c does not exist"` → TODO audio fallaba. Lo expuso la
+  observabilidad (`degraded`/`transcribe failed` con el status). Fix: `transcribeChain` = csv + loop en el adapter.
+- **`EMBEDDINGS_MODEL` NO lleva fallback (a propósito):** la query debe embeberse con el MISMO modelo que indexó
+  los documentos; mezclar modelos da vectores incompatibles (distancia coseno sin sentido). Cambiarlo exige
+  reingestar. Es la excepción correcta, no un olvido.
+- **Convención:** env que aceptan cadena = **plural** (`*_MODELS`); el único modelo = **singular** (`EMBEDDINGS_MODEL`).
