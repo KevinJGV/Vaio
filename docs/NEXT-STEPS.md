@@ -41,11 +41,15 @@
   proactivo), `escalate`, dedup/adjudicación, extracción automática. **166 tests** (146 agente + 20 compress);
   typecheck/biome/build limpios; **review final ✅** (8 tareas subagent-driven). Par de specs →
   [`2026-06-13-savefact-curation-hitl-design.md`](superpowers/specs/2026-06-13-savefact-curation-hitl-design.md)
-  · [`…-plan.md`](superpowers/specs/2026-06-13-savefact-curation-hitl-plan.md). **Pend. verificación de Kevin:**
-  (a) aplicar la migración `0004` a Neon (⚠️ ANTES de desplegar el código — `searchMemory` referencia `facts`;
-  el release step la aplica), (b) **e2e del flujo owner por Telegram** (proponer→confirmar→recuperar; requiere
-  su Telegram + `OWNER_TELEGRAM_ID`) + merge a `main`. _Aún sin correr contra una DB real (unit-tested con fakes;
-  el adapter Neon/`unionAll` se validó por revisión del SQL, no e2e)._
+  · [`…-plan.md`](superpowers/specs/2026-06-13-savefact-curation-hitl-plan.md). **✅ Verificado por Kevin
+  (2026-06-14): probado y funcional** (migración `0004` aplicada; flujo owner e2e por Telegram). **Queda solo el
+  merge a `main`** (luego → Historial).
+- [ ] **Errores del backend más explícitos / observabilidad de fallos silenciosos** (hallazgo 2026-06-14; vive en
+  el path **multimodal**, ya en `main` — NO es de saveFact). Al probar con un visitante mandando un **audio** por
+  Telegram, la transcripción falló y el turno respondió `[audio no procesable]` **sin ningún log del error real**
+  (causa invisible → imposible depurar). Foco propuesto: (a) entender por qué se tragó el error de STT
+  (systematic-debugging), (b) endurecer la observabilidad de fallos (que las degradaciones de media emitan la
+  CAUSA —status HTTP/excepción— no solo el marcador). Espera definir alcance con Kevin.
 > **Diferido/registrado (no es WIP, vive en su fase):** visión **"Vaio se nutre solo"** (memoria viva
 > auto-curada + self-awareness + fuentes crudas/tiempo-real) → `SPEC.md` §"Vaio se nutre solo" + memoria
 > `vaio-self-nourishing-memory-vision`; corresponde al **harness (eje 2)** + Fase 2 `facts` + Fase 3 grafos.
