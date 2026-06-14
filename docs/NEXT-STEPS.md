@@ -30,7 +30,15 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- _(vacío — sin ítems abiertos)_
+- [~] **saveFact (curación) + HITL persistido + facts bi-temporal** (rama `feat/savefact-curation-hitl`,
+  2026-06-13). 1ª **write-action** sobre el harness: `proposeFact`/`commitFact` (2-tool, HITL estructural —
+  commit exige un pending id), tabla `facts` **bi-temporal** (esquema día 1, motor mínimo), `searchMemory`
+  mergea `documents`+`facts` confirmados (`unionAll`), y **retomar pendientes** en el prompt (Nivel B: la
+  propuesta sobrevive al corte de charla). owner-only (gating 2 capas). **Fuera de alcance:** Nivel C
+  (scheduler/push proactivo), `escalate`, dedup/adjudicación, extracción automática. Par de specs →
+  [`2026-06-13-savefact-curation-hitl-design.md`](superpowers/specs/2026-06-13-savefact-curation-hitl-design.md)
+  · [`…-plan.md`](superpowers/specs/2026-06-13-savefact-curation-hitl-plan.md). Estado: diseño+plan escritos;
+  implementación por arrancar (8 tareas TDD).
 > **Diferido/registrado (no es WIP, vive en su fase):** visión **"Vaio se nutre solo"** (memoria viva
 > auto-curada + self-awareness + fuentes crudas/tiempo-real) → `SPEC.md` §"Vaio se nutre solo" + memoria
 > `vaio-self-nourishing-memory-vision`; corresponde al **harness (eje 2)** + Fase 2 `facts` + Fase 3 grafos.
