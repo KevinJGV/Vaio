@@ -33,19 +33,23 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [~] **Observabilidad de fallos silenciosos del backend — BARRIDO AMPLIO** (foco actual, 2026-06-14; arranca con
-  `brainstorming`). **Causa raíz ya diagnosticada** (systematic-debugging): el path de media degrada **a ciegas** —
-  `core/modality.ts:108-118` `safe()` tiene un `catch {}` que devuelve `null` SIN loguear/emitir; el adapter
-  `media-openrouter.ts:57-59` lanza `transcriptions <status>` pero no loguea el status/detalle. Por eso un audio
-  de un visitante respondió `[audio no procesable]` sin rastro (ni `media.transcribe` en el log). El patrón
-  correcto YA existe en `searchMemory` (catch → `logger.error` + `tool.result {ok:false}`); falta replicarlo.
-  **Alcance (def. con Kevin):** TraceEvent nuevo `degraded {component,reason,detail}` + helper `reportDegraded`
-  (log + traza) + callback `onDegrade` para el core puro (`modality`) + barrido de los ~17 fallos del inventario.
-  Dos niveles: log SIEMPRE; TraceEvent persistido donde afecte la respuesta. Par de specs (rama
-  `feat/backend-failure-observability`) →
+- [?] **Observabilidad de fallos silenciosos del backend — BARRIDO AMPLIO** (rama `feat/backend-failure-observability`,
+  2026-06-14). TraceEvent nuevo `degraded {component,reason,detail}` + helper `reportDegraded` (emite; el sink
+  loguea —nivel error— y persiste) + callback `onDegrade` para el core puro (`modality`) + barrido de los fallos
+  del inventario (media-openrouter status+body; neon-memory query-emb vacío; sources body-en-Error; speech tts
+  vacío; trace-composite sink roto; telegram webhook no-JSON). `embeddings` ya propagaba el status (sin cambio).
+  Dos niveles: log SIEMPRE; TraceEvent persistido donde afecte la respuesta. **171 tests** (151 agente + 20
+  compress); typecheck/biome/build limpios; **6 tareas inline**. Par de specs →
   [`2026-06-14-backend-failure-observability-design.md`](superpowers/specs/2026-06-14-backend-failure-observability-design.md)
-  · [`…-plan.md`](superpowers/specs/2026-06-14-backend-failure-observability-plan.md). Estado: diseño+plan
-  escritos; implementación por arrancar (6 tareas TDD).
+  · [`…-plan.md`](superpowers/specs/2026-06-14-backend-failure-observability-plan.md). **e2e real ✅:** audio
+  basura por `/chat` → log `transcribe failed status:400` + evento `degraded` (HTTP 200, turno intacto) →
+  **diagnosticó el bug real del audio** (ver ítem ↓). **Pend. verificación de Kevin + merge a `main`.**
+- [ ] **Bug — `TRANSCRIBE_MODEL` como lista CSV no funciona** (descubierto 2026-06-14 por la observabilidad ↑).
+  El endpoint `/audio/transcriptions` espera **UN solo modelo**; con `TRANSCRIBE_MODEL` = CSV de varios, OpenRouter
+  responde `400 "Model … does not exist"` → TODO audio falla la transcripción. A diferencia de `VISION_MODELS`/
+  `SPEECH_MODELS` (cadenas con fallback), el transcriber manda el string tal cual. **Fix (def. con Kevin):** o el
+  transcriber soporta cadena de fallback (como vision/speech), o se valida/documenta que es un único modelo +
+  corregir el `.env`/Railway. Cambio chico; su propio par o fix directo.
 > **Diferido/registrado (no es WIP, vive en su fase):** norte **"Vaio se nutre solo"** — fuentes **CRUDAS
 > (código/repos, NO webs)** + self-awareness + tiempo real. **Paso 4 (curación/`saveFact`) ✅ hecho; pasos 1-3
 > (lo crudo) pendientes** → ítem rastreable en **§"🔵 Pendiente FUTURO — Vaio se nutre solo"** (abajo) +

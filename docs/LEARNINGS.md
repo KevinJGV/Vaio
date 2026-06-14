@@ -352,3 +352,24 @@ El código typecheckeó sin cambios de API salvo **dos rupturas reales**:
   **pero el RAG entero queda ciego** (no solo facts, también documents). El `railway.json preDeployCommand`
   (`db:migrate:prod`) garantiza el orden en deploy normal; el riesgo real es un **rollback del código sin
   rollback de la migración** o un dev contra DB sin migrar. Migrar SIEMPRE antes de desplegar el código nuevo.
+
+### Observabilidad de fallos silenciosos (jun-2026)
+- **Patrón `degraded`**: TraceEvent nuevo `{component, reason, detail?}` para fallos **NO-fatales** (el turno sigue,
+  pero un componente accesorio falló) — distinto de `turn.error` (turno roto) y `tool.result`. `reportDegraded`
+  (core/observability.ts) lo **emite**; el sink (toLogRecord) lo loguea (nivel error, para que resalte) y lo
+  persiste en `trace_events`. **Clave de diseño:** NO duplicar log + emit — `emit` YA loguea vía el sink stdout
+  (toLogRecord). `reportDegraded` solo emite; el log sale del sink. (El plan original tenía un `logger.warn`
+  redundante; se quitó al ver que el sink ya loguea todo TraceEvent.)
+- **Núcleo puro reporta vía callback:** `core/modality.ts` (sin logger/emit por diseño) recibe un `onDegrade(d)`
+  que `agent.ts` cablea con `reportDegraded({emit, ids})`. El core queda agnóstico. **Distinción honesta:** puerto
+  `null` (off por config) NO es degradación → no se reporta; solo un `throw` real (fallo) dispara `onDegrade`.
+- **`detail` redactado** según `LOG_PROMPTS` (puede traer body de error); `component`/`reason` siempre visibles.
+- **Doble registro deliberado:** el adapter (media-openrouter) loguea el detalle técnico (status+body) en el punto
+  del fetch; el core emite el `degraded` semántico. Dos niveles de la misma causa, no ruido.
+- **🔎 La observabilidad DIAGNOSTICÓ un bug real al instante (2026-06-14):** un audio por Telegram fallaba la
+  transcripción sin rastro. Con el fix, el log reveló `transcribe failed status:400 "Model
+  openai/whisper-large-v3-turbo,google/chirp-3,... does not exist"`. **Causa:** `TRANSCRIBE_MODEL` se configuró
+  como **lista CSV** de modelos, pero el endpoint `/audio/transcriptions` espera **UN solo modelo** (a diferencia
+  de `VISION_MODELS`/`SPEECH_MODELS`, que SÍ son cadenas con fallback) → OpenRouter rechaza la cadena entera.
+  **Follow-up pendiente:** o el transcriber soporta cadena de fallback (como vision/speech), o se valida/documenta
+  que `TRANSCRIBE_MODEL` es un único modelo. (Bug aparte del de observabilidad; ver NEXT-STEPS.)
