@@ -108,6 +108,14 @@ flujo, no un extra:
 **Por cada tarea (loop):**
 1. **Entender la intención**, no solo la instrucción literal. Si es algo creativo/nuevo grande
    → diseña/actualiza el spec ANTES de codear (spec-driven). Tareas chicas → directo.
+   **Disciplina de skills + subagentes (NO opcional, decisión consciente y VISIBLE):** en CADA tarea no
+   trivial **considerá explícitamente** `superpowers:brainstorming` (antes de diseñar) y `writing-plans`
+   —sus rituales **incluyen desplegar subagentes**— y **default a aprovechar subagentes** para trabajo
+   grande/independiente/paralelo (exploración amplia + perspectivas de diseño en paralelo + revisión
+   adversarial), como se hizo en el desarrollo del portafolio. **Si decidís saltarlas** (diseño ya hecho,
+   cambio chico/acoplado, secuencial) → **decílo EXPLÍCITAMENTE con la razón + tu punto de vista** (que se
+   vea que fue una elección, no un olvido); nunca lo resuelvas en silencio. Default de despliegue: independiente/
+   paralelo → subagentes; secuencial/acoplado/chico → directo (más barato, "pocos $/mes") — y **decí cuál elegís**.
 2. **context7 ANTES de tocar APIs de librerías** (ver sección). No confíes en memoria de
    entrenamiento: las versiones y, sobre todo, **el catálogo/precios de modelos cambian
    mensualmente y están más allá del corte de conocimiento**.
@@ -187,6 +195,13 @@ estado + siguiente paso (+ índice a specs); `LEARNINGS.md` = aprendizajes de de
 - **`subagent-driven-development`** — ejecutar tareas independientes del plan vía subagentes.
 - Regla: trabajo independiente/paralelo → subagentes; secuencial/acoplado → directo. No paralelizar
   cosas que comparten estado o dependen entre sí.
+- **No solo para ejecutar: también para DISEÑAR.** En features grandes/inciertas, desplegá agentes en
+  paralelo en la fase de diseño (exploración del código + 2-3 perspectivas de diseño + revisión adversarial)
+  — como se hizo en el desarrollo del portafolio. `brainstorming`/`writing-plans` ya orquestan esto en sus
+  rituales: **invocá la skill** y dejá que despliegue, no rehagas la actividad a mano.
+- **La elección es VISIBLE:** decí siempre si vas con subagentes o directo y por qué. Si saltás las skills o no
+  desplegás agentes en algo grande, **justificá y dá tu punto de vista** — que se vea que fue decisión
+  consciente, no que olvidaste la disciplina. (Default: en lo grande, inclinarse a desplegar.)
 
 **Diseño de rutas (API + routing del agente) — diseñar ANTES de codear:**
 - Superficie HTTP actual: `POST /chat` (stream, auth `x-agent-key`), `GET /health`. Planeadas
