@@ -26,30 +26,23 @@
 > **saveFact (curación) + HITL persistido — MERGEADO en `main`** (2026-06-14): 1ª write-action sobre el harness
 > (`proposeFact`/`commitFact`, owner-only); tabla `facts` bi-temporal; `searchMemory` mergea documents+facts.
 > Verificado por Kevin (flujo owner e2e). Detalle → Historial.
-> **Foco actual:** **observabilidad de fallos silenciosos del backend** (barrido amplio — arranca con
-> `brainstorming`). Disparador: una transcripción de audio que falló sin dejar log de la causa (ver WIP abajo).
+> **Observabilidad de fallos silenciosos — MERGEADA en `main`** (2026-06-14): TraceEvent `degraded` +
+> `reportDegraded` + `onDegrade` (core puro) + barrido de adapters. e2e diagnosticó un bug real. Detalle → Historial.
+> **Foco actual:** **uniformar el parseo de fallback en TODOS los env de modelos** (el bug que la observabilidad
+> destapó: `TRANSCRIBE_MODEL` no acepta cadena CSV como `VISION_MODELS`/`SPEECH_MODELS`). Ver WIP abajo.
 > **Después / diferido:** Nivel C (scheduler + push proactivo) y/o `escalate` (Fase 2); el portafolio va DESPUÉS.
 
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [?] **Observabilidad de fallos silenciosos del backend — BARRIDO AMPLIO** (rama `feat/backend-failure-observability`,
-  2026-06-14). TraceEvent nuevo `degraded {component,reason,detail}` + helper `reportDegraded` (emite; el sink
-  loguea —nivel error— y persiste) + callback `onDegrade` para el core puro (`modality`) + barrido de los fallos
-  del inventario (media-openrouter status+body; neon-memory query-emb vacío; sources body-en-Error; speech tts
-  vacío; trace-composite sink roto; telegram webhook no-JSON). `embeddings` ya propagaba el status (sin cambio).
-  Dos niveles: log SIEMPRE; TraceEvent persistido donde afecte la respuesta. **171 tests** (151 agente + 20
-  compress); typecheck/biome/build limpios; **6 tareas inline**. Par de specs →
-  [`2026-06-14-backend-failure-observability-design.md`](superpowers/specs/2026-06-14-backend-failure-observability-design.md)
-  · [`…-plan.md`](superpowers/specs/2026-06-14-backend-failure-observability-plan.md). **e2e real ✅:** audio
-  basura por `/chat` → log `transcribe failed status:400` + evento `degraded` (HTTP 200, turno intacto) →
-  **diagnosticó el bug real del audio** (ver ítem ↓). **Pend. verificación de Kevin + merge a `main`.**
-- [ ] **Bug — `TRANSCRIBE_MODEL` como lista CSV no funciona** (descubierto 2026-06-14 por la observabilidad ↑).
-  El endpoint `/audio/transcriptions` espera **UN solo modelo**; con `TRANSCRIBE_MODEL` = CSV de varios, OpenRouter
-  responde `400 "Model … does not exist"` → TODO audio falla la transcripción. A diferencia de `VISION_MODELS`/
-  `SPEECH_MODELS` (cadenas con fallback), el transcriber manda el string tal cual. **Fix (def. con Kevin):** o el
-  transcriber soporta cadena de fallback (como vision/speech), o se valida/documenta que es un único modelo +
-  corregir el `.env`/Railway. Cambio chico; su propio par o fix directo.
+- [~] **Uniformar el parseo de fallback en TODOS los env de modelos** (foco 2026-06-14, descubierto por la
+  observabilidad). **Bug detonante:** `TRANSCRIBE_MODEL` se manda al endpoint `/audio/transcriptions` (que espera
+  UN modelo) tal cual; con una lista CSV → OpenRouter `400 "Model … does not exist"` → TODO audio falla. **Alcance
+  (Kevin):** que `TRANSCRIBE_MODEL` acepte **cadena de fallback** como `VISION_MODELS`/`SPEECH_MODELS`, **y revisar
+  TODOS los env de modelos** (`OPENROUTER_API_KEY`/cadena de chat, `VISION_MODELS`, `SPEECH_MODELS`,
+  `TRANSCRIBE_MODEL`, `EMBEDDINGS_MODEL`, `SUMMARY_MODEL`) para que el fallback se parsee/aplique consistente.
+  Decisión de ejecución: directo (cambio acotado en `config.ts` + el transcriber; `systematic-debugging` ya dio la
+  causa → no requiere brainstorming). TDD en el parseo (lógica pura).
 > **Diferido/registrado (no es WIP, vive en su fase):** norte **"Vaio se nutre solo"** — fuentes **CRUDAS
 > (código/repos, NO webs)** + self-awareness + tiempo real. **Paso 4 (curación/`saveFact`) ✅ hecho; pasos 1-3
 > (lo crudo) pendientes** → ítem rastreable en **§"🔵 Pendiente FUTURO — Vaio se nutre solo"** (abajo) +
@@ -65,6 +58,19 @@
 ---
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
+
+**🟢 OBSERVABILIDAD DE FALLOS SILENCIOSOS — MERGEADO en `main`** (2026-06-14, ex `feat/backend-failure-observability`).
+Que todo fallo/degradación del backend deje rastro de su causa (antes degradaba "a ciegas"). TraceEvent nuevo
+**`degraded {component, reason, detail}`** (fallo no-fatal: el turno sigue) + helper **`reportDegraded`** (emite; el
+sink loguea a nivel error y persiste en `trace_events`) + callback **`onDegrade`** para el núcleo puro (`modality`,
+que dejó de tener `catch {}` ciego; distinción "puerto null=off ≠ fallo"). **Barrido** de adapters: media-openrouter
+(status+body), neon-memory (query-emb vacío), sources (body-en-Error), speech (tts vacío), trace-composite (sink
+roto), telegram (webhook no-JSON); `embeddings` ya propagaba el status. **171 tests** (151 agente + 20 compress);
+6 tareas inline. **e2e real ✅** (audio basura → `transcribe failed status:400` + evento `degraded`, HTTP 200) que
+**diagnosticó al instante un bug real**: `TRANSCRIBE_MODEL` configurado como CSV → 400 (ver WIP "uniformar fallback").
+Specs → [`…-backend-failure-observability-design.md`](superpowers/specs/2026-06-14-backend-failure-observability-design.md)
+· [`…-plan.md`](superpowers/specs/2026-06-14-backend-failure-observability-plan.md). **Decisión de diseño:** `emit`
+ya loguea vía el sink → `reportDegraded` solo emite (no duplica log). **Futuro:** alertas/métricas sobre `degraded`.
 
 **🟢 saveFact (CURACIÓN) + HITL PERSISTIDO + facts BI-TEMPORAL — MERGEADO en `main`** (2026-06-14, ex
 `feat/savefact-curation-hitl`). 1ª **write-action** sobre el harness, primer paso de "Vaio se nutre solo".
