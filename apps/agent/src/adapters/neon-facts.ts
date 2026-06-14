@@ -58,12 +58,26 @@ export function createFactStore(db: Database, embedder: Embedder): FactStore {
 
     async listPending(principalId, limit = 10): Promise<PendingFact[]> {
       const rows = await db
-        .select({ id: facts.id, statement: facts.statement, createdAt: facts.createdAt })
+        .select({
+          id: facts.id,
+          statement: facts.statement,
+          createdAt: facts.createdAt,
+        })
         .from(facts)
-        .where(and(eq(facts.principalId, principalId), eq(facts.status, "pending"), isNull(facts.invalidAt)))
+        .where(
+          and(
+            eq(facts.principalId, principalId),
+            eq(facts.status, "pending"),
+            isNull(facts.invalidAt)
+          )
+        )
         .orderBy(desc(facts.createdAt))
         .limit(limit)
-      return rows.map((r) => ({ id: r.id, statement: r.statement, createdAt: r.createdAt }))
+      return rows.map((r) => ({
+        id: r.id,
+        statement: r.statement,
+        createdAt: r.createdAt,
+      }))
     },
   }
 }

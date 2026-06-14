@@ -12,7 +12,11 @@ import { searchMemory } from "./search-memory.js"
 import type { ActionContext, ActionDescriptor } from "./types.js"
 
 /** Único lugar donde se listan las acciones que el harness sabe construir. */
-export const ACTIONS: ActionDescriptor[] = [searchMemory, proposeFact, commitFact]
+export const ACTIONS: ActionDescriptor[] = [
+  searchMemory,
+  proposeFact,
+  commitFact,
+]
 
 /** ¿El principal cumple el clearance de la acción? */
 function meetsClearance(

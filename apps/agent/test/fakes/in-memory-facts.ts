@@ -16,7 +16,13 @@ export function inMemoryFacts(): FactStore & { rows: () => Row[] } {
     rows: () => rows,
     async propose(input) {
       const id = `f${++n}`
-      rows.push({ id, statement: input.statement, status: "pending", principalId: input.principalId, createdAt: null })
+      rows.push({
+        id,
+        statement: input.statement,
+        status: "pending",
+        principalId: input.principalId,
+        createdAt: null,
+      })
       return { id }
     },
     async commit(id) {
@@ -35,7 +41,11 @@ export function inMemoryFacts(): FactStore & { rows: () => Row[] } {
       return rows
         .filter((x) => x.status === "pending" && x.principalId === principalId)
         .slice(0, limit)
-        .map((x) => ({ id: x.id, statement: x.statement, createdAt: x.createdAt }))
+        .map((x) => ({
+          id: x.id,
+          statement: x.statement,
+          createdAt: x.createdAt,
+        }))
     },
   }
 }

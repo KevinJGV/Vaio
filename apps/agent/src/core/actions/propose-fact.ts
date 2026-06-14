@@ -16,13 +16,24 @@ export const proposeFact: ActionDescriptor = {
         statement: z
           .string()
           .min(1)
-          .describe("El hecho, en una frase clara y autocontenida (3ª persona sobre Kevin)."),
+          .describe(
+            "El hecho, en una frase clara y autocontenida (3ª persona sobre Kevin)."
+          ),
       }),
       execute: async ({ statement }, { toolCallId }) => {
         const t0 = Date.now()
         if (!ctx.factStore) {
-          const output = "No puedo guardar hechos ahora mismo (memoria no configurada)."
-          ctx.emit({ ...ctx.ids, type: "tool.result", toolCallId, toolName: "proposeFact", ok: false, latencyMs: Date.now() - t0, output })
+          const output =
+            "No puedo guardar hechos ahora mismo (memoria no configurada)."
+          ctx.emit({
+            ...ctx.ids,
+            type: "tool.result",
+            toolCallId,
+            toolName: "proposeFact",
+            ok: false,
+            latencyMs: Date.now() - t0,
+            output,
+          })
           return output
         }
         try {
@@ -34,11 +45,27 @@ export const proposeFact: ActionDescriptor = {
             turnId: ctx.ids.turnId,
           })
           const output = `Propuesta registrada (id ${id}). Pedile confirmación al usuario; si dice que sí, llamá commitFact con ese id.`
-          ctx.emit({ ...ctx.ids, type: "tool.result", toolCallId, toolName: "proposeFact", ok: true, latencyMs: Date.now() - t0, output })
+          ctx.emit({
+            ...ctx.ids,
+            type: "tool.result",
+            toolCallId,
+            toolName: "proposeFact",
+            ok: true,
+            latencyMs: Date.now() - t0,
+            output,
+          })
           return output
         } catch {
           const output = "No pude registrar la propuesta ahora mismo."
-          ctx.emit({ ...ctx.ids, type: "tool.result", toolCallId, toolName: "proposeFact", ok: false, latencyMs: Date.now() - t0, output })
+          ctx.emit({
+            ...ctx.ids,
+            type: "tool.result",
+            toolCallId,
+            toolName: "proposeFact",
+            ok: false,
+            latencyMs: Date.now() - t0,
+            output,
+          })
           return output
         }
       },

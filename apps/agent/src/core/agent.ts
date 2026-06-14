@@ -168,7 +168,10 @@ export function createAgent(deps: AgentDeps) {
         try {
           pendingFacts = await factStore.listPending(principal.id)
         } catch (err) {
-          ctx.logger.warn({ err: errMsg(err) }, "listPending falló (best-effort)")
+          ctx.logger.warn(
+            { err: errMsg(err) },
+            "listPending falló (best-effort)"
+          )
         }
       }
 

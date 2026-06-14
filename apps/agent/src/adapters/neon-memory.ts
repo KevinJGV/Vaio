@@ -38,7 +38,11 @@ export function createMemoryStore(
         .from(merged)
         .orderBy(asc(sql`dist`))
         .limit(k)
-      return rows.map((r) => ({ source: r.source, url: r.url ?? "", chunk: r.chunk }))
+      return rows.map((r) => ({
+        source: r.source,
+        url: r.url ?? "",
+        chunk: r.chunk,
+      }))
     },
 
     async upsertDocuments(rows: DocChunk[]): Promise<void> {
