@@ -42,9 +42,10 @@
   **Alcance (def. con Kevin):** además de media, **auditar TODOS los catch silenciosos del backend** + definir una
   política/patrón reusable de observabilidad de fallos (emitir la CAUSA, persistir en `trace_events` donde aplique).
   Produce su par design+plan.
-> **Diferido/registrado (no es WIP, vive en su fase):** visión **"Vaio se nutre solo"** (memoria viva
-> auto-curada + self-awareness + fuentes crudas/tiempo-real) → `SPEC.md` §"Vaio se nutre solo" + memoria
-> `vaio-self-nourishing-memory-vision`; corresponde al **harness (eje 2)** + Fase 2 `facts` + Fase 3 grafos.
+> **Diferido/registrado (no es WIP, vive en su fase):** norte **"Vaio se nutre solo"** — fuentes **CRUDAS
+> (código/repos, NO webs)** + self-awareness + tiempo real. **Paso 4 (curación/`saveFact`) ✅ hecho; pasos 1-3
+> (lo crudo) pendientes** → ítem rastreable en **§"🔵 Pendiente FUTURO — Vaio se nutre solo"** (abajo) +
+> `SPEC.md` §"Vaio se nutre solo" + memoria `vaio-self-nourishing-memory-vision`.
 > Cerrados el 2026-06-13 (→ Historial): **Harness de tools (eje 2) — infra mergeada en `main`** (registry +
 > gating 2 capas + seam HITL delgado; searchMemory migrado) · **Grounding (voz≠hechos) mergeado en `main`** +
 > **ritual refinado en CLAUDE.md** · **Observabilidad (App Attribution + persistencia de traza) mergeada y
@@ -294,6 +295,21 @@ persona es corta (< mínimo ~1024 tok) → cachearla sola no rinde; el quick-win
 es cachear **tool defs + bloque estable** como prefijo (las tools preceden al system y se reusan en los ~5
 steps/turno) y separar `buildSystemPrompt` en `{estable, volátil}`; la cadena de fallback rompe el cache al
 cambiar de provider. *SPEC ya ajustado para no afirmar un caching inexistente; implementación = followup cuando rinda.*
+
+### 🔵 Pendiente FUTURO — "Vaio se nutre solo": fuentes CRUDAS (código/repos), NO ingesta de webs
+**Norte de Kevin — NO diluir** (rastreable acá para que no se pierda al cerrar features). El "vivo" se alimenta de
+**código crudo y repos (incl. el suyo), en tiempo real**, **no de scrapear el HTML/web desplegado**. La ingesta
+batch de URLs/APIs de hoy (`adapters/sources/*`) es el **punto de partida a superar**, no el norte. Decomposición
+(detalle en [`SPEC.md`](SPEC.md) §"Vaio se nutre solo" + memoria `vaio-self-nourishing-memory-vision`):
+- ✅ **Paso 4 — Curación agéntica** (`saveFact` + HITL): **HECHO** (2026-06-14, ver Historial). El "decide qué guardar".
+- [ ] **Paso 1 — Fuentes crudas**: collectors que leen **repo md/código** (no HTML desplegado). Mismo patrón
+  `collectX()→DocChunk[]`. Su propio par design+plan.
+- [ ] **Paso 2 — Self-awareness**: Vaio ingiere **su propio repo** ("sus tripas"). ⚠️ excluir secrets/`.env`.
+- [ ] **Paso 3 — Acceso en tiempo real / on-demand**: retrieval como **read-action del harness** (eje 2, ya
+  existe la infra); sync continuo → Fase 3.
+- [ ] **Paso 5 — Grafos**: `facts` → Graphiti bi-temporal (Fase 3).
+> **Los pasos 1-3 son el corazón del "vivo" que falta** (paso 4 ya da la curación; 1-3 dan el acceso a lo crudo).
+> Cada paso = su propio `brainstorming` → design+plan cuando se priorice.
 
 ### 🔵 Pendiente FUTURO — Neon como DB reactiva estilo Convex
 El **hot-sync de esquema** (`db:push`) ya da la DX de "el esquema sigue al código". La **reactividad real**

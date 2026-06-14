@@ -194,9 +194,12 @@ Diseño/plan → [`superpowers/specs/2026-06-12-cavemem-compression-{design,plan
 
 ### Norte: "Vaio se nutre solo" — memoria viva auto-curada + self-awareness (visión, 2026-06-13)
 Materializa el **Invariante #3** (crecimiento orgánico > prompt estático) y el norte "Vaio como harness
-personal". Hoy la ingesta es **pull batch de URLs/APIs** (`adapters/sources/*`). El norte: Vaio **accede a las
-fuentes CRUDAS (repos, incl. EL SUYO) y en tiempo real, y DECIDE qué vale la pena guardar** en memoria (DB →
-grafos) → "se siente vivo". Decomposición y fase:
+personal". **Principio de la línea (NO diluir):** la data del "vivo" viene del **CÓDIGO CRUDO y los repos
+(incluido el suyo), leídos en tiempo real** — **NO de scrapear las webs/HTML desplegados**. Hoy la ingesta es
+**pull batch de URLs/APIs** (`adapters/sources/*`) → eso es el punto de partida a superar, no el norte. El norte:
+Vaio **accede a las fuentes CRUDAS (repos, incl. EL SUYO) y en tiempo real, y DECIDE qué vale la pena guardar**
+en memoria (DB → grafos) → "se siente vivo". Decomposición y fase (**paso 4 = `saveFact`, ✅ implementado
+2026-06-14; pasos 1-3 = pendientes, son el corazón del "vivo" aún por construir**):
 1. **Fuentes crudas** (repo md/código, no HTML desplegado) — collectors `collectX()→DocChunk[]` en
    `adapters/sources/`; cercano e independiente del harness.
 2. **Self-awareness**: Vaio ingiere su propio repo ("sus tripas") — collector local (⚠️ excluir secrets/`.env`).
