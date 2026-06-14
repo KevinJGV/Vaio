@@ -45,7 +45,13 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- _(vacío — sin ítems abiertos)_
+- [~] **Memoria viva de repos — sync incremental + frescura autónoma lazy (paso 3, parte 1)** (en progreso,
+  2026-06-14, sobre `feat/raw-repo-ingestion`). Engine incremental (diff por blob-SHA → re-embebe SOLO lo cambiado) +
+  frescura barata (1 request) + tools autónomas en chat (`checkRepoFreshness`/`syncRepo`, sin HITL, mención natural
+  solo al owner, silencio en web/visitante) + entrypoint `sync.ts`. Schema: `documents`+`path`/`blob_sha` +
+  `tracked_repos` (migración). Caso rápido inline; largo → caveat + refresco background. Specs →
+  [`…-repo-incremental-sync-design.md`](superpowers/specs/2026-06-14-repo-incremental-sync-design.md) ·
+  [`…-plan.md`](superpowers/specs/2026-06-14-repo-incremental-sync-plan.md). Verificación = 2ª corrida `skipped-fresh`.
 > **Diferido/registrado (no es WIP, vive en su fase):** norte **"Vaio se nutre solo"** — fuentes **CRUDAS
 > (código/repos, NO webs)** + self-awareness + tiempo real. **Paso 4 (curación/`saveFact`) ✅ hecho; pasos 1-3
 > (lo crudo) pendientes** → ítem rastreable en **§"🔵 Pendiente FUTURO — Vaio se nutre solo"** (abajo) +
@@ -384,8 +390,11 @@ batch de URLs/APIs de hoy (`adapters/sources/*`) es el **punto de partida a supe
   `collectRawRepo` ingiere md+código de repos curados incl. el propio (`KevinJGV/Vaio`+`KevinJGV/KevinJGV`) vía
   GitHub API, con doble guard de secrets. e2e ✅ (800+800 chunks, 0 fuga de secrets, `/chat` cita el repo).
 - ✅ **Paso 4 — Curación agéntica** (`saveFact` + HITL): **HECHO** (2026-06-14, ver Historial). El "decide qué guardar".
-- **Paso 3 — Acceso en tiempo real / on-demand** (pendiente): retrieval como **read-action del harness** (eje 2,
-  ya existe la infra; reusa la maquinaria de pasos 1+2); sync continuo → Fase 3. Su propio par design+plan.
+- **Paso 3 — Acceso en tiempo real / on-demand** → **REENCAUZADO (2026-06-14):** el "leer en caliente" se **descartó**
+  (lo indexado+vectorizado le gana en costo/velocidad/precisión + alimenta grafos). El norte real = **mantener el
+  índice al día, barato**: sync **incremental lazy autónomo**. **Parte 1 EN PROGRESO** (ver WIP arriba): engine
+  incremental + frescura + tools autónomas. **Parte 2 (followup):** on-demand ingest de repo nuevo/arbitrario
+  (owner+background+notify). Depende de los **turnos proactivos** (abajo ★).
 - **Paso 5 — Grafos** (pendiente, Fase 3): `facts` → Graphiti bi-temporal.
 > ✅ **Followup de grounding — RESUELTO/VERIFICADO (2026-06-14, ver Historial "GROUNDING: AUTO-INTROSPECCIÓN").**
 > Pasos 1+2 dejaron el código de Vaio en la memoria pero la política del prompt lo tapaba; se distinguió en el
@@ -413,6 +422,19 @@ y `commit` (`neon-facts.ts:28-48`) confirma **sin mirar si contradice** un fact 
 - **Encaje con el norte:** es el paso que falta para que la curación de "Vaio se nutre solo" sea **confiable** (no
   solo aditiva). Relacionado: extracción automática post-conversación (otro pendiente) y, en Fase 3, edges
   temporales de aprobación en grafo (Graphiti bi-temporal).
+
+### ⭐ Pendiente PRIORIZADO — Turnos proactivos ("Vaio retoma solo") — capacidad transversal (su propio design+plan)
+**Visión de Kevin (2026-06-14) — NO diluir.** Como el arnés de **Claude Code** con tareas en background: Vaio dispara
+una tarea larga (p.ej. el sync de un repo, o `escalate`), **sigue conversando**, y **cuando la tarea termina REANUDA
+por su cuenta** (mensaje **iniciado por el agente**, sin esperar al usuario) para responder la duda original. UX:
+"dame un momento que lo reviso / se lo confirmo a Kevin" → al terminar, Vaio retoma natural en el mismo hilo.
+**Infra:** (1) **background runner** con **re-entrada al loop del agente** al completar (con el contexto del turno
+pendiente); (2) **canal push**: **Telegram-first** (el bot manda mensaje cuando sea); **web `/chat` NO** se puede
+empujar post-turno (stream cerrado; chat web del portafolio aún no existe) → web espera canal persistente.
+**Seam REUTILIZABLE** — habilita: el **caso "sync largo"** de la memoria viva de repos (parte 1 hoy lo resuelve con
+caveat+refresco-background, SIN reanudación), la **parte 2 del paso 3** (avisar al terminar la ingesta de un repo
+nuevo), **`escalate`** (Fase 2) y **scheduler/recordatorios** (Nivel C). = el "Nivel C / turnos proactivos" ya anotado,
+ahora con forma concreta. **Su propio `brainstorming`→design+plan.** Relacionado: memoria `proactive-turns-vision`.
 
 ### 🔵 Pendiente FUTURO — Neon como DB reactiva estilo Convex
 El **hot-sync de esquema** (`db:push`) ya da la DX de "el esquema sigue al código". La **reactividad real**

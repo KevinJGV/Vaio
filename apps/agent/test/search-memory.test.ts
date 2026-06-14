@@ -64,6 +64,9 @@ describe("searchMemory (descriptor migrado)", () => {
       },
       upsertDocuments: async () => {},
       clearSource: async () => {},
+      listIndexedFiles: async () => [],
+      deleteFiles: async () => {},
+      replaceFile: async () => {},
     }
     const events: TraceEvent[] = []
     const t = searchMemory.build(
@@ -87,6 +90,9 @@ describe("searchMemory (descriptor migrado)", () => {
       searchMemory: async () => [{ source: "cv", url: "", chunk: "chunk-uno" }],
       upsertDocuments: async () => {},
       clearSource: async () => {},
+      listIndexedFiles: async () => [],
+      deleteFiles: async () => {},
+      replaceFile: async () => {},
     }
     const compressor = {
       compress: (t: string) => `[C]${t}`,
@@ -124,6 +130,9 @@ describe("searchMemory (descriptor migrado)", () => {
       },
       upsertDocuments: async () => {},
       clearSource: async () => {},
+      listIndexedFiles: async () => [],
+      deleteFiles: async () => {},
+      replaceFile: async () => {},
     }
     // reranker que invierte la relevancia: el último candidato es el más relevante.
     const reranker = {
@@ -157,6 +166,9 @@ describe("searchMemory (descriptor migrado)", () => {
       searchMemory: async () => cands,
       upsertDocuments: async () => {},
       clearSource: async () => {},
+      listIndexedFiles: async () => [],
+      deleteFiles: async () => {},
+      replaceFile: async () => {},
     }
     const reranker = { rerank: async () => [] }
     const t = searchMemory.build(ctx({ caps: caps(2), memory, reranker }))

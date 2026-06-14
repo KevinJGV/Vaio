@@ -29,6 +29,7 @@ import type {
   Transcriber,
 } from "../ports/media.js"
 import type { MemoryStore } from "../ports/memory.js"
+import type { RepoSyncPort } from "../ports/repo-sync.js"
 import type { Reranker } from "../ports/rerank.js"
 import type { Summarizer } from "../ports/summary.js"
 import type { TraceSink } from "../ports/trace.js"
@@ -76,6 +77,10 @@ export interface AgentDeps {
   reranker?: Reranker | null
   /** Pool de candidatos (wide-K) para el rerank. Default 30. */
   rerankCandidates?: number
+  /** Sync de repos (frescura + sync incremental). null = sin DB/token → las tools de sync degradan. */
+  repoSync?: RepoSyncPort | null
+  /** Umbral de archivos para sync inline vs diferido (default 20). */
+  syncInlineMaxFiles?: number
 }
 
 /** Contexto de observabilidad de un turno (lo arma el adapter de canal por request). */
@@ -139,6 +144,8 @@ export function createAgent(deps: AgentDeps) {
     factStore = null,
     reranker = null,
     rerankCandidates = 30,
+    repoSync = null,
+    syncInlineMaxFiles = 20,
   } = deps
 
   return {
@@ -282,6 +289,8 @@ export function createAgent(deps: AgentDeps) {
           ragIntensity,
           reranker,
           rerankCandidates,
+          repoSync,
+          syncInlineMaxFiles,
         }),
         onChunk({ chunk }) {
           if (chunk.type === "tool-call") {

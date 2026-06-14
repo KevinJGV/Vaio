@@ -17,8 +17,10 @@ import {
 import { createConversationStore } from "./adapters/neon-conversation.js"
 import { createFactStore } from "./adapters/neon-facts.js"
 import { createMemoryStore } from "./adapters/neon-memory.js"
+import { createRepoTracker } from "./adapters/neon-tracker.js"
 import { createModel } from "./adapters/openrouter.js"
 import { createReranker } from "./adapters/rerank-openrouter.js"
+import { createRepoSync } from "./adapters/sources/repo-sync.js"
 import { createSpeechSynthesizer } from "./adapters/speech-openrouter.js"
 import { createSummarizer } from "./adapters/summarizer.js"
 import { createTelegramClient } from "./adapters/telegram/client.js"
@@ -40,10 +42,12 @@ import {
   visionChain,
 } from "./config.js"
 import { type Agent, createAgent } from "./core/agent.js"
+import { DEFAULT_REPO_POLICY } from "./core/repo-ingest.js"
 import type { ConversationStore } from "./ports/conversation.js"
 import type { FactStore } from "./ports/facts.js"
 import type { MediaUnderstanding, Transcriber } from "./ports/media.js"
 import type { MemoryStore } from "./ports/memory.js"
+import type { RepoSyncPort } from "./ports/repo-sync.js"
 import type { Reranker } from "./ports/rerank.js"
 import type { SpeechSynthesizer } from "./ports/speech.js"
 import type { Summarizer } from "./ports/summary.js"
@@ -82,6 +86,7 @@ let transcriber: Transcriber | null = null
 let mediaUnderstanding: MediaUnderstanding | null = null
 let speech: SpeechSynthesizer | null = null
 let reranker: Reranker | null = null
+let repoSync: RepoSyncPort | null = null
 if (env.OPENROUTER_API_KEY && models.length > 0) {
   let memory: MemoryStore | null = null
   // La memoria conversacional (conversations/messages) solo necesita DB; el RAG necesita además
@@ -99,6 +104,18 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
       })
       memory = createMemoryStore(db, embedder, logger)
       factStore = createFactStore(db, embedder)
+      // Sync incremental de repos (frescura + re-embeber solo lo cambiado). Reusa la policy de ingesta.
+      repoSync = createRepoSync({
+        memory,
+        tracker: createRepoTracker(db),
+        token: env.GITHUB_TOKEN,
+        policy: {
+          ...DEFAULT_REPO_POLICY,
+          maxFileBytes: env.RAW_FILE_MAX_BYTES,
+          maxChunksPerRepo: env.RAW_REPO_MAX_CHUNKS,
+        },
+        logger,
+      })
       ragEnabled = true
     } else {
       logger.warn(
@@ -181,6 +198,8 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
     nativeImages: env.MULTIMODAL_NATIVE_IMAGES,
     reranker,
     rerankCandidates: env.RERANK_CANDIDATES,
+    repoSync,
+    syncInlineMaxFiles: env.SYNC_INLINE_MAX_FILES,
   })
   // Salida de voz (TTS) — cadena de fallback (model|voice|format). Vacía → Vaio solo habla por texto.
   const ttsChain = speechChain(env)
@@ -254,6 +273,7 @@ logger.info(
     vision: mediaUnderstanding !== null,
     speech: speech !== null,
     rerank: reranker !== null,
+    repoSync: repoSync !== null,
     nativeImages: env.MULTIMODAL_NATIVE_IMAGES,
     telegram: telegram !== undefined,
     models,

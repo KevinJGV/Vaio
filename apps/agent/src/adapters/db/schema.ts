@@ -30,9 +30,14 @@ export const documents = pgTable(
   "documents",
   {
     id: bigserial("id", { mode: "number" }).primaryKey(),
-    source: text("source").notNull(), // 'cv' | 'cv-en' | 'me' | 'github' | 'lastfm' | ...
+    source: text("source").notNull(), // 'cv' | 'cv-en' | 'me' | 'github' | 'lastfm' | 'repo:owner/repo' | ...
     url: text("url"),
     chunk: text("chunk").notNull(),
+    // Path del archivo dentro del repo + blob-SHA de Git (solo los setea el collector de repos). Nullable →
+    // backward-compatible (los demás collectors y las filas legacy quedan NULL). El manifest del sync incremental
+    // ES este par (SELECT DISTINCT path, blob_sha): una sola fuente de verdad, sin tabla manifest aparte.
+    path: text("path"),
+    blobSha: text("blob_sha"),
     embedding: vector("embedding", { dimensions: EMBEDDING_DIM }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   },
@@ -42,8 +47,28 @@ export const documents = pgTable(
       t.embedding.op("vector_cosine_ops")
     ),
     index("documents_source_idx").on(t.source),
+    // Diff + borrado por archivo (deleteFiles) + el DISTINCT del manifest se apoyan en (source, path).
+    index("documents_source_path_idx").on(t.source, t.path, t.blobSha),
   ]
 )
+
+/** Estado de frescura/sync por repo trackeado (1 fila por source). `last_commit_sha` = HEAD del branch en el
+ *  último sync OK → habilita el chequeo de frescura barato (1 request vs este SHA). `policy_version` fuerza full
+ *  si cambian los chunkers/policy (el blob-SHA no cambiaría pero los chunks sí). */
+export const trackedRepos = pgTable("tracked_repos", {
+  source: text("source").primaryKey(), // 'repo:owner/repo'
+  owner: text("owner").notNull(),
+  repo: text("repo").notNull(),
+  branch: text("branch").notNull(),
+  lastCommitSha: text("last_commit_sha"),
+  lastTreeSha: text("last_tree_sha"),
+  policyVersion: integer("policy_version").notNull().default(1),
+  lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+  lastStatus: text("last_status"), // 'ok' | 'partial' | 'error'
+  embeddedCount: integer("embedded_count").default(0),
+  deletedCount: integer("deleted_count").default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+})
 
 /** Memoria conversacional: un hilo por (channel, threadKey). `summary` = resumen rodante de los
  *  turnos viejos; `summarizedUpToMessageId` marca hasta qué mensaje se resumió. */

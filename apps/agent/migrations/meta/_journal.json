@@ -36,6 +36,13 @@
       "when": 1781408350717,
       "tag": "0004_lucky_winter_soldier",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1781475725839,
+      "tag": "0005_loving_george_stacy",
+      "breakpoints": true
     }
   ]
 }

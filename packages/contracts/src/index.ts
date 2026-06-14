@@ -86,11 +86,14 @@ export const turnRequestSchema = z
   })
 export type TurnRequest = z.infer<typeof turnRequestSchema>
 
-/** Fragmento de memoria recuperado (RAG). */
+/** Fragmento de memoria recuperado (RAG). `path`/`blobSha` solo los setea el collector de repos
+ *  (sync incremental); el resto de las fuentes los dejan sin definir. */
 export const docChunkSchema = z.object({
   source: z.string(),
   url: z.string(),
   chunk: z.string(),
+  path: z.string().optional(),
+  blobSha: z.string().optional(),
 })
 export type DocChunk = z.infer<typeof docChunkSchema>
 

@@ -8,6 +8,7 @@
     "build": "pnpm --filter @vaio/contracts build && tsc",
     "start": "node dist/index.js",
     "ingest": "tsx src/ingest.ts",
+    "sync": "tsx src/sync.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",

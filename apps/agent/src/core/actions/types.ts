@@ -9,6 +9,7 @@ import type { Compressor, Intensity } from "../../ports/compress.js"
 import type { FactStore } from "../../ports/facts.js"
 import type { Logger } from "../../ports/logger.js"
 import type { MemoryStore } from "../../ports/memory.js"
+import type { RepoSyncPort } from "../../ports/repo-sync.js"
 import type { Reranker } from "../../ports/rerank.js"
 import type { CapabilityProfile, Principal, ToolName } from "../capabilities.js"
 
@@ -41,6 +42,10 @@ export interface ActionContext {
   reranker?: Reranker | null
   /** Pool de candidatos (wide-K) a recuperar por vector antes de rerankear. Default 30. */
   rerankCandidates?: number
+  /** Sync de repos (frescura + sync incremental). null = sin DB/token → las tools de sync degradan. */
+  repoSync?: RepoSyncPort | null
+  /** Umbral de archivos para sync inline vs diferido (default 20). */
+  syncInlineMaxFiles?: number
 }
 
 /** Descriptor de una acción: metadata de gating + cómo construir su tool del AI SDK.

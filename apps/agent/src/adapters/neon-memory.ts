@@ -2,9 +2,23 @@
 // Búsqueda por distancia coseno (cosineDistance → operador <=>); el orden ascendente
 // de distancia = más similar primero.
 
-import { and, asc, cosineDistance, eq, isNull, sql } from "drizzle-orm"
+import {
+  and,
+  asc,
+  cosineDistance,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  sql,
+} from "drizzle-orm"
 import type { Logger } from "../ports/logger.js"
-import type { DocChunk, Embedder, MemoryStore } from "../ports/memory.js"
+import type {
+  DocChunk,
+  Embedder,
+  IndexedFile,
+  MemoryStore,
+} from "../ports/memory.js"
 import type { Database } from "./db/client.js"
 import { documents, facts } from "./db/schema.js"
 
@@ -62,13 +76,77 @@ export function createMemoryStore(
         const embedding = embeddings[i]
         if (!embedding)
           throw new Error("Embeddings desalineados con los chunks.")
-        return { source: r.source, url: r.url, chunk: r.chunk, embedding }
+        return {
+          source: r.source,
+          url: r.url,
+          chunk: r.chunk,
+          path: r.path ?? null,
+          blobSha: r.blobSha ?? null,
+          embedding,
+        }
       })
       await db.insert(documents).values(values)
     },
 
     async clearSource(source: string): Promise<void> {
       await db.delete(documents).where(eq(documents.source, source))
+    },
+
+    async listIndexedFiles(source: string): Promise<IndexedFile[]> {
+      // Manifest = el propio `documents` (DISTINCT path,blob_sha). Ignora filas legacy con path/blob_sha NULL
+      // (esos repos se tratan como "no indexados" → el primer sync incremental los re-embebe = full).
+      const rows = await db
+        .selectDistinct({ path: documents.path, blobSha: documents.blobSha })
+        .from(documents)
+        .where(
+          and(
+            eq(documents.source, source),
+            isNotNull(documents.path),
+            isNotNull(documents.blobSha)
+          )
+        )
+      return rows.flatMap((r) =>
+        r.path && r.blobSha ? [{ path: r.path, blobSha: r.blobSha }] : []
+      )
+    },
+
+    async deleteFiles(source: string, paths: string[]): Promise<void> {
+      if (paths.length === 0) return
+      await db
+        .delete(documents)
+        .where(
+          and(eq(documents.source, source), inArray(documents.path, paths))
+        )
+    },
+
+    async replaceFile(
+      source: string,
+      path: string,
+      rows: DocChunk[]
+    ): Promise<void> {
+      // Atómico: borra los chunks del archivo y reinserta los nuevos en una sola tx (si el embed falla,
+      // el delete se revierte → nunca queda el archivo a medias).
+      await db.transaction(async (tx) => {
+        await tx
+          .delete(documents)
+          .where(and(eq(documents.source, source), eq(documents.path, path)))
+        if (rows.length === 0) return
+        const embeddings = await embedder.embed(rows.map((r) => r.chunk))
+        const values = rows.map((r, i) => {
+          const embedding = embeddings[i]
+          if (!embedding)
+            throw new Error("Embeddings desalineados con los chunks.")
+          return {
+            source: r.source,
+            url: r.url,
+            chunk: r.chunk,
+            path: r.path ?? null,
+            blobSha: r.blobSha ?? null,
+            embedding,
+          }
+        })
+        await tx.insert(documents).values(values)
+      })
     },
   }
 }

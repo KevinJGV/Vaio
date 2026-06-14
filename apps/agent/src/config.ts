@@ -115,6 +115,8 @@ const envSchema = z.object({
   RERANK_MODELS: z.string().optional(),
   // Pool de candidatos (wide-K) que se recupera por vector y se manda a rerankear. Default 30.
   RERANK_CANDIDATES: positiveIntWithDefault(30),
+  // Sync incremental de repos: umbral de archivos cambiados para hacerlo INLINE en el chat; más → background. Default 20.
+  SYNC_INLINE_MAX_FILES: positiveIntWithDefault(20),
   // Límite defensivo de tamaño de media (descarga Telegram / base64 web). Default 20MB.
   MEDIA_MAX_BYTES: z.coerce
     .number()
