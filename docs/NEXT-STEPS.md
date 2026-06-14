@@ -31,10 +31,11 @@
 > **Fallback uniforme en env de modelos — MERGEADO + EN PROD** (2026-06-14): `TRANSCRIBE_MODELS`/`SUMMARY_MODELS`
 > aceptan cadena (fallback client/server-side); `EMBEDDINGS_MODEL` único a propósito; plural por consistencia.
 > Arregla el bug del audio. Detalle → Historial. **Sin WIP abierto.**
-> **"Vaio se nutre solo" pasos 1+2 — MERGEADO/VERIFICADO** (2026-06-14): ingesta BATCH de fuentes CRUDAS
-> (md+código) de repos curados vía GitHub API, **incl. el propio repo** (self-awareness). e2e ✅: `repo:KevinJGV/Vaio`
-> + `repo:KevinJGV/KevinJGV` (800 chunks c/u) en `documents`, **0 fuga de secrets** (verificado en DB), `/chat`
-> cita el propio código con procedencia. Detalle → Historial. ⚠️ **Hallazgo:** la política del prompt BLOQUEA la
+> **"Vaio se nutre solo" pasos 1+2 — VERIFICADO, en rama `feat/raw-repo-ingestion` (commit 5f9fb93), LISTO PARA
+> MERGE** (2026-06-14): ingesta BATCH de fuentes CRUDAS (md+código) de repos curados vía GitHub API, **incl. el
+> propio repo** (self-awareness). e2e ✅: `repo:KevinJGV/Vaio` + `repo:KevinJGV/KevinJGV` (800 chunks c/u) en
+> `documents`, **0 fuga de secrets** (verificado en DB), `/chat` cita el propio código con procedencia. Detalle →
+> Historial. ⚠️ La ingesta corrió contra la DB real (los chunks YA están), pero el código aún no está en `main`/deploy. ⚠️ **Hallazgo:** la política del prompt BLOQUEA la
 > auto-introspección directa ("tu propio código") → followup de grounding (ver §"Vaio se nutre solo").
 > **Próximos candidatos (eligen Kevin/yo):** **rerank** (trigger disparado por esta ingesta — ver §Evolución
 > multimodal), el **paso 3** (acceso on-demand como read-action del harness), la **adjudicación de conflictos de
@@ -60,8 +61,8 @@
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
 
-**🟢 "VAIO SE NUTRE SOLO" PASOS 1+2 — INGESTA DE FUENTES CRUDAS — VERIFICADO** (2026-06-14, ex
-`feat/raw-repo-ingestion`). 1ª materialización del norte (paso 4/curación ya estaba; faltaba el acceso a lo crudo).
+**🟢 "VAIO SE NUTRE SOLO" PASOS 1+2 — INGESTA DE FUENTES CRUDAS — VERIFICADO, LISTO PARA MERGE** (2026-06-14,
+rama `feat/raw-repo-ingestion`, commit 5f9fb93 — aún NO en `main`). 1ª materialización del norte (paso 4/curación ya estaba; faltaba el acceso a lo crudo).
 Collector `collectRawRepo` que lee **md+código** de repos curados vía **GitHub API** (Git Trees recursive +
 Contents `vnd.github.raw+json`, verificado context7), **incl. el propio `KevinJGV/Vaio` + `KevinJGV/KevinJGV`**
 (self-awareness). Lógica pura en `core/` (TDD): `secret-scan` (guard de secrets, **skip-no-redact**, alto-recall),
