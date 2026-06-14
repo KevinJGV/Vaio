@@ -328,3 +328,27 @@ El código typecheckeó sin cambios de API salvo **dos rupturas reales**:
   agnóstico (solo `name` + metadata de gating + `build`).
 - **`buildTools(ctx, actions = ACTIONS)`**: el 2º parámetro (registry inyectable) permite **testear el deny path**
   con un descriptor owner-only de prueba, sin tener que enviar una write-action real. En prod siempre usa `ACTIONS`.
+
+### saveFact (curación) + HITL persistido + facts bi-temporal (jun-2026)
+- **HITL estructural con 2 tools (`proposeFact`→`commitFact`)**: la confirmación humana no es solo convención
+  del prompt — `commitFact(id)` exige el id de una propuesta **pending real** (`neon-facts` valida
+  `status='pending'` antes de actuar). Un fact **no se fabrica inline**: hay que proponerlo (persiste fila
+  pending) y recién confirmarlo. La propuesta persistida es lo que sobrevive al corte de charla (Nivel B): se
+  retoma cargándola al system prompt el próximo turno del owner.
+- **Tabla `facts` bi-temporal, motor mínimo**: una sola tabla con `status` (pending/confirmed/rejected) +
+  valid time (`valid_at`/`invalid_at`) + transaction time (`created_at`/`expired_at`). El motor de hoy solo
+  ejerce `pending→confirmed` + `valid_at=now`; **invalidar = marcar `invalid_at`, NUNCA borrar** (paper STALE /
+  Graphiti-Zep). El esquema completo desde día 1 evita retro-ajustar; dedup/adjudicación de conflictos = futuro.
+- **`searchMemory` mergea `documents`+`facts` con `unionAll`** ordenado por `cosineDistance` (el modelo ve UNA
+  memoria; un fact entra como `{source:"fact"}`). Gotcha Drizzle: ordenar por la columna `dist` de una subquery
+  `unionAll` no tipa → usar `orderBy(asc(sql\`dist\`))`. El `order by ... limit k` va sobre el UNION (ranking
+  global), no por rama.
+  - **Nota de performance (futuro):** el patrón actual calcula la distancia sobre TODA la tabla antes del
+    `limit` externo → no aprovecha el índice HNSW para top-k. Trivial con el corpus actual (~decenas de filas);
+    si `documents`/`facts` crecen a miles, migrar a `ORDER BY ... LIMIT k` por rama antes de unir.
+- **⚠️ Orden migración↔código (deploy)**: `searchMemory` ahora referencia la tabla `facts`. Si el código nuevo
+  corre contra una DB SIN la migración `0004` aplicada, cada `searchMemory` tira (`relation "facts" does not
+  exist`) → degrada limpio (la tool tiene try/catch → cortesía, la invariante "siempre responde" se mantiene)
+  **pero el RAG entero queda ciego** (no solo facts, también documents). El `railway.json preDeployCommand`
+  (`db:migrate:prod`) garantiza el orden en deploy normal; el riesgo real es un **rollback del código sin
+  rollback de la migración** o un dev contra DB sin migrar. Migrar SIEMPRE antes de desplegar el código nuevo.

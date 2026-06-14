@@ -23,22 +23,29 @@
 > **Harness de tools (eje 2) — MERGEADO en `main`** (2026-06-13): registry de acciones (`core/actions/`) + gating
 > de 2 capas (canal oculta / principal deniega) + seam HITL delgado; `searchMemory` migrado; `denied?` en
 > `tool.result`. Detalle → Historial. **Sin WIP abierto.**
-> **Foco / "go" pendiente (próximo paso):** sobre la base del harness enchufan las **write-actions** (1ª
-> candidata: `escalate`/`saveFact`) con el seam HITL **async** (HITL nativo del AI SDK v6) — ahí entra la
-> **curación agéntica** del norte "Vaio se nutre solo". **El portafolio va DESPUÉS.**
+> **saveFact (curación) + HITL persistido — INFRA EN RAMA** (2026-06-13, `feat/savefact-curation-hitl`, pend.
+> verificación de Kevin: migración `0004` + e2e por Telegram + merge): 1ª write-action sobre el harness; tabla
+> `facts` bi-temporal; ver la lista WIP abajo.
+> **Foco / "go" pendiente (próximo paso):** sobre esta base, el **Nivel C** (scheduler + push proactivo → Vaio
+> te pregunta primero por Telegram para cerrar pendientes) y/o `escalate` (Fase 2). **El portafolio va DESPUÉS.**
 
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [~] **saveFact (curación) + HITL persistido + facts bi-temporal** (rama `feat/savefact-curation-hitl`,
+- [?] **saveFact (curación) + HITL persistido + facts bi-temporal** (rama `feat/savefact-curation-hitl`,
   2026-06-13). 1ª **write-action** sobre el harness: `proposeFact`/`commitFact` (2-tool, HITL estructural —
-  commit exige un pending id), tabla `facts` **bi-temporal** (esquema día 1, motor mínimo), `searchMemory`
-  mergea `documents`+`facts` confirmados (`unionAll`), y **retomar pendientes** en el prompt (Nivel B: la
-  propuesta sobrevive al corte de charla). owner-only (gating 2 capas). **Fuera de alcance:** Nivel C
-  (scheduler/push proactivo), `escalate`, dedup/adjudicación, extracción automática. Par de specs →
+  commit exige un pending id real), tabla `facts` **bi-temporal** (`0004`, esquema día 1, motor mínimo:
+  pending→confirmed + invalidar≠borrar), `searchMemory` mergea `documents`+`facts` confirmados (`unionAll`),
+  **retomar pendientes** en el prompt (Nivel B: la propuesta sobrevive al corte de charla, best-effort), policy
+  del owner actualizada. owner-only (gating 2 capas verificado). **Fuera de alcance:** Nivel C (scheduler/push
+  proactivo), `escalate`, dedup/adjudicación, extracción automática. **166 tests** (146 agente + 20 compress);
+  typecheck/biome/build limpios; **review final ✅** (8 tareas subagent-driven). Par de specs →
   [`2026-06-13-savefact-curation-hitl-design.md`](superpowers/specs/2026-06-13-savefact-curation-hitl-design.md)
-  · [`…-plan.md`](superpowers/specs/2026-06-13-savefact-curation-hitl-plan.md). Estado: diseño+plan escritos;
-  implementación por arrancar (8 tareas TDD).
+  · [`…-plan.md`](superpowers/specs/2026-06-13-savefact-curation-hitl-plan.md). **Pend. verificación de Kevin:**
+  (a) aplicar la migración `0004` a Neon (⚠️ ANTES de desplegar el código — `searchMemory` referencia `facts`;
+  el release step la aplica), (b) **e2e del flujo owner por Telegram** (proponer→confirmar→recuperar; requiere
+  su Telegram + `OWNER_TELEGRAM_ID`) + merge a `main`. _Aún sin correr contra una DB real (unit-tested con fakes;
+  el adapter Neon/`unionAll` se validó por revisión del SQL, no e2e)._
 > **Diferido/registrado (no es WIP, vive en su fase):** visión **"Vaio se nutre solo"** (memoria viva
 > auto-curada + self-awareness + fuentes crudas/tiempo-real) → `SPEC.md` §"Vaio se nutre solo" + memoria
 > `vaio-self-nourishing-memory-vision`; corresponde al **harness (eje 2)** + Fase 2 `facts` + Fase 3 grafos.
