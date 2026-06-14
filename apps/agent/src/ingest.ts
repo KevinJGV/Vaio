@@ -12,7 +12,9 @@ import { collectCV } from "./adapters/sources/cv.js"
 import { collectGithub } from "./adapters/sources/github.js"
 import { collectLastfm } from "./adapters/sources/lastfm.js"
 import { collectPortfolio } from "./adapters/sources/portfolio.js"
-import { loadConfig } from "./config.js"
+import { collectRawRepo } from "./adapters/sources/repo.js"
+import { loadConfig, rawSourceRepos } from "./config.js"
+import { DEFAULT_REPO_POLICY } from "./core/repo-ingest.js"
 import type { DocChunk } from "./ports/memory.js"
 
 async function main(): Promise<void> {
@@ -59,6 +61,27 @@ async function main(): Promise<void> {
     })
   } else {
     logger.info("lastfm: sin LASTFM_API_KEY/USER, salto.")
+  }
+
+  // "Vaio se nutre solo" pasos 1+2: fuentes CRUDAS (md+código) de repos curados, incl. el propio.
+  const rawRepos = rawSourceRepos(env)
+  if (rawRepos.length > 0) {
+    collectors.push({
+      name: "raw-repos",
+      run: () =>
+        collectRawRepo({
+          repos: rawRepos,
+          token: env.GITHUB_TOKEN,
+          policy: {
+            ...DEFAULT_REPO_POLICY,
+            maxFileBytes: env.RAW_FILE_MAX_BYTES,
+            maxChunksPerRepo: env.RAW_REPO_MAX_CHUNKS,
+          },
+          logger,
+        }),
+    })
+  } else {
+    logger.info("raw-repos: sin RAW_SOURCE_REPOS, salto.")
   }
 
   for (const col of collectors) {

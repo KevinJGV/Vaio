@@ -1,4 +1,5 @@
 import type { DocChunk } from "../../ports/memory.js"
+import { githubApi } from "./github-api.js"
 import { toChunks } from "./util.js"
 
 export interface GithubConfig {
@@ -22,23 +23,6 @@ interface GithubRepo {
   html_url: string
   fork: boolean
   archived: boolean
-}
-
-async function githubApi<T>(path: string, token?: string): Promise<T> {
-  const headers: Record<string, string> = {
-    accept: "application/vnd.github+json",
-    "user-agent": "vaio-ingest",
-  }
-  if (token) headers.authorization = `Bearer ${token}`
-  const res = await fetch(`https://api.github.com${path}`, { headers })
-  if (!res.ok) {
-    // El body de error de GitHub (rate-limit, permisos) va en el mensaje → visible al loguear aguas arriba.
-    const body = await res.text().catch(() => "")
-    throw new Error(
-      `GitHub ${path} → ${res.status}${body ? ` · ${body.slice(0, 200)}` : ""}`
-    )
-  }
-  return (await res.json()) as T
 }
 
 /** Perfil + repos públicos (no forks/archivados) de GitHub. */

@@ -1,8 +1,10 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it } from "vitest"
 import type { Env } from "../src/config.js"
 import {
   attribution,
+  loadConfig,
   modelChain,
+  rawSourceRepos,
   speechChain,
   summaryChain,
   telegramAllowedIds,
@@ -90,6 +92,48 @@ describe("envs por modalidad (fase 2)", () => {
   })
   it("speechChain: vacío → []", () => {
     expect(speechChain({} as Env)).toEqual([])
+  })
+})
+
+describe("loadConfig: caps numéricos toleran string vacío", () => {
+  const saved = { ...process.env }
+  afterEach(() => {
+    process.env = { ...saved }
+  })
+
+  it("RAW_FILE_MAX_BYTES/RAW_REPO_MAX_CHUNKS vacíos → caen al default (no rompen)", () => {
+    process.env.RAW_FILE_MAX_BYTES = ""
+    process.env.RAW_REPO_MAX_CHUNKS = ""
+    const env = loadConfig()
+    expect(env.RAW_FILE_MAX_BYTES).toBe(100 * 1024)
+    expect(env.RAW_REPO_MAX_CHUNKS).toBe(800)
+  })
+
+  it("valores explícitos se respetan", () => {
+    process.env.RAW_FILE_MAX_BYTES = "2048"
+    process.env.RAW_REPO_MAX_CHUNKS = "50"
+    const env = loadConfig()
+    expect(env.RAW_FILE_MAX_BYTES).toBe(2048)
+    expect(env.RAW_REPO_MAX_CHUNKS).toBe(50)
+  })
+})
+
+describe("rawSourceRepos", () => {
+  it("parsea csv 'owner/repo[@branch]', trimea y descarta malformados", () => {
+    expect(
+      rawSourceRepos({
+        RAW_SOURCE_REPOS: "KevinJGV/Vaio, a/b@dev , sin-slash, c/d",
+      } as Env)
+    ).toEqual([
+      { owner: "KevinJGV", repo: "Vaio" },
+      { owner: "a", repo: "b", branch: "dev" },
+      { owner: "c", repo: "d" },
+    ])
+  })
+
+  it("vacío/ausente → []", () => {
+    expect(rawSourceRepos({} as Env)).toEqual([])
+    expect(rawSourceRepos({ RAW_SOURCE_REPOS: "  , ," } as Env)).toEqual([])
   })
 })
 

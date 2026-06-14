@@ -31,9 +31,14 @@
 > **Fallback uniforme en env de modelos — MERGEADO + EN PROD** (2026-06-14): `TRANSCRIBE_MODELS`/`SUMMARY_MODELS`
 > aceptan cadena (fallback client/server-side); `EMBEDDINGS_MODEL` único a propósito; plural por consistencia.
 > Arregla el bug del audio. Detalle → Historial. **Sin WIP abierto.**
-> **Próximos candidatos (eligen Kevin/yo):** los **pasos 1-3 de "Vaio se nutre solo"** (fuentes CRUDAS de
-> código/repos — ver §Pendiente FUTURO), el **Nivel C** (scheduler + push proactivo) y/o `escalate` (Fase 2).
-> El **portafolio** (ChatSheet + proxy) va DESPUÉS.
+> **"Vaio se nutre solo" pasos 1+2 — MERGEADO/VERIFICADO** (2026-06-14): ingesta BATCH de fuentes CRUDAS
+> (md+código) de repos curados vía GitHub API, **incl. el propio repo** (self-awareness). e2e ✅: `repo:KevinJGV/Vaio`
+> + `repo:KevinJGV/KevinJGV` (800 chunks c/u) en `documents`, **0 fuga de secrets** (verificado en DB), `/chat`
+> cita el propio código con procedencia. Detalle → Historial. ⚠️ **Hallazgo:** la política del prompt BLOQUEA la
+> auto-introspección directa ("tu propio código") → followup de grounding (ver §"Vaio se nutre solo").
+> **Próximos candidatos (eligen Kevin/yo):** **rerank** (trigger disparado por esta ingesta — ver §Evolución
+> multimodal), el **paso 3** (acceso on-demand como read-action del harness), la **adjudicación de conflictos de
+> `facts`** (§🟠 priorizado), el **Nivel C** (scheduler + push) y/o `escalate` (Fase 2). El **portafolio** va DESPUÉS.
 
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
@@ -54,6 +59,29 @@
 ---
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
+
+**🟢 "VAIO SE NUTRE SOLO" PASOS 1+2 — INGESTA DE FUENTES CRUDAS — VERIFICADO** (2026-06-14, ex
+`feat/raw-repo-ingestion`). 1ª materialización del norte (paso 4/curación ya estaba; faltaba el acceso a lo crudo).
+Collector `collectRawRepo` que lee **md+código** de repos curados vía **GitHub API** (Git Trees recursive +
+Contents `vnd.github.raw+json`, verificado context7), **incl. el propio `KevinJGV/Vaio` + `KevinJGV/KevinJGV`**
+(self-awareness). Lógica pura en `core/` (TDD): `secret-scan` (guard de secrets, **skip-no-redact**, alto-recall),
+`repo-ingest` (`filterTree`/`isProseFile`/`languageOf`/`isProbablyText` + `DEFAULT_REPO_POLICY`), `code-chunking`
+(`chunkCode` line-aware + `withProvenanceHeader`). I/O: `github-api` (extraído, +`githubRaw`) y `repo.ts`
+(**best-effort por repo y por archivo**, caps con log de descartes). `source="repo:owner/repo"` (clearSource
+idempotente por repo), `url`=blob clickeable, header de procedencia por chunk. **Sin migración** (reúsa `documents`).
+**Seguridad en 2 capas** (path + contenido). **218 tests del agente** (+65 nuevos: config +4, secret-scan 25,
+repo-ingest 23, code-chunking 10, sources +3) + 20 compress; typecheck/biome/build limpios. **Bug encontrado por el e2e y arreglado:** `z.coerce.number().default()`
+NO tolera string vacío en `.env` (`""`→0→falla `.positive()`) → helper `positiveIntWithDefault` (ver `LEARNINGS.md`).
+**e2e real ✅:** `pnpm ingest` pobló 800+800 chunks; verificado en DB **0 fuga de secrets** (key OpenRouter / pass DB /
+patrones genéricos = 0) + procedencia correcta; `/chat` "el proyecto Vaio de Kevin" → `searchMemory` trae chunks del
+repo (design del harness + `registry.ts`) y Vaio cita su propio código. Estrategia: fase 1 (config) directa → fases
+2-5 **subagentes en paralelo** (módulos puros) → fases 6-9 directas. Specs →
+[`…-raw-repo-ingestion-design.md`](superpowers/specs/2026-06-14-raw-repo-ingestion-design.md) ·
+[`…-plan.md`](superpowers/specs/2026-06-14-raw-repo-ingestion-plan.md). **Hallazgo del e2e (followup):** la política
+del prompt (chat público, "no reveles internals") **bloquea la auto-introspección directa** — el dato está en memoria
+y el retrieval anda, pero Vaio se niega si le preguntás por "tu propio código". Es un sobre-alcance del prompt (el
+repo es PÚBLICO ≠ secreto) → followup de grounding (§"Vaio se nutre solo"). **Pendientes futuros:** paso 3 (on-demand),
+rerank (trigger disparado), dedup por hash (no re-embeber lo no cambiado), subir el cap (800/repo dejó ~56+51 archivos fuera).
 
 **🟢 FALLBACK UNIFORME EN ENV DE MODELOS — MERGEADO + EN PROD** (2026-06-14, ex `fix/model-env-fallback`).
 Fix del bug que la observabilidad destapó: `TRANSCRIBE_MODEL` (singular) mandaba la cadena CSV entera como un
@@ -251,11 +279,14 @@ principal** en el core (hoy solo en el proxy); identidad **cross-canal** + facts
 prompt** = capacidades de E/S reales. Todo por OpenRouter REST → single-provider (ver `openrouter-api-surface`).
 
 **Queda pendiente (futuro):**
-- **Rerank — precisión de retrieval para el grounding** (OpenRouter `/rerank`, AI SDK `rerank()`): segunda
-  etapa del RAG = recuperar un K **ancho** por vectores → rerankear (cross-encoder, query+chunk juntos) →
-  recortar al top-N. Mejora QUÉ entra al contexto (mejor grounding). **Timing:** hoy el corpus (~29 chunks)
-  es chico → prematuro; **el valor escala con el corpus** (facts fase 2, más fuentes). Seam: `searchMemory`
-  con K ancho opcional → rerank → trim. Diseño decidido en el design spec; atar a fase 2 de memoria.
+- **Rerank — precisión de retrieval para el grounding** (OpenRouter `/rerank`, single-provider REST — el provider
+  del AI SDK NO lo envuelve, ver memoria `openrouter-api-surface`): segunda etapa del RAG = recuperar un K
+  **ancho** por vectores → rerankear (cross-encoder, query+chunk juntos) → recortar al top-N. Mejora QUÉ entra al
+  contexto (mejor grounding). **🟢 TRIGGER DISPARADO (2026-06-14):** la nota decía "~29 chunks → prematuro"; la
+  **ingesta de fuentes crudas** subió el corpus a **~1600+ chunks** (Vaio 800 + KevinJGV 800 + cv/portfolio/
+  github/lastfm), y son **chunks de CÓDIGO** (similitud vectorial más ruidosa → el rerank rinde especialmente).
+  El timing previsto ("el valor escala con el corpus") **se cumplió** → pasa de prematuro a **candidato fuerte del
+  próximo paso** (junto con el paso 3). Seam: `searchMemory` con K ancho opcional → `/rerank` → trim. Su propio par design+plan.
 - **TTS en web `/chat`** (hoy solo Telegram; el `/chat` es stream de texto → necesita canal de audio).
 
 ### 🔬 Hallazgos del bot real (jun-2026) → followups de grounding / meta-prompting (espera el "go" de Kevin)
@@ -322,15 +353,41 @@ cambiar de provider. *SPEC ya ajustado para no afirmar un caching inexistente; i
 **código crudo y repos (incl. el suyo), en tiempo real**, **no de scrapear el HTML/web desplegado**. La ingesta
 batch de URLs/APIs de hoy (`adapters/sources/*`) es el **punto de partida a superar**, no el norte. Decomposición
 (detalle en [`SPEC.md`](SPEC.md) §"Vaio se nutre solo" + memoria `vaio-self-nourishing-memory-vision`):
+- ✅ **Paso 1 — Fuentes crudas** + ✅ **Paso 2 — Self-awareness**: **HECHO/VERIFICADO** (2026-06-14, ver Historial).
+  `collectRawRepo` ingiere md+código de repos curados incl. el propio (`KevinJGV/Vaio`+`KevinJGV/KevinJGV`) vía
+  GitHub API, con doble guard de secrets. e2e ✅ (800+800 chunks, 0 fuga de secrets, `/chat` cita el repo).
 - ✅ **Paso 4 — Curación agéntica** (`saveFact` + HITL): **HECHO** (2026-06-14, ver Historial). El "decide qué guardar".
-- **Paso 1 — Fuentes crudas** (pendiente): collectors que leen **repo md/código** (no HTML desplegado). Mismo
-  patrón `collectX()→DocChunk[]`. Su propio par design+plan.
-- **Paso 2 — Self-awareness** (pendiente): Vaio ingiere **su propio repo** ("sus tripas"). ⚠️ excluir secrets/`.env`.
 - **Paso 3 — Acceso en tiempo real / on-demand** (pendiente): retrieval como **read-action del harness** (eje 2,
-  ya existe la infra); sync continuo → Fase 3.
+  ya existe la infra; reusa la maquinaria de pasos 1+2); sync continuo → Fase 3. Su propio par design+plan.
 - **Paso 5 — Grafos** (pendiente, Fase 3): `facts` → Graphiti bi-temporal.
-> **Los pasos 1-3 son el corazón del "vivo" que falta** (paso 4 ya da la curación; 1-3 dan el acceso a lo crudo).
+> ⚠️ **Followup de grounding (hallazgo del e2e 2026-06-14) — habilitar la auto-introspección.** Pasos 1+2 dejaron
+> el código de Vaio EN la memoria y el retrieval anda, PERO la política del prompt (chat público: "no reveles
+> internals/configuración") **bloquea** que Vaio hable de "su propio código" cuando se lo pedís directo (declina sin
+> consultar `searchMemory`). Es un **sobre-alcance del prompt**: el repo es **PÚBLICO** (≠ system prompt / secrets,
+> que SÍ deben protegerse). Misma clase que el bug voz≠hechos. **Fix (su propio design+plan):** distinguir en el
+> prompt "system prompt + secrets" (proteger) de "código público del repo de Vaio" (consultable vía `searchMemory`);
+> enumerar el repo propio como categoría en la descripción de `searchMemory`; cuidar no romper la protección anti-fuga.
+> **Paso 3 = el corazón del "vivo" que falta** (pasos 1+2 ya dan el acceso batch a lo crudo; el 3 lo hace on-demand).
 > Cada paso = su propio `brainstorming` → design+plan cuando se priorice.
+
+### 🟠 Pendiente PRIORIZADO — Adjudicación de conflictos + staleness de `facts` (su propio par design+plan)
+**Planteado por Kevin (2026-06-14).** Hoy `saveFact` es **solo aditivo**: si Kevin confirma "me gusta X" y
+luego "ya no, ahora Y", quedan **dos facts `confirmed`** y `searchMemory` devuelve **ambos** → el modelo adivina
+cuál vale. **Estado real (verificado en código):** el **cimiento bi-temporal está** (`facts` con
+`valid_at`/`invalid_at` + `created_at`/`expired_at`; "invalidar = marcar, nunca borrar"; `searchMemory` lee solo
+`status='confirmed' AND invalid_at IS NULL`, `schema.ts:121-144`), pero el **motor NO**: el puerto `FactStore`
+(`ports/facts.ts`) solo tiene `propose/commit/reject/listPending` — **no hay `invalidate(id)`/`supersede(old,new)`**
+y `commit` (`neon-facts.ts:28-48`) confirma **sin mirar si contradice** un fact ya confirmado.
+**Forma propuesta** (esbozo, NO es el diseño aún):
+- Al **commit**, buscar facts confirmados semánticamente cercanos (vector + mismo `principal`) sobre un umbral → detectar conflicto.
+- Resolver: **auto-invalidar** el viejo (`invalid_at=now()`) **o, mejor, HITL** ("choca con 'X' del 12/6, ¿lo reemplazo?") — encaja con el seam HITL existente.
+- Agregar `invalidate(id)`/`supersede(oldId,newId)` al puerto `FactStore` + (opcional) columna `supersedes` para procedencia (migración).
+- ⚠️ **Aprendizaje load-bearing** (research del propio NEXT-STEPS, §"Grafos", claim **refutado**): NO confiar en que
+  "el retrieval lo resuelve y el modelo prefiere lo recuperado" — los modelos buenos **resisten** lo recuperado →
+  **la adjudicación tiene que pasar al ESCRIBIR (write/ingest), no en retrieval.**
+- **Encaje con el norte:** es el paso que falta para que la curación de "Vaio se nutre solo" sea **confiable** (no
+  solo aditiva). Relacionado: extracción automática post-conversación (otro pendiente) y, en Fase 3, edges
+  temporales de aprobación en grafo (Graphiti bi-temporal).
 
 ### 🔵 Pendiente FUTURO — Neon como DB reactiva estilo Convex
 El **hot-sync de esquema** (`db:push`) ya da la DX de "el esquema sigue al código". La **reactividad real**

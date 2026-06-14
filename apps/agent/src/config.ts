@@ -5,6 +5,16 @@
 import "./load-env.js"
 import { z } from "zod"
 
+/** Entero positivo con default que TOLERA string vacío. `z.coerce.number()` convierte "" → 0 (y `.default()`
+ *  solo aplica a `undefined`, no a ""), así que una var presente-pero-vacía en `.env` rompería `.positive()`.
+ *  El preprocess mapea "" → undefined para que caiga al default. */
+function positiveIntWithDefault(def: number) {
+  return z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.coerce.number().int().positive().default(def)
+  )
+}
+
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(8787),
 
@@ -59,6 +69,15 @@ const envSchema = z.object({
   GITHUB_USER: z.string().default("KevinJGV"),
   LASTFM_API_KEY: z.string().optional(),
   LASTFM_USER: z.string().optional(),
+
+  // "Vaio se nutre solo" (pasos 1+2): ingesta de fuentes CRUDAS (md + código) de repos curados, incl. el
+  // propio repo (self-awareness). csv de "owner/repo[@branch]" (branch omitido → default branch del repo).
+  // Vacío/ausente → la fuente no corre (degrada limpio). Reusa GITHUB_TOKEN.
+  RAW_SOURCE_REPOS: z.string().optional(),
+  // Cap defensivo de tamaño por archivo crudo (default 100KB). Más grande ≈ generado/datos → se descarta.
+  RAW_FILE_MAX_BYTES: positiveIntWithDefault(100 * 1024),
+  // Cap de chunks por repo (corta runaway de embeddings; los descartes se LOGUEAN, no se truncan en silencio).
+  RAW_REPO_MAX_CHUNKS: positiveIntWithDefault(800),
 
   // Memoria conversacional.
   SUMMARY_MODELS: z.string().optional(), // modelo barato del resumen; default = cola de la cadena.
@@ -187,6 +206,30 @@ export function speechChain(env: Env): SpeechEntry[] {
       } satisfies SpeechEntry
     })
     .filter((e): e is SpeechEntry => e !== null)
+}
+
+/** Spec de un repo a ingerir como fuente cruda (parseado de RAW_SOURCE_REPOS). */
+export interface RawRepoSpec {
+  owner: string
+  repo: string
+  branch?: string
+}
+
+/** RAW_SOURCE_REPOS (csv "owner/repo[@branch]") → lista de specs. Descarta entradas malformadas
+ *  (sin "owner/repo"). Vacío/ausente → []. Puro/testeable (mismo estilo que speechChain). */
+export function rawSourceRepos(env: Env): RawRepoSpec[] {
+  return csv(env.RAW_SOURCE_REPOS)
+    .map((entry) => {
+      const [slug, branch] = entry.split("@").map((p) => p.trim())
+      const [owner, repo] = (slug ?? "").split("/").map((p) => p.trim())
+      if (!owner || !repo) return null
+      return {
+        owner,
+        repo,
+        ...(branch ? { branch } : {}),
+      } satisfies RawRepoSpec
+    })
+    .filter((s): s is RawRepoSpec => s !== null)
 }
 
 /** Telegram user ids permitidos (csv → Set<number>, descarta vacíos y no-numéricos). */

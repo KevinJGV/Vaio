@@ -386,3 +386,26 @@ El código typecheckeó sin cambios de API salvo **dos rupturas reales**:
   los documentos; mezclar modelos da vectores incompatibles (distancia coseno sin sentido). Cambiarlo exige
   reingestar. Es la excepción correcta, no un olvido.
 - **Convención:** env que aceptan cadena = **plural** (`*_MODELS`); el único modelo = **singular** (`EMBEDDINGS_MODEL`).
+
+### Ingesta de fuentes CRUDAS de repos — "Vaio se nutre solo" pasos 1+2 (jun-2026)
+- **`z.coerce.number().default()` NO protege contra string vacío en `.env`.** `Number("")` es `0`, y `.default()`
+  solo aplica a `undefined` → una var **presente pero vacía** (`RAW_FILE_MAX_BYTES=`) coerce a `0` → falla
+  `.positive()` → `loadConfig` tira y la ingesta NO arranca. **Lo destapó el e2e** (no los unit tests, que pasaban
+  `Env` parcial sin pisar el schema real). **Fix:** helper `positiveIntWithDefault(def)` con `z.preprocess(v => v
+  === "" ? undefined : v, …)` → vacío cae al default. ⚠️ Mismo patrón latente en otros caps (`MEDIA_MAX_BYTES`,
+  `SUMMARY_THRESHOLD`…): si alguna vez se ponen vacías en `.env`, romperían igual. Test de regresión en `config.test.ts`.
+- **`source = "repo:<owner>/<repo>"`** (un source por repo) → `clearSource` idempotente POR repo (reingesta uno
+  sin tocar los demás); el prefijo `repo:` evita colisión con el collector `github` (que guarda solo descripciones).
+  `url` = blob URL del archivo → procedencia clickeable. Entra al RAG por el `unionAll` de `searchMemory` sin tocar el core.
+- **Seguridad en 2 capas (Invariante #5):** (1) filtro por PATH (`.env*`/`*.pem`/`*.key`/lockfiles, salvo
+  `.env.example` whitelisted) descarta los contenedores obvios ANTES de bajarlos; (2) `scanSecrets` sobre el
+  CONTENIDO bajado (alto-recall) → **SKIP del archivo entero (no redact)**: redactar deja el riesgo de un patrón no
+  cubierto. Falsos-positivos cubiertos: `.env.example` real, `process.env.X`, placeholders.
+- **Chunking por tipo:** prosa (`.md/.txt`) reusa `chunkText` (corte por palabra); código usa `chunkCode` (corte por
+  LÍNEA + overlap de líneas, anti-loop con `start = max(end - overlap, start+1)`). Cada chunk lleva header de
+  procedencia (`// repo · path · lang`) — load-bearing para el recall (inyecta path/lang al espacio de embeddings).
+- **GitHub API (verificado context7):** Trees recursive (`?recursive=1`, acepta branch como `tree_sha`, `truncated`
+  a 100k entries/7MB) + Contents raw (`Accept: application/vnd.github.raw+json`, sirve hasta 100MB, sin base64).
+  Best-effort por repo Y por archivo (404/privado/binario no rompen el resto). Cap `maxChunksPerRepo` con log de descartes.
+- **Paso 3 (acceso on-demand como read-action del harness) quedó fuera** — su propio incremento; reusa toda esta
+  maquinaria (collector/filtros/secret-scan/chunker/githubRaw). Ver `NEXT-STEPS.md` §"Vaio se nutre solo".
