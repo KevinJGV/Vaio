@@ -11,7 +11,6 @@ import { recentActivity } from "./recent-activity.js"
 import { rememberFact } from "./remember-fact.js"
 import { resolveFact } from "./resolve-fact.js"
 import { searchMemory } from "./search-memory.js"
-import { syncRepoAction } from "./sync-repo.js"
 import type { ActionContext, ActionDescriptor } from "./types.js"
 
 /** Único lugar donde se listan las acciones que el harness sabe construir. */
@@ -20,7 +19,6 @@ export const ACTIONS: ActionDescriptor[] = [
   rememberFact,
   resolveFact,
   checkRepoFreshness,
-  syncRepoAction,
   recentActivity,
 ]
 

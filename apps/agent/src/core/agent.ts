@@ -83,10 +83,8 @@ export interface AgentDeps {
   factRetrieveDistance?: number
   /** Sync de repos (frescura + sync incremental). null = sin DB/token → las tools de sync degradan. */
   repoSync?: RepoSyncPort | null
-  /** Repos curados que Vaio conoce (RAW_SOURCE_REPOS) → el set cerrado de check/syncRepo. */
+  /** Repos curados que Vaio conoce (RAW_SOURCE_REPOS) → el set cerrado de checkRepoFreshness. */
   knownRepos?: RepoSyncSpec[]
-  /** Umbral de archivos para sync inline vs diferido (default 20). */
-  syncInlineMaxFiles?: number
   /** Conectores de actividad/estado en vivo (Last.fm, GitHub, …) para la tool recentActivity. */
   connectors?: Connector[]
   /** Zona horaria de Kevin para el "sentido del ahora" (default America/Bogota). */
@@ -157,7 +155,6 @@ export function createAgent(deps: AgentDeps) {
     factRetrieveDistance = 0.7,
     repoSync = null,
     knownRepos = [],
-    syncInlineMaxFiles = 20,
     connectors = [],
     ownerTimezone = "America/Bogota",
   } = deps
@@ -306,7 +303,6 @@ export function createAgent(deps: AgentDeps) {
           factRetrieveDistance,
           repoSync,
           knownRepos,
-          syncInlineMaxFiles,
           connectors,
         }),
         onChunk({ chunk }) {

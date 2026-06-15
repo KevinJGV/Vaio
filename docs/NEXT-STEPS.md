@@ -74,9 +74,12 @@
   **4** chunks `trend:*` derivados (en transacción; verificado 0 filas). La violación de grounding (historia
   fabricada narrada como real) queda resuelta. Nota: ahí estaba el origen del `"se achicó"` del Followup ① ("el
   espectro musical de Kevin se achicó"). La acumulación real arranca limpia al activar trends.
-- [ ] **Activar trends REALES en prod.** `TRENDS_ENABLED=1` en Railway + (recordatorio) `WAKATIME_API_KEY`/
-  `STEAM_API_KEY`/`STEAM_ID` en secrets. Tras limpiar el seed: `pnpm ingest` acumula la 1ª captura real; las
-  tendencias reales emergen recién con la 2ª corrida (cuando cambie la actividad). Verificar acumulación real.
+- [ ] **Activar trends REALES en prod — DIFERIDO (gate: 1ª versión bien establecida + integración completa en el
+  portafolio).** Decisión de Kevin (2026-06-15): **toda activación de trends y todo cambio de env en producción** se
+  hace recién cuando Vaio tenga una **primera versión bien establecida desplegada**; la **señal disparadora = la
+  integración completa en el portafolio**. Hasta entonces, no tocar Railway/secrets. Cuando llegue: `TRENDS_ENABLED=1`
+  + `WAKATIME_API_KEY`/`STEAM_API_KEY`/`STEAM_ID` en secrets; `pnpm ingest` acumula la 1ª captura; las tendencias
+  reales emergen con la 2ª corrida. (Mismo gate para los 3 conectores nuevos: WakaTime/Steam/GitHub-stats en prod.)
 - [?] **Followup ① — corrupción de texto en `searchMemory` → CAUSA RAÍZ HALLADA + FIX (pend. verificación de Kevin).**
   NO era el reranker (solo devuelve `index`/`score`, jamás texto) NI un artefacto de log: era **corrupción REAL** —
   `searchMemory` **comprimía** cada chunk recuperado y cavemem (compresor de PROSA) borra artículos ES+EN
@@ -98,6 +101,15 @@
   typecheck/biome limpios. **e2e ✅:** `/chat` real → `searchMemory` 9.8s (baseline, sin bloqueo). Detalle →
   `LEARNINGS.md`. **Optimización follow-up (no urgente, Kevin "largo OK"):** el embedding corre DENTRO de la tx de
   `replaceFile` (retiene conexión del pool max=10) → sacarlo de la tx reduce contención del sync de fondo.
+- [?] **Tools de freshness rediseñadas (hermano del Followup ②) → FIX (pend. verificación de Kevin).** Los logs de
+  Kevin mostraron un turno de **211s**: el gate ya iba background, pero el **tool `syncRepo`** que el modelo invocaba
+  explícitamente al ver "stale" sincronizaba **inline** (16 archivos = 191s) + era redundante con el gate + daba
+  estados contradictorios (check "stale" → sync "ya estaba al día"). **Fundó el Invariante #9** (minimizar el
+  encadenamiento; tools auto-contenidas — pedido de Kevin de hacerlo trascendente). **Fix (decisión de Kevin):**
+  **eliminado el tool `syncRepo`**; `checkRepoFreshness` (read) ahora, si detecta stale, **dispara el sync en
+  background sola** y reporta — el modelo solo consulta, nunca sincroniza ni bloquea. Quitado el plumbing
+  `syncInlineMaxFiles`/`SYNC_INLINE_MAX_FILES`; prompt/capabilities actualizados. **325 tests**; typecheck/biome
+  limpios. **e2e ✅:** repo **forzado stale** → `/chat` en **12s** (no 191s) + bg sync auto-sanante. → `LEARNINGS.md`.
 > **Mejora futura diferida (Kevin "dejémoslo así por ahora", 2026-06-15) — streaming en TOPICS de Telegram:**
 > hoy el streaming en vivo solo va en chats privados (límite de `sendMessageDraft`); en topics aparece de golpe
 > (typing fallback). Para streamear en topics → `editMessageText` (universal, pero "parpadea" al editar y hay que

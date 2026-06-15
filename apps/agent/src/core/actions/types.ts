@@ -45,11 +45,9 @@ export interface ActionContext {
   factRetrieveDistance?: number
   /** Sync de repos (frescura + sync incremental). null = sin DB/token → las tools de sync degradan. */
   repoSync?: RepoSyncPort | null
-  /** Repos curados que Vaio conoce (de RAW_SOURCE_REPOS): el SET CERRADO que ofrecen check/syncRepo como enum
-   *  (Invariante #8: el modelo elige uno, no tipea owner/repo libre). Vacío → las tools de repos degradan. */
+  /** Repos curados que Vaio conoce (de RAW_SOURCE_REPOS): el SET CERRADO que ofrece checkRepoFreshness como enum
+   *  (Invariante #8: el modelo elige uno, no tipea owner/repo libre). Vacío → la tool de freshness degrada. */
   knownRepos?: RepoSyncSpec[]
-  /** Umbral de archivos para sync inline vs diferido (default 20). */
-  syncInlineMaxFiles?: number
   /** Conectores de actividad/estado en vivo (Last.fm, GitHub, …) para la tool recentActivity. */
   connectors?: Connector[]
 }

@@ -438,3 +438,18 @@ El código typecheckeó sin cambios de API salvo **dos rupturas reales**:
   **DENTRO** de la `db.transaction` → retiene una conexión del pool (`new Pool` sin `max` = **10** default) durante
   toda la red del embedding. Con un sync de fondo + el RAG del turno compitiendo → contención del pool. Sacar el
   embed FUERA de la tx (embeber, después tx corta delete+insert) lo aliviaría. Diferido (Kevin: "largo OK si notifica").
+- **⚠️ El sync NO debe ser una WRITE-ACTION del modelo — la frescura la gestiona el SISTEMA (Invariante #8)**
+  (2026-06-15, hermano del fix del gate; lo destaparon logs de Kevin: un turno de **211s**). Arreglar el gate no
+  alcanzó: existía un **tool `syncRepo`** que el modelo invocaba explícitamente al ver "stale", y sincronizaba
+  **inline** si el diff ≤ 20 archivos → 16 archivos = **191s** colgando el turno. Además **redundante** (el gate ya
+  sincroniza en background) y **confuso** (`checkRepoFreshness` decía "desactualizado" → el modelo corría `syncRepo`
+  → "ya estaba al día", deduplicado por el guard de in-flight → razonamiento contradictorio). **El sync es gestión
+  de ESTADO/DATOS, no intención** → no debe ser una tool del modelo (Invariante #8). **Fix (decisión de Kevin):**
+  **eliminado el tool `syncRepo`**; `checkRepoFreshness` (read) ahora, si detecta stale, **dispara el sync en
+  background** (`void repoSync.sync`) y reporta "ya lo pongo al día solo en segundo plano". El modelo solo CONSULTA
+  y reporta; nunca sincroniza ni bloquea. Quitado el plumbing `syncInlineMaxFiles`/`SYNC_INLINE_MAX_FILES`. (La
+  función orquestadora `syncRepo` se queda: la usa `pnpm sync` offline.) e2e con repo **forzado stale**: `/chat` en
+  **12s** (no 191s) + bg sync auto-sanante (restaura `tracked_repos` al HEAD real). **Este caso fundó el Invariante
+  #9** (`CLAUDE.md` + memoria `tools-self-contained-minimize-chaining`): minimizar el encadenamiento de acciones del
+  modelo; tools versátiles/auto-contenidas que engloben la tarea (acción automática del sistema + feedback), no
+  atómicas que el modelo deba orquestar — sobre todo si exponen estados async no sincronizados.

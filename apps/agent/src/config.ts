@@ -149,8 +149,6 @@ const envSchema = z.object({
   TREND_MODELS: z.string().optional(),
   // Retención de snapshots por source (cuántos guardar / pasar al LLM). Default 12.
   TREND_RETENTION: positiveIntWithDefault(12),
-  // Sync incremental de repos: umbral de archivos cambiados para hacerlo INLINE en el chat; más → background. Default 20.
-  SYNC_INLINE_MAX_FILES: positiveIntWithDefault(20),
   // Freshness gate: TTL (minutos) — no rechequea la frescura de un repo si lo hizo hace menos. Default 10.
   FRESHNESS_TTL_MINUTES: positiveIntWithDefault(10),
   // Fuerza re-index FULL en `sync.ts` (clearSource + re-embeber todo) ignorando frescura. Para re-index puntual

@@ -35,6 +35,18 @@ lateral) y —más adelante— por Telegram y correo. **TypeScript** · **Hono**
    pequeño / boolean). El sistema mapea esas opciones a los ids/objetos reales. **Excepciones: pocas y
    controladas** — selección de opciones, o datos de baja cardinalidad con **fallo VISIBLE** (nunca silencioso).
    **Auditá cada tool nueva contra esto** (ver `docs/superpowers/specs/2026-06-14-llm-no-relay-ids-design.md`).
+9. **Minimizá el ENCADENAMIENTO de acciones del modelo — tools VERSÁTILES y AUTO-CONTENIDAS, no atómicas que el
+   modelo deba orquestar.** Hacer que Vaio piense "qué tool sigue" y encadene pasos es una **ventana de fallo en la
+   cadena de ejecución** (hermano del #8: ahí el riesgo es relayar datos; acá es orquestar flujos). **Peor aún si
+   los pasos corren async y exponen estados NO sincronizados entre sí** (p.ej. una tool reporta "stale" y la
+   siguiente, deduplicada por un guard de in-flight, dice "ya está al día" → el modelo se contradice). **Regla:**
+   una tool **engloba la tarea completa** — incluida la acción derivada (disparada **automáticamente** por el
+   sistema) **+ feedback del proceso** al modelo — en vez de partirla en varias que el modelo deba coordinar.
+   Dale a Vaio todo lo más **masticado** posible: acciones automáticas/determinísticas del sistema, tools que se
+   auto-resuelven y le devuelven estado, para que **no dé vueltas**. Caso fundacional (2026-06-15): se colapsó
+   `checkRepoFreshness`+`syncRepo` (dos tools que el modelo encadenaba, con estados async contradictorios y un sync
+   inline de 191s) en **una sola** `checkRepoFreshness` que consulta, **dispara el sync en background sola** y
+   reporta — el modelo solo consulta, el sistema gestiona. Ver memoria `tools-self-contained-minimize-chaining`.
 
 ---
 

@@ -211,7 +211,6 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
     factRetrieveDistance: env.FACT_RETRIEVE_DISTANCE,
     repoSync,
     knownRepos: rawSourceRepos(env),
-    syncInlineMaxFiles: env.SYNC_INLINE_MAX_FILES,
     connectors,
     ownerTimezone: env.OWNER_TIMEZONE,
   })
