@@ -63,15 +63,19 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [~] **Acumulación + patrones de conectores en el tiempo ("trends") (#3 del orden de Kevin) — EN CURSO** (rama
-  `feat/connector-trends`). Plan aprobado + specs
-  ([`…-design.md`](superpowers/specs/2026-06-15-connector-trends-design.md) ·
-  [`…-plan.md`](superpowers/specs/2026-06-15-connector-trends-plan.md)). Decisiones (Kevin): alcance **rico con
-  clasificación** (vía LLM), patrones como **chunks en memoria**, **timestamp-aware** (cadencia manual). Diseño:
-  tabla `connector_snapshots` (serie temporal de los textos de `collect()` + hash/dedup + `payload` jsonb seam),
-  derivación de tendencia con LLM (degrada a delta determinístico) → chunk `trend:<source>`. Flag OFF por defecto.
-  **Precursor de los grafos (Fase 3):** el `SnapshotStore` + `payload` jsonb son graph-ready (ver §forward-link
-  del design). Diseño con **Plan agent**; implementación directa/secuencial (7 fases, TDD).
+- [?] **Acumulación + patrones de conectores ("trends") (#3) — IMPLEMENTADO + e2e Neon, pend. owner + merge**
+  (rama `feat/connector-trends`). Tabla `connector_snapshots` (serie temporal, migración **0008** aplicada) +
+  derivación de tendencia con LLM (degrada a delta determinístico) → chunk `trend:<source>` en `documents`
+  (`searchMemory` lo trae solo). Cada ingest: collect → snapshot vigente → append (dedup por hash) → prune →
+  listRecent → `buildTrendPrompt` (grounded ES/EN) → `summarize`/`deterministicTrend` → upsert. Flag
+  `TRENDS_ENABLED` **OFF por defecto**. Alcance rico con clasificación (vía LLM), chunks en memoria,
+  timestamp-aware. **Precursor graph-ready** (Fase 3): `SnapshotStore` + `payload` jsonb (ver §forward-link del
+  design). **326 tests** (+11); typecheck/biome/build limpios. **e2e Neon ✅:** append/dedup/listRecent/prune
+  reales + LLM derivó tendencia grounded ("en los últimos 14 días… incorporó Hades II (8h)… añadió Cuphead").
+  Specs → [`…-design.md`](superpowers/specs/2026-06-15-connector-trends-design.md) ·
+  [`…-plan.md`](superpowers/specs/2026-06-15-connector-trends-plan.md). **Falta:** activar `TRENDS_ENABLED=1` +
+  `pnpm ingest` ×2 (con cambios reales) + verificar que Vaio menciona la tendencia + merge. **Followup:** si el
+  chunk `trend:*` no aflora en el RAG (se ahoga como pasó con los facts) → prioridad de retrieval estilo `searchFacts`.
 > **Mejora futura diferida (Kevin "dejémoslo así por ahora", 2026-06-15) — streaming en TOPICS de Telegram:**
 > hoy el streaming en vivo solo va en chats privados (límite de `sendMessageDraft`); en topics aparece de golpe
 > (typing fallback). Para streamear en topics → `editMessageText` (universal, pero "parpadea" al editar y hay que
