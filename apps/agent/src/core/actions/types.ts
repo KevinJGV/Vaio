@@ -10,7 +10,7 @@ import type { Connector } from "../../ports/connector.js"
 import type { FactStore } from "../../ports/facts.js"
 import type { Logger } from "../../ports/logger.js"
 import type { MemoryStore } from "../../ports/memory.js"
-import type { RepoSyncPort } from "../../ports/repo-sync.js"
+import type { RepoSyncPort, RepoSyncSpec } from "../../ports/repo-sync.js"
 import type { Reranker } from "../../ports/rerank.js"
 import type { CapabilityProfile, Principal, ToolName } from "../capabilities.js"
 
@@ -49,6 +49,9 @@ export interface ActionContext {
   factRetrieveDistance?: number
   /** Sync de repos (frescura + sync incremental). null = sin DB/token → las tools de sync degradan. */
   repoSync?: RepoSyncPort | null
+  /** Repos curados que Vaio conoce (de RAW_SOURCE_REPOS): el SET CERRADO que ofrecen check/syncRepo como enum
+   *  (Invariante #8: el modelo elige uno, no tipea owner/repo libre). Vacío → las tools de repos degradan. */
+  knownRepos?: RepoSyncSpec[]
   /** Umbral de archivos para sync inline vs diferido (default 20). */
   syncInlineMaxFiles?: number
   /** Conectores de actividad/estado en vivo (Last.fm, GitHub, …) para la tool recentActivity. */

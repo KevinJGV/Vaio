@@ -5,6 +5,7 @@
 
 import { tool } from "ai"
 import { z } from "zod"
+import { repoSlug, resolveKnownRepo } from "./repo-select.js"
 import type { ActionContext, ActionDescriptor } from "./types.js"
 
 export const syncRepoAction: ActionDescriptor = {
@@ -12,14 +13,22 @@ export const syncRepoAction: ActionDescriptor = {
   sideEffecting: true,
   clearance: "anyone",
   build(ctx: ActionContext) {
+    // Invariante #8: el modelo ELIGE el repo de un set cerrado (enum), no tipea owner/repo libre.
+    const repos = ctx.knownRepos ?? []
+    const slugs = repos.map(repoSlug)
+    const inputSchema =
+      slugs.length > 0
+        ? z.object({
+            repo: z
+              .enum(slugs as [string, ...string[]])
+              .describe("Elegí el repo de la lista (de los que conocés)."),
+          })
+        : z.object({})
     return tool({
       description:
-        "Pone al día (re-indexa lo cambiado) tu copia de un repo que YA conocés, para responder con su estado actual. Llamala cuando checkRepoFreshness dé 'desactualizado'. NO sirve para repos nuevos/ajenos.",
-      inputSchema: z.object({
-        owner: z.string().describe("Dueño del repo, p.ej. KevinJGV."),
-        repo: z.string().describe("Nombre del repo, p.ej. Vaio."),
-      }),
-      execute: async ({ owner, repo }, { toolCallId }) => {
+        "Pone al día (re-indexa lo cambiado) tu copia de un repo que YA conocés, para responder con su estado actual. Elegí el repo de la lista. Llamala cuando checkRepoFreshness dé 'desactualizado'. NO sirve para repos nuevos/ajenos.",
+      inputSchema,
+      execute: async (args, { toolCallId }) => {
         const t0 = Date.now()
         const done = (ok: boolean, output: string, denied?: boolean) => {
           ctx.emit({
@@ -37,6 +46,14 @@ export const syncRepoAction: ActionDescriptor = {
         if (!ctx.repoSync) {
           return done(false, "No puedo sincronizar repos ahora mismo.")
         }
+        const spec = resolveKnownRepo(repos, (args as { repo?: string }).repo)
+        if (!spec) {
+          return done(
+            false,
+            "Por ahora no tengo repos que conozca para poner al día."
+          )
+        }
+        const { owner, repo } = spec
         try {
           if (!(await ctx.repoSync.isTracked({ owner, repo }))) {
             return done(

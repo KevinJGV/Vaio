@@ -39,6 +39,8 @@ function ctx(
     ids,
     logger: noopLogger(),
     repoSync,
+    // Invariante #8: el modelo elige el repo de este set cerrado (enum); no tipea owner/repo.
+    knownRepos: [{ owner: "kev", repo: "vaio" }],
     ...extra,
   }
 }
@@ -57,20 +59,14 @@ describe("checkRepoFreshness", () => {
     }
     const t = checkRepoFreshness.build(ctx(repoSync))
     const out = String(
-      await t.execute?.(
-        { owner: "kev", repo: "vaio" },
-        { toolCallId: "c", messages: [] }
-      )
+      await t.execute?.({ repo: "kev/vaio" }, { toolCallId: "c", messages: [] })
     )
     expect(out.toLowerCase()).toContain("desactualizada")
   })
   it("degrada si no hay repoSync", async () => {
     const t = checkRepoFreshness.build(ctx(null))
     const out = String(
-      await t.execute?.(
-        { owner: "k", repo: "v" },
-        { toolCallId: "c", messages: [] }
-      )
+      await t.execute?.({ repo: "kev/vaio" }, { toolCallId: "c", messages: [] })
     )
     expect(out.toLowerCase()).toContain("no puedo")
   })
@@ -90,15 +86,12 @@ describe("syncRepo (tool)", () => {
     }
     const t = syncRepoAction.build(ctx(repoSync))
     const out = String(
-      await t.execute?.(
-        { owner: "kev", repo: "vaio" },
-        { toolCallId: "c", messages: [] }
-      )
+      await t.execute?.({ repo: "kev/vaio" }, { toolCallId: "c", messages: [] })
     )
     expect(out.toLowerCase()).toContain("actualicé")
   })
 
-  it("repo NO trackeado → denegado (parte 2)", async () => {
+  it("repo conocido pero aún no trackeado en DB → denegado (parte 2)", async () => {
     const events: TraceEvent[] = []
     const repoSync: RepoSyncPort = {
       freshness: async () => ({ state: "untracked" }),
@@ -114,15 +107,28 @@ describe("syncRepo (tool)", () => {
       ctx(repoSync, { emit: (e) => events.push(e) })
     )
     const out = String(
-      await t.execute?.(
-        { owner: "ajeno", repo: "x" },
-        { toolCallId: "c", messages: [] }
-      )
+      await t.execute?.({ repo: "kev/vaio" }, { toolCallId: "c", messages: [] })
     )
     expect(out.toLowerCase()).toContain("no tengo")
     expect(events.find((e) => e.type === "tool.result")).toMatchObject({
       denied: true,
     })
+  })
+
+  it("knownRepos vacío → degrada sin romper (no hay repos que conozca)", async () => {
+    const repoSync: RepoSyncPort = {
+      freshness: async () => ({ state: "fresh" }),
+      sync: async () => ({
+        mode: "skipped-fresh",
+        embedded: 0,
+        deleted: 0,
+        unchanged: 0,
+      }),
+      isTracked: async () => true,
+    }
+    const t = syncRepoAction.build(ctx(repoSync, { knownRepos: [] }))
+    const out = String(await t.execute?.({}, { toolCallId: "c", messages: [] }))
+    expect(out.toLowerCase()).toContain("no tengo repos")
   })
 
   it("diff grande (deferred) → avisa que actualiza en background", async () => {
@@ -139,10 +145,7 @@ describe("syncRepo (tool)", () => {
     }
     const t = syncRepoAction.build(ctx(repoSync, { syncInlineMaxFiles: 20 }))
     const out = String(
-      await t.execute?.(
-        { owner: "kev", repo: "vaio" },
-        { toolCallId: "c", messages: [] }
-      )
+      await t.execute?.({ repo: "kev/vaio" }, { toolCallId: "c", messages: [] })
     )
     expect(out.toLowerCase()).toContain("segundo plano")
     // el refresco background se disparó (fire-and-forget)

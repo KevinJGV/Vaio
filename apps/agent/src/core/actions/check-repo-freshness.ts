@@ -4,6 +4,7 @@
 
 import { tool } from "ai"
 import { z } from "zod"
+import { repoSlug, resolveKnownRepo } from "./repo-select.js"
 import type { ActionContext, ActionDescriptor } from "./types.js"
 
 export const checkRepoFreshness: ActionDescriptor = {
@@ -11,14 +12,22 @@ export const checkRepoFreshness: ActionDescriptor = {
   sideEffecting: false,
   clearance: "anyone",
   build(ctx: ActionContext) {
+    // Invariante #8: el modelo ELIGE el repo de un set cerrado (enum), no tipea owner/repo libre.
+    const repos = ctx.knownRepos ?? []
+    const slugs = repos.map(repoSlug)
+    const inputSchema =
+      slugs.length > 0
+        ? z.object({
+            repo: z
+              .enum(slugs as [string, ...string[]])
+              .describe("Elegí el repo de la lista (de los que conocés)."),
+          })
+        : z.object({})
     return tool({
       description:
-        "Verifica si tu copia indexada de un repo que conocés (p.ej. tu propio KevinJGV/Vaio) está al día con GitHub. Es barato. Usala cuando la respuesta dependa del ESTADO ACTUAL del código/arquitectura de un repo; si da desactualizado, sincronizá con syncRepo antes de responder.",
-      inputSchema: z.object({
-        owner: z.string().describe("Dueño del repo, p.ej. KevinJGV."),
-        repo: z.string().describe("Nombre del repo, p.ej. Vaio."),
-      }),
-      execute: async ({ owner, repo }, { toolCallId }) => {
+        "Verifica si tu copia indexada de un repo que conocés (p.ej. tu propio KevinJGV/Vaio) está al día con GitHub. Es barato. Elegí el repo de la lista. Usala cuando la respuesta dependa del ESTADO ACTUAL del código/arquitectura de un repo; si da desactualizado, sincronizá con syncRepo antes de responder.",
+      inputSchema,
+      execute: async (args, { toolCallId }) => {
         const t0 = Date.now()
         const done = (ok: boolean, output: string) => {
           ctx.emit({
@@ -35,6 +44,14 @@ export const checkRepoFreshness: ActionDescriptor = {
         if (!ctx.repoSync) {
           return done(false, "No puedo verificar repos ahora mismo.")
         }
+        const spec = resolveKnownRepo(repos, (args as { repo?: string }).repo)
+        if (!spec) {
+          return done(
+            false,
+            "Por ahora no tengo repos que conozca para revisar."
+          )
+        }
+        const { owner, repo } = spec
         try {
           const { state } = await ctx.repoSync.freshness({ owner, repo })
           const output =

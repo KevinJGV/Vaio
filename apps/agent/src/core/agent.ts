@@ -30,7 +30,7 @@ import type {
   Transcriber,
 } from "../ports/media.js"
 import type { MemoryStore } from "../ports/memory.js"
-import type { RepoSyncPort } from "../ports/repo-sync.js"
+import type { RepoSyncPort, RepoSyncSpec } from "../ports/repo-sync.js"
 import type { Reranker } from "../ports/rerank.js"
 import type { Summarizer } from "../ports/summary.js"
 import type { TraceSink } from "../ports/trace.js"
@@ -85,6 +85,8 @@ export interface AgentDeps {
   factRetrieveDistance?: number
   /** Sync de repos (frescura + sync incremental). null = sin DB/token → las tools de sync degradan. */
   repoSync?: RepoSyncPort | null
+  /** Repos curados que Vaio conoce (RAW_SOURCE_REPOS) → el set cerrado de check/syncRepo. */
+  knownRepos?: RepoSyncSpec[]
   /** Umbral de archivos para sync inline vs diferido (default 20). */
   syncInlineMaxFiles?: number
   /** Conectores de actividad/estado en vivo (Last.fm, GitHub, …) para la tool recentActivity. */
@@ -157,6 +159,7 @@ export function createAgent(deps: AgentDeps) {
     factRetrieveMax = 4,
     factRetrieveDistance = 0.7,
     repoSync = null,
+    knownRepos = [],
     syncInlineMaxFiles = 20,
     connectors = [],
     ownerTimezone = "America/Bogota",
@@ -307,6 +310,7 @@ export function createAgent(deps: AgentDeps) {
           factRetrieveMax,
           factRetrieveDistance,
           repoSync,
+          knownRepos,
           syncInlineMaxFiles,
           connectors,
         }),
