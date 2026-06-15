@@ -65,6 +65,16 @@
   [`…-llm-no-relay-ids-design.md`](superpowers/specs/2026-06-14-llm-no-relay-ids-design.md) (§Tools de repos).
   **Falta:** e2e por chat (que el modelo dispare la tool con el slug del enum) + merge a `main`. **Es el #1 del
   orden de Kevin; sigue #2 streaming de Telegram, #3 acumulación de conectores.**
+- [?] **Fixes de sync de repos (de logs e2e de Kevin, 2026-06-15) — IMPLEMENTADO, pend. merge** (misma rama
+  `feat/repo-tools-uuid-free`). Dos bugs destapados al ver los logs: **(A) tombstone de descartados** — un archivo
+  descartado al sincronizar (secret/no-texto, p.ej. 5 tests con keys falsas) no tenía chunks en `documents` → el
+  diff lo veía "nuevo" en CADA sync → re-leído+re-warned perpetuo. Fix: registrarlos por blob_sha en
+  `tracked_repos.skipped` (migración **0007** aplicada); el diff los trata como "ya procesados" hasta que el blob
+  cambie. **(B) guard de in-flight** — el tracker se actualiza al final del sync, así que un sync largo en vuelo
+  hacía que cada `searchMemory`/`syncRepo` viera "stale" y disparara OTRO sync full concurrente (3 rondas en los
+  logs). Fix: `Set` de in-flight por repo en `createRepoSync`; una 2ª sync concurrente se saltea. **305 tests**;
+  typecheck/biome/build limpios; e2e Neon del diagnóstico. **Auto-heal:** el 1er sync tras este fix tombstonea los
+  5 (1 warning final) y listo. **Falta:** merge a `main`.
 > **Diferido (no es WIP) — Streaming/typing en Telegram (#3 del feedback de Kevin, 2026-06-15):** mostrar
 > 'escribiendo…' y/o editar el mensaje progresivamente mientras Vaio responde. Feature de UX; requiere verificar
 > la API de Telegram (context7) + tocar el adapter de Telegram. Su propio par design+plan cuando se priorice.
