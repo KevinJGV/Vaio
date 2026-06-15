@@ -51,12 +51,16 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [~] **Adjudicación de conflictos de `facts`** (§🟠 abajo) — EN CURSO (rama `feat/facts-conflict-adjudication`).
-  Plan aprobado + specs escritos
-  ([`…-design.md`](superpowers/specs/2026-06-14-facts-conflict-adjudication-design.md) ·
-  [`…-plan.md`](superpowers/specs/2026-06-14-facts-conflict-adjudication-plan.md)). Decisiones cerradas:
-  detección por cercanía + el modelo juzga · resolución plegada a la confirmación (detecta al proponer) ·
-  linaje `supersedes`. Implementación TDD en marcha (8 fases).
+- [?] **Adjudicación de conflictos de `facts`** — IMPLEMENTADO, pend. verificación owner-chat de Kevin (rama
+  `feat/facts-conflict-adjudication`, sin mergear). `propose` detecta facts confirmados cercanos (coseno, mismo
+  principal); `commit` con `supersedes` invalida bi-temporal el viejo + guarda linaje (col `supersedes`,
+  migración `0006` aplicada). La adjudicación pasa al ESCRIBIR (no al recuperar). **294 tests** (+5); typecheck/
+  biome/build limpios. **e2e directo contra Neon ✅:** "Real Madrid"→"Barcelona" detectó+reemplazó (viejo
+  invalidado, `searchMemory` ya no lo trae); pizza/pasta coexisten (surfacea pero no invalida). Specs →
+  [`…-design.md`](superpowers/specs/2026-06-14-facts-conflict-adjudication-design.md) ·
+  [`…-plan.md`](superpowers/specs/2026-06-14-facts-conflict-adjudication-plan.md). **Falta:** e2e owner real por
+  Telegram (Vaio decidiendo `supersedes` desde la charla) + merge a `main` (tu "go"). ⚠️ Deploy: migración `0006`
+  va antes del código (release step lo hace).
 > **Recordatorio operativo (no es WIP):** para que los 3 conectores nuevos corran **en prod**, las envs
 > `WAKATIME_API_KEY`/`STEAM_API_KEY`/`STEAM_ID` deben estar en los secrets de Railway (sin ellas degradan
 > limpio = apagados; el resto del agente no se ve afectado).
@@ -499,7 +503,14 @@ batch de URLs/APIs de hoy (`adapters/sources/*`) es el **punto de partida a supe
 > **Paso 3 = el corazón del "vivo" que falta** (pasos 1+2 ya dan el acceso batch a lo crudo; el 3 lo hace on-demand).
 > Cada paso = su propio `brainstorming` → design+plan cuando se priorice.
 
-### 🟠 Pendiente PRIORIZADO — Adjudicación de conflictos + staleness de `facts` (su propio par design+plan)
+### ✅ Adjudicación de conflictos de `facts` — IMPLEMENTADO (2026-06-14, ver el WIP `[?]` arriba)
+> **RESUELTO** (rama `feat/facts-conflict-adjudication`, pend. verificación owner-chat + merge). El motor que
+> faltaba (detección al proponer por cercanía + el modelo juzga + `commit` con `supersedes` que invalida
+> bi-temporal + linaje) está hecho y e2e-verificado contra Neon. Specs
+> `2026-06-14-facts-conflict-adjudication-{design,plan}.md`. **Queda futuro (no en esta iteración):** extracción
+> automática post-conversación de facts; `feedback_type` del panel; staleness por TTL de facts sin tocar.
+> Texto original del planteo (referencia histórica):
+
 **Planteado por Kevin (2026-06-14).** Hoy `saveFact` es **solo aditivo**: si Kevin confirma "me gusta X" y
 luego "ya no, ahora Y", quedan **dos facts `confirmed`** y `searchMemory` devuelve **ambos** → el modelo adivina
 cuál vale. **Estado real (verificado en código):** el **cimiento bi-temporal está** (`facts` con
