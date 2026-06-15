@@ -139,6 +139,17 @@ const envSchema = z.object({
   // fact cuente como relevante a la query (generoso; evita inyectar facts claramente off-topic).
   FACT_RETRIEVE_MAX: positiveIntWithDefault(4),
   FACT_RETRIEVE_DISTANCE: positiveFloatWithDefault(0.7),
+
+  // Acumulación + tendencias de conectores ("se nutre en el tiempo"): guarda una serie de snapshots y deriva un
+  // chunk de tendencia (clasificación + deltas) cada ingest. OFF por defecto → ship sin tocar prod hasta el "go".
+  TRENDS_ENABLED: z
+    .string()
+    .optional()
+    .transform((v) => v === "true" || v === "1"),
+  // Modelo(s) de derivación de tendencias (csv, fallback server-side). Vacío → cae a SUMMARY_MODELS / cola del chat.
+  TREND_MODELS: z.string().optional(),
+  // Retención de snapshots por source (cuántos guardar / pasar al LLM). Default 12.
+  TREND_RETENTION: positiveIntWithDefault(12),
   // Sync incremental de repos: umbral de archivos cambiados para hacerlo INLINE en el chat; más → background. Default 20.
   SYNC_INLINE_MAX_FILES: positiveIntWithDefault(20),
   // Freshness gate: TTL (minutos) — no rechequea la frescura de un repo si lo hizo hace menos. Default 10.
@@ -234,6 +245,13 @@ export function transcribeChain(env: Env): string[] {
  *  cae a la cola de la cadena de chat (modelo barato de respaldo). */
 export function summaryChain(env: Env): string[] {
   return csv(env.SUMMARY_MODELS)
+}
+
+/** Cadena de derivación de TENDENCIAS de conectores. `TREND_MODELS` csv → fallback server-side; vacía → cae a
+ *  `summaryChain` (modelo barato del resumen). El llamador (ingest) cae a la cola del chat si ambas vacías. */
+export function trendChain(env: Env): string[] {
+  const own = csv(env.TREND_MODELS)
+  return own.length > 0 ? own : summaryChain(env)
 }
 
 export interface SpeechEntry {

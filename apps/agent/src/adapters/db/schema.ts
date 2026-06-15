@@ -74,6 +74,27 @@ export const trackedRepos = pgTable("tracked_repos", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 })
 
+/** Serie temporal de snapshots de conectores (append-only). Cada fila = una corrida de `collect()` para UN
+ *  source, con su texto formateado + fecha real de captura. Las TENDENCIAS ("trends") se derivan sobre estas
+ *  filas (timestamp-aware, robusto a cadencia irregular). Retención: se podan las viejas por source. Sin
+ *  embedding (se lee por source+fecha, no se busca semánticamente). `payload` = seam futuro a estructurado/grafo. */
+export const connectorSnapshots = pgTable(
+  "connector_snapshots",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    source: text("source").notNull(), // 'lastfm'|'steam'|'wakatime'|'github-stats'|'github'
+    capturedAt: timestamp("captured_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    content: text("content").notNull(), // chunk(s) de collect() de ese source, unidos por "\n"
+    contentHash: text("content_hash").notNull(), // sha256(normalize(content)) → dedup consecutivo
+    payload: jsonb("payload"), // nullable, sin uso hoy: extensión a estructurado/grafo
+  },
+  (t) => [
+    index("connector_snapshots_source_time_idx").on(t.source, t.capturedAt),
+  ]
+)
+
 /** Memoria conversacional: un hilo por (channel, threadKey). `summary` = resumen rodante de los
  *  turnos viejos; `summarizedUpToMessageId` marca hasta qué mensaje se resumió. */
 export const conversations = pgTable(

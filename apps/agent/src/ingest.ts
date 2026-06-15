@@ -13,7 +13,11 @@ import { EMBEDDING_DIM } from "./adapters/db/schema.js"
 import { createEmbedder } from "./adapters/embeddings.js"
 import { createLogger } from "./adapters/logger.js"
 import { createMemoryStore } from "./adapters/neon-memory.js"
-import { loadConfig } from "./config.js"
+import { createSnapshotStore } from "./adapters/neon-snapshots.js"
+import { createModel } from "./adapters/openrouter.js"
+import { createTrendSummarizer } from "./adapters/trend-summarizer.js"
+import { attribution, loadConfig, modelChain, trendChain } from "./config.js"
+import { runConnectorTrend, type TrendDeps } from "./core/trend-ingest.js"
 import type { DocChunk } from "./ports/memory.js"
 
 // Fuentes scrapeadas deprecadas (su contenido es duplicado del repo del portafolio, que sí tiene frescura).
@@ -46,6 +50,33 @@ async function main(): Promise<void> {
   })
   const memory = createMemoryStore(db, embedder)
 
+  // Tendencias ("trends"): acumular snapshots + derivar el patrón. OFF por defecto. El modelo cae a
+  // TREND_MODELS → SUMMARY_MODELS → cola del chat; si no hay ninguno, se saltea (degrada a determinístico).
+  let trendDeps: TrendDeps | undefined
+  if (env.TRENDS_ENABLED) {
+    const trendModels = trendChain(env)
+    const models = trendModels.length > 0 ? trendModels : modelChain(env)
+    if (models.length > 0) {
+      trendDeps = {
+        snapshots: createSnapshotStore(db),
+        summarizer: createTrendSummarizer(
+          createModel(
+            env.OPENROUTER_API_KEY ?? "",
+            models,
+            logger,
+            attribution(env)
+          )
+        ),
+        memory,
+        retention: env.TREND_RETENTION,
+        locale: "es", // owner (Kevin); el ingest es batch, no per-usuario
+        now: new Date(),
+      }
+    } else {
+      logger.info("trends: ON pero sin modelos configurados → se saltea")
+    }
+  }
+
   // Limpieza one-shot de las fuentes scrapeadas deprecadas (idempotente: no-op si ya no existen).
   for (const source of DEPRECATED_SOURCES) {
     await memory.clearSource(source)
@@ -70,6 +101,12 @@ async function main(): Promise<void> {
         await memory.clearSource(source)
         await memory.upsertDocuments(group)
         logger.info({ source, chunks: group.length }, "ingest source")
+        // Tendencia: el snapshot vigente quedó en `documents`; acumular la serie y derivar el patrón.
+        if (trendDeps) {
+          const content = group.map((c) => c.chunk).join("\n")
+          const status = await runConnectorTrend(source, content, trendDeps)
+          logger.info({ source, status }, "ingest trend")
+        }
       }
     } catch (err) {
       logger.error(
