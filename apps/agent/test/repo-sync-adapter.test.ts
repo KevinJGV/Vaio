@@ -325,6 +325,43 @@ describe("createRepoSync.ensureFresh (freshness gate)", () => {
     expect(commitFetches).toBe(1) // 2ª llamada cae en el TTL → no rechequea
   })
 
+  it("guard de in-flight: una 2ª sync concurrente del mismo repo se saltea", async () => {
+    mockGithub((url) => {
+      if (url.includes("/commits/")) return { json: { sha: "c2" } }
+      if (url.includes("/git/trees/"))
+        return { json: tree([{ path: "README.md", sha: "a2" }]) }
+      if (url.includes("/contents/")) return { text: "# x" }
+      return {}
+    })
+    // replaceFile que se cuelga hasta soltar el gate → mantiene el 1er sync "en vuelo".
+    let release!: () => void
+    const gate = new Promise<void>((r) => {
+      release = r
+    })
+    const { mem } = fakeMemory({
+      "repo:kev/vaio": [{ path: "README.md", blobSha: "a" }],
+    })
+    const slowMem = {
+      ...mem,
+      replaceFile: async () => {
+        await gate
+      },
+    }
+    const { tracker } = fakeTracker(trackedFresh())
+    const rs = createRepoSync({
+      memory: slowMem,
+      tracker,
+      policy: DEFAULT_REPO_POLICY,
+    })
+    const spec = { owner: "kev", repo: "vaio", branch: "main" }
+    const p1 = rs.sync(spec) // arranca, se cuelga en replaceFile (in-flight)
+    await new Promise((r) => setTimeout(r, 5)) // dejar que p1 entre a replaceFile
+    const r2 = await rs.sync(spec) // 2ª concurrente → guard → skipped
+    expect(r2.mode).toBe("skipped-fresh")
+    release()
+    await p1
+  })
+
   it("stale → sincroniza inline → refreshed:true", async () => {
     mockGithub((url) => {
       if (url.includes("/commits/")) return { json: { sha: "c2" } } // != c1 → stale

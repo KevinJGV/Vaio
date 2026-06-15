@@ -314,6 +314,33 @@ export function createRepoSync(deps: SyncRepoDeps): RepoSyncPort {
   const inlineMaxFiles = deps.inlineMaxFiles ?? 20
   // Cache TTL del freshness gate (vida de proceso): source → último chequeo (ms epoch via performance.now base).
   const lastChecked = new Map<string, number>()
+  // Guard de in-flight (vida de proceso): un repo no tiene 2 syncs corriendo a la vez. El tracker se actualiza
+  // AL FINAL del sync, así que sin esto, mientras uno largo está en vuelo, cada searchMemory/syncRepo lo ve
+  // "stale" y dispara OTRO sync full concurrente (re-embeber todo N veces + posible race en replaceFile).
+  const inFlight = new Set<string>()
+  const guardedSync = async (
+    spec: RawRepoSpec,
+    opts?: { inlineMaxFiles?: number; forceFull?: boolean }
+  ): Promise<SyncReport> => {
+    const source = `repo:${spec.owner}/${spec.repo}`
+    if (inFlight.has(source)) {
+      // Ya se está sincronizando → no arranques otro (el en vuelo lo deja fresco).
+      return {
+        source,
+        mode: "skipped-fresh",
+        embedded: 0,
+        deleted: 0,
+        unchanged: 0,
+      }
+    }
+    inFlight.add(source)
+    try {
+      return await syncRepo(spec, deps, opts)
+    } finally {
+      inFlight.delete(source)
+    }
+  }
+
   return {
     async freshness(spec) {
       const r = await repoFreshness(spec, {
@@ -323,7 +350,7 @@ export function createRepoSync(deps: SyncRepoDeps): RepoSyncPort {
       return { state: r.state }
     },
     async sync(spec, opts) {
-      const r = await syncRepo(spec, deps, opts)
+      const r = await guardedSync(spec, opts)
       return {
         mode: r.mode,
         embedded: r.embedded,
@@ -351,12 +378,12 @@ export function createRepoSync(deps: SyncRepoDeps): RepoSyncPort {
             token: deps.token,
           })
           if (f.state !== "stale") continue
-          const r = await syncRepo(spec, deps, { inlineMaxFiles })
+          const r = await guardedSync(spec, { inlineMaxFiles })
           if (r.mode === "incremental" || r.mode === "full") {
             refreshed = true // se aplicó inline → re-recuperar para incluir lo fresco
           } else if (r.mode === "deferred") {
             // Diff grande → refresco completo en background (sin reanudación proactiva = incremento 2).
-            void syncRepo(spec, deps).catch(() => {})
+            void guardedSync(spec).catch(() => {})
           }
         } catch (err) {
           deps.logger?.warn(
