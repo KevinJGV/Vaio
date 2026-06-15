@@ -9,6 +9,7 @@ import type { Connector } from "../../ports/connector.js"
 import type { FactStore } from "../../ports/facts.js"
 import type { Logger } from "../../ports/logger.js"
 import type { MemoryStore } from "../../ports/memory.js"
+import type { OwnerRepoCatalog } from "../../ports/owner-repos.js"
 import type { RepoSyncPort, RepoSyncSpec } from "../../ports/repo-sync.js"
 import type { Reranker } from "../../ports/rerank.js"
 import type { CapabilityProfile, Principal, ToolName } from "../capabilities.js"
@@ -50,6 +51,10 @@ export interface ActionContext {
   knownRepos?: RepoSyncSpec[]
   /** Conectores de actividad/estado en vivo (Last.fm, GitHub, …) para la tool recentActivity. */
   connectors?: Connector[]
+  /** Catálogo de repos PÚBLICOS del owner (para resolver nombres en learnRepo). null = sin token/DB → degrada. */
+  ownerRepos?: OwnerRepoCatalog | null
+  /** Owner de los repos (env GITHUB_USER): el sistema arma el spec con esto, NUNCA con un string del modelo. */
+  ownerUser?: string
 }
 
 /** Descriptor de una acción: metadata de gating + cómo construir su tool del AI SDK.

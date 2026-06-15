@@ -7,6 +7,7 @@
 import { type Tool, type ToolSet, tool } from "ai"
 import { z } from "zod"
 import { checkRepoFreshness } from "./check-repo-freshness.js"
+import { learnRepo } from "./learn-repo.js"
 import { recentActivity } from "./recent-activity.js"
 import { rememberFact } from "./remember-fact.js"
 import { resolveFact } from "./resolve-fact.js"
@@ -19,6 +20,7 @@ export const ACTIONS: ActionDescriptor[] = [
   rememberFact,
   resolveFact,
   checkRepoFreshness,
+  learnRepo,
   recentActivity,
 ]
 

@@ -118,6 +118,17 @@
   chequea por las suyas — `checkRepoFreshness` solo si preguntan explícitamente (el gate determinístico mantiene la
   frescura solo). **328 tests**; typecheck/biome limpios. **e2e ✅:** "qué stack usás"→solo searchMemory; "estás al
   día?"→checkRepoFreshness; sync 12 archivos ~12s correcto. → `LEARNINGS.md`. **Mejora futura:** honrar `Retry-After`.
+- [?] **Paso 3 parte 2 — `learnRepo` (ingesta on-demand de repo público de Kevin) — IMPLEMENTADO (pend.
+  verificación conversacional de Kevin por Telegram).** Acción `learnRepo` (owner-only, telegram trusted): el modelo
+  pasa un NOMBRE, el sistema lo valida contra los repos PÚBLICOS reales de Kevin (excepción #8: fallo visible, sin
+  doble confirmación si es inequívoco), y dispara `syncRepo` (full, background) reusando toda la maquinaria — v1 sin
+  notify (turnos proactivos = futuro). Arquitectura: matcher PURO `core/repo-resolve.ts` + puerto/adapter
+  `OwnerRepoCatalog` (listado público cacheado, filtro `private`) + acción auto-contenida. **347 tests** (+19);
+  typecheck/biome limpios. **e2e parcial ✅:** GitHub real (39 repos públicos, shape OK); ingest real de un repo
+  untracked (`Ej_montecarlo`) → `mode:full, embedded:2` en `documents`+`tracked_repos` (limpiado tras la prueba).
+  **Falta:** e2e conversacional por Telegram owner ("hablame de mi repo X" → learnRepo → bg ingest → re-preguntar).
+  Specs [`…-learn-repo-design.md`](superpowers/specs/2026-06-15-learn-repo-design.md) ·
+  [`…-plan.md`](superpowers/specs/2026-06-15-learn-repo-plan.md). Cierra el paso 3 parte 2 de "Vaio se nutre solo".
 > **Mejora futura diferida (Kevin "dejémoslo así por ahora", 2026-06-15) — streaming en TOPICS de Telegram:**
 > hoy el streaming en vivo solo va en chats privados (límite de `sendMessageDraft`); en topics aparece de golpe
 > (typing fallback). Para streamear en topics → `editMessageText` (universal, pero "parpadea" al editar y hay que

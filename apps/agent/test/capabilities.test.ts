@@ -61,6 +61,18 @@ describe("createCapabilityResolver", () => {
     expect(p).toMatch(/secret/)
   })
 
+  it("learnRepo (owner-only) SOLO en el perfil owner-telegram, ausente en web y visitante", () => {
+    expect(
+      resolver.resolve("telegram", principal("telegram", true)).allowedTools
+    ).toContain("learnRepo")
+    expect(
+      resolver.resolve("web", principal("web", false)).allowedTools
+    ).not.toContain("learnRepo")
+    expect(
+      resolver.resolve("telegram", principal("telegram", false)).allowedTools
+    ).not.toContain("learnRepo")
+  })
+
   it("ambas policies de telegram piden formato HTML", () => {
     expect(
       resolver.resolve("telegram", principal("telegram", true)).policyText

@@ -21,6 +21,7 @@ import { createMemoryStore } from "./adapters/neon-memory.js"
 import { createRepoTracker } from "./adapters/neon-tracker.js"
 import { createModel } from "./adapters/openrouter.js"
 import { createReranker } from "./adapters/rerank-openrouter.js"
+import { createOwnerRepoCatalog } from "./adapters/sources/owner-repos.js"
 import { createRepoSync } from "./adapters/sources/repo-sync.js"
 import { createSpeechSynthesizer } from "./adapters/speech-openrouter.js"
 import { createSummarizer } from "./adapters/summarizer.js"
@@ -46,6 +47,7 @@ import {
 import { type Agent, createAgent } from "./core/agent.js"
 import { DEFAULT_REPO_POLICY } from "./core/repo-ingest.js"
 import type { Connector } from "./ports/connector.js"
+import type { OwnerRepoCatalog } from "./ports/owner-repos.js"
 import type { ConversationStore } from "./ports/conversation.js"
 import type { FactStore } from "./ports/facts.js"
 import type { MediaUnderstanding, Transcriber } from "./ports/media.js"
@@ -90,6 +92,7 @@ let mediaUnderstanding: MediaUnderstanding | null = null
 let speech: SpeechSynthesizer | null = null
 let reranker: Reranker | null = null
 let repoSync: RepoSyncPort | null = null
+let ownerRepos: OwnerRepoCatalog | null = null
 let connectors: Connector[] = []
 if (env.OPENROUTER_API_KEY && models.length > 0) {
   let memory: MemoryStore | null = null
@@ -124,6 +127,12 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
         },
         logger,
         freshnessTtlMs: env.FRESHNESS_TTL_MINUTES * 60 * 1000,
+      })
+      // Catálogo de repos públicos del owner (para learnRepo: resolver un nombre → repo real).
+      ownerRepos = createOwnerRepoCatalog({
+        user: env.GITHUB_USER,
+        token: env.GITHUB_TOKEN,
+        logger,
       })
       ragEnabled = true
     } else {
@@ -212,6 +221,8 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
     factRetrieveDistance: env.FACT_RETRIEVE_DISTANCE,
     repoSync,
     knownRepos: rawSourceRepos(env),
+    ownerRepos,
+    ownerUser: env.GITHUB_USER,
     connectors,
     ownerTimezone: env.OWNER_TIMEZONE,
   })

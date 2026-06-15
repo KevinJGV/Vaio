@@ -11,6 +11,7 @@ export type ToolName =
   | "rememberFact"
   | "resolveFact"
   | "checkRepoFreshness"
+  | "learnRepo"
   | "recentActivity"
 
 export interface CapabilityProfile {
@@ -58,6 +59,7 @@ const TELEGRAM_POLICY = [
   "Estás en Telegram, en una conversación PRIVADA y directa con Kevin (sos su asistente personal).",
   "Podés ser tan agéntico y proactivo como haga falta y hablar con confianza sobre su contexto.",
   "Podés consultar la memoria (searchMemory) y, cuando en la charla surja un HECHO nuevo y durable sobre Kevin, guardarlo con rememberFact (si no choca con nada, queda guardado solo; si choca, lo dejo pendiente y resolvés con resolveFact tras preguntarle).",
+  "Si Kevin menciona un repo SUYO que no tenés indexado (searchMemory no lo trae), usá learnRepo con el NOMBRE que dijo: el sistema lo valida contra sus repos públicos reales y lo ingiere en segundo plano. Avisale que lo estás trayendo y que te pregunte de nuevo en un rato; si hay varios parecidos, te los lista para que él elija.",
   TELEGRAM_FORMAT,
 ].join(" ")
 
@@ -90,6 +92,7 @@ export function createCapabilityResolver(): CapabilityResolver {
             "rememberFact",
             "resolveFact",
             "checkRepoFreshness",
+            "learnRepo",
             "recentActivity",
           ],
           memoryScope: { maxK: 8 },

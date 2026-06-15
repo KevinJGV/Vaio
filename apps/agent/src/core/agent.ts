@@ -30,6 +30,7 @@ import type {
   Transcriber,
 } from "../ports/media.js"
 import type { MemoryStore } from "../ports/memory.js"
+import type { OwnerRepoCatalog } from "../ports/owner-repos.js"
 import type { RepoSyncPort, RepoSyncSpec } from "../ports/repo-sync.js"
 import type { Reranker } from "../ports/rerank.js"
 import type { Summarizer } from "../ports/summary.js"
@@ -87,6 +88,10 @@ export interface AgentDeps {
   knownRepos?: RepoSyncSpec[]
   /** Conectores de actividad/estado en vivo (Last.fm, GitHub, …) para la tool recentActivity. */
   connectors?: Connector[]
+  /** Catálogo de repos públicos del owner (para learnRepo). null = sin token/DB. */
+  ownerRepos?: OwnerRepoCatalog | null
+  /** Owner de los repos (GITHUB_USER): el sistema arma el spec con esto, nunca el modelo. */
+  ownerUser?: string
   /** Zona horaria de Kevin para el "sentido del ahora" (default America/Bogota). */
   ownerTimezone?: string
 }
@@ -155,6 +160,8 @@ export function createAgent(deps: AgentDeps) {
     factRetrieveDistance = 0.7,
     repoSync = null,
     knownRepos = [],
+    ownerRepos = null,
+    ownerUser,
     connectors = [],
     ownerTimezone = "America/Bogota",
   } = deps
@@ -303,6 +310,8 @@ export function createAgent(deps: AgentDeps) {
           factRetrieveDistance,
           repoSync,
           knownRepos,
+          ownerRepos,
+          ownerUser,
           connectors,
         }),
         onChunk({ chunk }) {
