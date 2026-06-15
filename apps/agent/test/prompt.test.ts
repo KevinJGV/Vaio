@@ -131,12 +131,39 @@ describe("buildSystemPrompt", () => {
           id: "f1",
           statement: "A Kevin no le gusta el fútbol",
           createdAt: null,
+          conflicts: [],
         },
       ],
     })
     expect(p).toContain("pendientes de tu confirmación")
     expect(p).toContain("[f1]")
     expect(p).toContain("commitFact")
+  })
+
+  it("muestra los conflictos de una pendiente con sus ids (para supersedes)", () => {
+    const p = buildSystemPrompt({
+      locale: "es",
+      audience: "owner",
+      policyText: "",
+      summary: "",
+      pendingFacts: [
+        {
+          id: "f2",
+          statement: "A Kevin ya no le gustan las hamburguesas",
+          createdAt: null,
+          conflicts: [
+            {
+              id: "old1",
+              statement: "A Kevin le gustan las hamburguesas",
+              validAt: null,
+            },
+          ],
+        },
+      ],
+    })
+    expect(p).toContain("[f2]")
+    expect(p).toContain("[old1]") // el id del conflicto está disponible para supersedes
+    expect(p).toContain("supersedes")
   })
   it("sin pendientes, no agrega el bloque", () => {
     const p = buildSystemPrompt({

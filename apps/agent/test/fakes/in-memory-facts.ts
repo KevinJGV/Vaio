@@ -78,6 +78,20 @@ export function inMemoryFacts(): FactStore & { rows: () => Row[] } {
           id: x.id,
           statement: x.statement,
           createdAt: x.createdAt,
+          // Stub de conflictos (igual que propose): confirmados vigentes del mismo principal.
+          conflicts: rows
+            .filter(
+              (y) =>
+                y.status === "confirmed" &&
+                y.invalidAt === null &&
+                y.principalId === principalId &&
+                y.id !== x.id
+            )
+            .map((y) => ({
+              id: y.id,
+              statement: y.statement,
+              validAt: y.validAt,
+            })),
         }))
     },
   }

@@ -1,11 +1,14 @@
 // Puerto de la memoria de HECHOS curados (write + listado de pendientes). El core depende de esta
 // interfaz; el adapter Neon (adapters/neon-facts) embebe e implementa contra pgvector.
 
-/** Una propuesta de hecho pendiente de confirmación (para retomarla en el prompt). */
+/** Una propuesta de hecho pendiente de confirmación (para retomarla en el prompt). `conflicts` = facts
+ *  confirmados cercanos (recomputados con el embedding guardado) → el turno de confirmación tiene los ids para
+ *  pasar a `supersedes` (el modelo decide si REALMENTE se contradicen). */
 export interface PendingFact {
   id: string
   statement: string
   createdAt: Date | null
+  conflicts: ConflictCandidate[]
 }
 
 /** Un hecho confirmado vigente que el nuevo PODRÍA estar contradiciendo (cercanía vectorial; el modelo decide

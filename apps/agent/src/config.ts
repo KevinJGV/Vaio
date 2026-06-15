@@ -163,7 +163,7 @@ const envSchema = z.object({
   // (generoso a propósito: el modelo + el owner filtran la contradicción real; el umbral solo corta ruido lejano).
   // CANDIDATES = cuántos candidatos sugerir como máx.
   FACT_CONFLICT_DISTANCE: positiveFloatWithDefault(0.45),
-  FACT_CONFLICT_CANDIDATES: positiveIntWithDefault(3),
+  FACT_CONFLICT_CANDIDATES: positiveIntWithDefault(2),
 })
 
 export type Env = z.infer<typeof envSchema>

@@ -24,6 +24,39 @@ export function createFactStore(
   embedder: Embedder,
   cfg: FactConflictConfig
 ): FactStore {
+  // Candidatos a conflicto: facts confirmados vigentes del mismo principal, cercanos por coseno al embedding
+  // dado (excluye `excludeId`). El modelo decide si REALMENTE se contradicen. Reusado por propose y listPending.
+  const findNearConfirmed = async (
+    emb: number[],
+    principalId: string,
+    excludeId: string
+  ): Promise<ConflictCandidate[]> => {
+    const dist = cosineDistance(facts.embedding, emb)
+    const rows = await db
+      .select({
+        id: facts.id,
+        statement: facts.statement,
+        validAt: facts.validAt,
+      })
+      .from(facts)
+      .where(
+        and(
+          eq(facts.status, "confirmed"),
+          isNull(facts.invalidAt),
+          eq(facts.principalId, principalId),
+          ne(facts.id, excludeId),
+          lt(dist, cfg.conflictDistance)
+        )
+      )
+      .orderBy(asc(dist))
+      .limit(cfg.conflictCandidates)
+    return rows.map((r) => ({
+      id: r.id,
+      statement: r.statement,
+      validAt: r.validAt,
+    }))
+  }
+
   return {
     async propose(input) {
       // Embeber ahora (best-effort): habilita la detección de conflictos y se reusa al confirmar.
@@ -48,33 +81,7 @@ export function createFactStore(
         .returning({ id: facts.id })
       if (!row) throw new Error("facts insert no devolvió id")
       if (!emb) return { id: row.id, conflicts: [] }
-
-      // Candidatos: facts confirmados vigentes del mismo principal, cercanos por coseno (excluye la fila nueva).
-      const dist = cosineDistance(facts.embedding, emb)
-      const candidates = await db
-        .select({
-          id: facts.id,
-          statement: facts.statement,
-          validAt: facts.validAt,
-          dist: dist.as("dist"),
-        })
-        .from(facts)
-        .where(
-          and(
-            eq(facts.status, "confirmed"),
-            isNull(facts.invalidAt),
-            eq(facts.principalId, input.principalId),
-            ne(facts.id, row.id),
-            lt(dist, cfg.conflictDistance)
-          )
-        )
-        .orderBy(asc(sql`dist`))
-        .limit(cfg.conflictCandidates)
-      const conflicts: ConflictCandidate[] = candidates.map((c) => ({
-        id: c.id,
-        statement: c.statement,
-        validAt: c.validAt,
-      }))
+      const conflicts = await findNearConfirmed(emb, input.principalId, row.id)
       return { id: row.id, conflicts }
     },
 
@@ -140,6 +147,7 @@ export function createFactStore(
           id: facts.id,
           statement: facts.statement,
           createdAt: facts.createdAt,
+          embedding: facts.embedding,
         })
         .from(facts)
         .where(
@@ -151,11 +159,21 @@ export function createFactStore(
         )
         .orderBy(sql`${facts.createdAt} desc`)
         .limit(limit)
-      return rows.map((r) => ({
-        id: r.id,
-        statement: r.statement,
-        createdAt: r.createdAt,
-      }))
+      // Recompute los conflictos de cada pendiente con su embedding YA guardado (sin re-embeber) → el turno de
+      // confirmación tiene los ids para `supersedes`. Cierra el hueco de continuidad entre turnos.
+      const out: PendingFact[] = []
+      for (const r of rows) {
+        const conflicts = r.embedding
+          ? await findNearConfirmed(r.embedding, principalId, r.id)
+          : []
+        out.push({
+          id: r.id,
+          statement: r.statement,
+          createdAt: r.createdAt,
+          conflicts,
+        })
+      }
+      return out
     },
   }
 }

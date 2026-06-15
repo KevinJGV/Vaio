@@ -101,6 +101,24 @@ describe("FactStore (contrato, vía fake)", () => {
     expect(fs.rows().find((r) => r.id === nuevo)?.invalidAt).toBeNull()
   })
 
+  it("listPending devuelve los conflictos de cada pendiente (para el bloque del prompt)", async () => {
+    const fs = inMemoryFacts()
+    const { id: viejo } = await fs.propose({
+      statement: "A Kevin le gustan las hamburguesas",
+      principalId: "k",
+      channel: "telegram",
+    })
+    await fs.commit(viejo)
+    await fs.propose({
+      statement: "A Kevin ya no le gustan las hamburguesas",
+      principalId: "k",
+      channel: "telegram",
+    })
+    const pend = await fs.listPending("k")
+    expect(pend).toHaveLength(1)
+    expect(pend[0]?.conflicts.map((c) => c.id)).toContain(viejo)
+  })
+
   it("commit con supersedes a un id inexistente/no-confirmado no rompe", async () => {
     const fs = inMemoryFacts()
     const { id } = await fs.propose({

@@ -103,15 +103,27 @@ export function buildSystemPrompt(args: {
       : `Contexto previo de esta conversación (resumen, tratalo como hechos ya dichos):\n${summary}`
     : ""
   const pend = args.pendingFacts ?? []
+  const renderPending = (p: PendingFact): string => {
+    const head = `- [${p.id}] «${p.statement}»`
+    if (p.conflicts.length === 0) return head
+    const conf = p.conflicts
+      .map((c) => `    · [${c.id}] «${c.statement}»`)
+      .join("\n")
+    const note =
+      args.locale === "en"
+        ? `\n  ⚠️ might replace (you decide if it REALLY contradicts):\n${conf}`
+        : `\n  ⚠️ podría reemplazar (vos decidís si REALMENTE se contradice):\n${conf}`
+    return head + note
+  }
   const pendingBlock =
     pend.length > 0
       ? (args.locale === "en"
           ? "Memory proposals awaiting your confirmation:\n"
           : "Propuestas de memoria pendientes de tu confirmación:\n") +
-        pend.map((p) => `- [${p.id}] «${p.statement}»`).join("\n") +
+        pend.map(renderPending).join("\n") +
         (args.locale === "en"
-          ? "\nIf the user confirms one, call commitFact with its id; if they reject it, commitFact with decision:reject."
-          : "\nSi el usuario confirma una, llamá commitFact con su id; si la rechaza, commitFact con decision:reject.")
+          ? "\nIf the user confirms one and it REALLY replaces a listed fact, call commitFact with its id and supersedes:[those ids]; if it just coexists, commitFact without supersedes; if rejected, commitFact decision:reject."
+          : "\nSi el usuario confirma una y de verdad REEMPLAZA un hecho listado, llamá commitFact con su id y supersedes:[esos ids]; si solo coexiste, commitFact sin supersedes; si la rechaza, commitFact decision:reject.")
       : ""
   return [
     personaPrompt(args.locale),

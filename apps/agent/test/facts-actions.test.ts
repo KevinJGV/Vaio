@@ -82,6 +82,19 @@ describe("proposeFact / commitFact", () => {
     expect(String(out)).toMatch(/no configurada/i)
   })
 
+  it("proposeFact sin conflicto instruye guardar YA (auto-save, sin pedir confirmación)", async () => {
+    const fs = inMemoryFacts()
+    const out = await proposeFact
+      .build(ctx(fs))
+      .execute?.(
+        { statement: "A Kevin le gustan las hamburguesas" },
+        { toolCallId: "tc", messages: [] }
+      )
+    expect(String(out)).toMatch(/no choca/i)
+    expect(String(out)).toMatch(/ahora mismo/i)
+    expect(String(out)).not.toMatch(/pedile confirmación/i)
+  })
+
   it("proposeFact lista los conflictos detectados e instruye supersedes", async () => {
     const fs = inMemoryFacts()
     // un fact confirmado del mismo principal → el siguiente propose lo trae como conflicto

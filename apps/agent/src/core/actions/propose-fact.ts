@@ -44,8 +44,14 @@ export const proposeFact: ActionDescriptor = {
             conversationId: ctx.ids.conversationId,
             turnId: ctx.ids.turnId,
           })
-          let output = `Propuesta registrada (id ${id}). Pedile confirmación al usuario; si dice que sí, llamá commitFact con ese id.`
-          if (conflicts.length > 0) {
+          let output: string
+          if (conflicts.length === 0) {
+            // Sin choque: si el owner lo pidió explícitamente, no hace falta pedir confirmación → guardalo ya.
+            output =
+              `Propuesta registrada (id ${id}). No choca con nada guardado. Si el usuario lo pidió explícitamente, ` +
+              `llamá commitFact con id ${id} AHORA MISMO para guardarlo (no necesitás pedirle confirmación). ` +
+              `Solo preguntá si fuiste vos quien dedujo el dato sin que lo pidiera.`
+          } else {
             const list = conflicts
               .map((c) => {
                 const when = c.validAt
@@ -54,10 +60,10 @@ export const proposeFact: ActionDescriptor = {
                 return `  - [${c.id}] «${c.statement}»${when}`
               })
               .join("\n")
-            output +=
-              `\n⚠️ Puede chocar con hechos ya guardados:\n${list}\n` +
-              "Si REALMENTE se contradicen y el usuario confirma reemplazar, pasá esos id(s) en commitFact " +
-              "como `supersedes`. Si solo se parecen pero conviven (no se contradicen), NO los pases."
+            output =
+              `Propuesta registrada (id ${id}).\n⚠️ Puede chocar con hechos ya guardados:\n${list}\n` +
+              "Preguntale al usuario si REEMPLAZA el/los anterior(es). Si confirma reemplazar, llamá commitFact " +
+              `con id ${id} y supersedes:[esos id(s)]. Si en realidad conviven (no se contradicen), commitFact sin supersedes.`
           }
           ctx.emit({
             ...ctx.ids,
