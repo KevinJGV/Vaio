@@ -103,27 +103,29 @@ export function buildSystemPrompt(args: {
       : `Contexto previo de esta conversación (resumen, tratalo como hechos ya dichos):\n${summary}`
     : ""
   const pend = args.pendingFacts ?? []
-  const renderPending = (p: PendingFact): string => {
-    const head = `- [${p.id}] «${p.statement}»`
+  // Invariante #8: el bloque NO muestra ids/uuids. La pendiente se referencia por su ordinal `which` y cada
+  // conflicto por su número (lo que el modelo pasa en `replaces`); el sistema mapea ordinal→uuid en resolveFact.
+  const renderPending = (p: PendingFact, idx: number): string => {
+    const head = `• (which ${idx}) «${p.statement}»`
     if (p.conflicts.length === 0) return head
     const conf = p.conflicts
-      .map((c) => `    · [${c.id}] «${c.statement}»`)
+      .map((c, i) => `    [${i}] «${c.statement}»`)
       .join("\n")
     const note =
       args.locale === "en"
-        ? `\n  ⚠️ might replace (you decide if it REALLY contradicts):\n${conf}`
-        : `\n  ⚠️ podría reemplazar (vos decidís si REALMENTE se contradice):\n${conf}`
+        ? `\n  ⚠️ might replace (pass the number in replaces if it REALLY contradicts):\n${conf}`
+        : `\n  ⚠️ podría reemplazar (pasá el número en replaces si de verdad se contradice):\n${conf}`
     return head + note
   }
   const pendingBlock =
     pend.length > 0
       ? (args.locale === "en"
-          ? "Memory proposals awaiting your confirmation:\n"
-          : "Propuestas de memoria pendientes de tu confirmación:\n") +
+          ? "Pending memory proposals (resolve with resolveFact):\n"
+          : "Propuestas de memoria pendientes (resolvelas con resolveFact):\n") +
         pend.map(renderPending).join("\n") +
         (args.locale === "en"
-          ? "\nIf the user confirms one and it REALLY replaces a listed fact, call commitFact with its id and supersedes:[those ids]; if it just coexists, commitFact without supersedes; if rejected, commitFact decision:reject."
-          : "\nSi el usuario confirma una y de verdad REEMPLAZA un hecho listado, llamá commitFact con su id y supersedes:[esos ids]; si solo coexiste, commitFact sin supersedes; si la rechaza, commitFact decision:reject.")
+          ? "\nConfirm replacing → resolveFact(decision:confirm, replaces:[numbers], which:N). Coexist → resolveFact(decision:confirm, which:N). Discard → resolveFact(decision:reject, which:N). which 0 = newest (default)."
+          : "\nConfirmar reemplazando → resolveFact(decision:confirm, replaces:[números], which:N). Coexisten → resolveFact(decision:confirm, which:N). Descartar → resolveFact(decision:reject, which:N). which 0 = la más reciente (default).")
       : ""
   return [
     personaPrompt(args.locale),

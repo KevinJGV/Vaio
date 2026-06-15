@@ -1,7 +1,7 @@
 import type { TraceEvent } from "@vaio/contracts"
 import { describe, expect, it } from "vitest"
-import { commitFact } from "../src/core/actions/commit-fact.js"
-import { proposeFact } from "../src/core/actions/propose-fact.js"
+import { rememberFact } from "../src/core/actions/remember-fact.js"
+import { resolveFact } from "../src/core/actions/resolve-fact.js"
 import type { ActionContext } from "../src/core/actions/types.js"
 import type { Principal } from "../src/core/capabilities.js"
 import type { LogFields, Logger } from "../src/ports/logger.js"
@@ -27,7 +27,7 @@ function ctx(
   return {
     caps: {
       channel: "telegram",
-      allowedTools: ["proposeFact", "commitFact"],
+      allowedTools: ["rememberFact", "resolveFact"],
       memoryScope: { maxK: 8 },
       policyText: "",
     },
@@ -40,111 +40,147 @@ function ctx(
   }
 }
 
-describe("proposeFact / commitFact", () => {
-  it("proposeFact registra la propuesta y devuelve el id en el texto", async () => {
+describe("rememberFact", () => {
+  it("sin conflicto → guarda EN EL ACTO (auto-save, sin pendiente, sin confirmación)", async () => {
     const fs = inMemoryFacts()
-    const out = await proposeFact
-      .build(ctx(fs))
-      .execute?.(
-        { statement: "A Kevin no le gusta el fútbol" },
-        { toolCallId: "tc", messages: [] }
-      )
-    expect(String(out)).toMatch(/id f1/)
-    expect(await fs.listPending("k")).toHaveLength(1)
-  })
-
-  it("commitFact confirm guarda; id inexistente → 'no encontré'", async () => {
-    const fs = inMemoryFacts()
-    await proposeFact
-      .build(ctx(fs))
-      .execute?.({ statement: "X" }, { toolCallId: "t1", messages: [] })
-    const okOut = await commitFact
-      .build(ctx(fs))
-      .execute?.(
-        { id: "f1", decision: "confirm" },
-        { toolCallId: "t2", messages: [] }
-      )
-    expect(String(okOut)).toMatch(/guard/i)
-    expect(await fs.listPending("k")).toHaveLength(0)
-    const missOut = await commitFact
-      .build(ctx(fs))
-      .execute?.(
-        { id: "nope", decision: "confirm" },
-        { toolCallId: "t3", messages: [] }
-      )
-    expect(String(missOut)).toMatch(/no encontré/i)
-  })
-
-  it("degradan a cortesía si no hay factStore", async () => {
-    const out = await proposeFact
-      .build(ctx(null))
-      .execute?.({ statement: "X" }, { toolCallId: "tc", messages: [] })
-    expect(String(out)).toMatch(/no configurada/i)
-  })
-
-  it("proposeFact sin conflicto instruye guardar YA (auto-save, sin pedir confirmación)", async () => {
-    const fs = inMemoryFacts()
-    const out = await proposeFact
+    const out = await rememberFact
       .build(ctx(fs))
       .execute?.(
         { statement: "A Kevin le gustan las hamburguesas" },
         { toolCallId: "tc", messages: [] }
       )
-    expect(String(out)).toMatch(/no choca/i)
-    expect(String(out)).toMatch(/ahora mismo/i)
-    expect(String(out)).not.toMatch(/pedile confirmación/i)
+    expect(String(out)).toMatch(/guard/i)
+    expect(await fs.listPending("k")).toHaveLength(0) // se confirmó, no quedó pendiente
   })
 
-  it("proposeFact lista los conflictos detectados e instruye supersedes", async () => {
+  it("con conflicto → deja pendiente y numera los conflictos por ordinal (sin uuids)", async () => {
     const fs = inMemoryFacts()
-    // un fact confirmado del mismo principal → el siguiente propose lo trae como conflicto
-    await proposeFact
+    // un fact confirmado del mismo principal → el siguiente remember choca con él
+    await rememberFact
+      .build(ctx(fs))
+      .execute?.(
+        { statement: "A Kevin le gustan las hamburguesas" },
+        { toolCallId: "t1", messages: [] }
+      )
+    const out = await rememberFact
+      .build(ctx(fs))
+      .execute?.(
+        { statement: "A Kevin ya no le gustan las hamburguesas" },
+        { toolCallId: "t2", messages: [] }
+      )
+    expect(String(out)).toMatch(/pendiente/i)
+    expect(String(out)).toMatch(/\[0\]/) // conflicto por ordinal
+    expect(String(out)).toMatch(/resolveFact/)
+    expect(await fs.listPending("k")).toHaveLength(1) // sí quedó pendiente
+  })
+
+  it("degrada a cortesía si no hay factStore", async () => {
+    const out = await rememberFact
+      .build(ctx(null))
+      .execute?.({ statement: "X" }, { toolCallId: "tc", messages: [] })
+    expect(String(out)).toMatch(/no configurada/i)
+  })
+})
+
+describe("resolveFact", () => {
+  it("confirm con replaces:[0] → mapea el ordinal al uuid e invalida el viejo (el modelo no pasa ids)", async () => {
+    const fs = inMemoryFacts()
+    await rememberFact
+      .build(ctx(fs))
+      .execute?.(
+        { statement: "A Kevin le gustan las hamburguesas" },
+        { toolCallId: "t1", messages: [] }
+      )
+    await rememberFact
+      .build(ctx(fs))
+      .execute?.(
+        { statement: "A Kevin ya no le gustan las hamburguesas" },
+        { toolCallId: "t2", messages: [] }
+      )
+    const viejo = fs.rows().find((r) => r.statement.includes("le gustan"))?.id
+    const out = await resolveFact
+      .build(ctx(fs))
+      .execute?.(
+        { decision: "confirm", replaces: [0] },
+        { toolCallId: "t3", messages: [] }
+      )
+    expect(String(out)).toMatch(/reemplac/i)
+    expect(fs.rows().find((r) => r.id === viejo)?.invalidAt).not.toBeNull()
+  })
+
+  it("confirm sin replaces → confirma sin invalidar nada (coexistencia)", async () => {
+    const fs = inMemoryFacts()
+    await rememberFact
+      .build(ctx(fs))
+      .execute?.(
+        { statement: "A Kevin le gusta la pizza" },
+        { toolCallId: "t1", messages: [] }
+      )
+    // segundo (cercano en el fake) → pendiente
+    await rememberFact
+      .build(ctx(fs))
+      .execute?.(
+        { statement: "A Kevin le gusta la pasta" },
+        { toolCallId: "t2", messages: [] }
+      )
+    const out = await resolveFact
+      .build(ctx(fs))
+      .execute?.({ decision: "confirm" }, { toolCallId: "t3", messages: [] })
+    expect(String(out)).toMatch(/guard/i)
+    // ninguno invalidado
+    expect(fs.rows().every((r) => r.invalidAt === null)).toBe(true)
+  })
+
+  it("reject → descarta la pendiente", async () => {
+    const fs = inMemoryFacts()
+    await rememberFact
       .build(ctx(fs))
       .execute?.(
         { statement: "A Kevin le gusta X" },
         { toolCallId: "t1", messages: [] }
       )
-    await commitFact
-      .build(ctx(fs))
-      .execute?.(
-        { id: "f1", decision: "confirm" },
-        { toolCallId: "t2", messages: [] }
-      )
-    const out = await proposeFact
+    await rememberFact
       .build(ctx(fs))
       .execute?.(
         { statement: "A Kevin ya no le gusta X" },
-        { toolCallId: "t3", messages: [] }
-      )
-    expect(String(out)).toMatch(/chocar/i)
-    expect(String(out)).toMatch(/f1/)
-    expect(String(out)).toMatch(/supersedes/i)
-  })
-
-  it("commitFact pasa supersedes y avisa el reemplazo", async () => {
-    const fs = inMemoryFacts()
-    await proposeFact
-      .build(ctx(fs))
-      .execute?.(
-        { statement: "le gusta X" },
-        { toolCallId: "t1", messages: [] }
-      )
-    await commitFact
-      .build(ctx(fs))
-      .execute?.(
-        { id: "f1", decision: "confirm" },
         { toolCallId: "t2", messages: [] }
       )
-    await proposeFact
+    const out = await resolveFact
       .build(ctx(fs))
-      .execute?.({ statement: "ahora Y" }, { toolCallId: "t3", messages: [] })
-    const out = await commitFact
+      .execute?.({ decision: "reject" }, { toolCallId: "t3", messages: [] })
+    expect(String(out)).toMatch(/descart/i)
+    expect(await fs.listPending("k")).toHaveLength(0)
+  })
+
+  it("sin pendiente → avisa que no hay nada que resolver", async () => {
+    const fs = inMemoryFacts()
+    const out = await resolveFact
+      .build(ctx(fs))
+      .execute?.({ decision: "confirm" }, { toolCallId: "t1", messages: [] })
+    expect(String(out)).toMatch(/no tengo ninguna propuesta pendiente/i)
+  })
+
+  it("replaces con ordinal fuera de rango → se ignora, no rompe (confirma sin invalidar)", async () => {
+    const fs = inMemoryFacts()
+    await rememberFact
       .build(ctx(fs))
       .execute?.(
-        { id: "f2", decision: "confirm", supersedes: ["f1"] },
-        { toolCallId: "t4", messages: [] }
+        { statement: "A Kevin le gusta Y" },
+        { toolCallId: "t1", messages: [] }
       )
-    expect(String(out)).toMatch(/reemplac/i)
-    expect(fs.rows().find((r) => r.id === "f1")?.invalidAt).not.toBeNull()
+    await rememberFact
+      .build(ctx(fs))
+      .execute?.(
+        { statement: "A Kevin ya no le gusta Y" },
+        { toolCallId: "t2", messages: [] }
+      )
+    const out = await resolveFact
+      .build(ctx(fs))
+      .execute?.(
+        { decision: "confirm", replaces: [99] },
+        { toolCallId: "t3", messages: [] }
+      )
+    expect(String(out)).toMatch(/guard/i)
+    expect(fs.rows().every((r) => r.invalidAt === null)).toBe(true)
   })
 })

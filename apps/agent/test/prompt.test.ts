@@ -135,12 +135,12 @@ describe("buildSystemPrompt", () => {
         },
       ],
     })
-    expect(p).toContain("pendientes de tu confirmación")
-    expect(p).toContain("[f1]")
-    expect(p).toContain("commitFact")
+    expect(p).toContain("pendientes")
+    expect(p).toContain("resolveFact")
+    expect(p).not.toContain("f1") // Invariante #8: NO se muestra el uuid de la pendiente
   })
 
-  it("muestra los conflictos de una pendiente con sus ids (para supersedes)", () => {
+  it("numera los conflictos por ordinal (sin uuids) e instruye replaces", () => {
     const p = buildSystemPrompt({
       locale: "es",
       audience: "owner",
@@ -161,9 +161,10 @@ describe("buildSystemPrompt", () => {
         },
       ],
     })
-    expect(p).toContain("[f2]")
-    expect(p).toContain("[old1]") // el id del conflicto está disponible para supersedes
-    expect(p).toContain("supersedes")
+    expect(p).toContain("[0]") // conflicto por ordinal
+    expect(p).toContain("replaces")
+    expect(p).not.toContain("old1") // el uuid del conflicto NO se muestra
+    expect(p).not.toContain("f2") // ni el de la pendiente
   })
   it("sin pendientes, no agrega el bloque", () => {
     const p = buildSystemPrompt({

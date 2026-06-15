@@ -187,7 +187,7 @@ export function createAgent(deps: AgentDeps) {
       // Retomar propuestas de hechos pendientes (solo si el perfil puede commitear → owner).
       // Best-effort: es contexto accesorio → un hipo de DB no debe costar el turno del owner.
       let pendingFacts: PendingFact[] = []
-      if (factStore && caps.allowedTools.includes("commitFact")) {
+      if (factStore && caps.allowedTools.includes("resolveFact")) {
         try {
           pendingFacts = await factStore.listPending(principal.id)
         } catch (err) {

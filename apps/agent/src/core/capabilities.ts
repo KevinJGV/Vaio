@@ -8,8 +8,8 @@ import type { Channel } from "@vaio/contracts"
 /** Tools que el registry sabe construir. Unión extensible: sumar acciones futuras acá. */
 export type ToolName =
   | "searchMemory"
-  | "proposeFact"
-  | "commitFact"
+  | "rememberFact"
+  | "resolveFact"
   | "checkRepoFreshness"
   | "syncRepo"
   | "recentActivity"
@@ -58,7 +58,7 @@ const TELEGRAM_FORMAT = [
 const TELEGRAM_POLICY = [
   "Estás en Telegram, en una conversación PRIVADA y directa con Kevin (sos su asistente personal).",
   "Podés ser tan agéntico y proactivo como haga falta y hablar con confianza sobre su contexto.",
-  "Podés consultar la memoria (searchMemory) y, cuando en la charla surja un HECHO nuevo y durable sobre Kevin, proponer guardarlo con proposeFact y —tras su confirmación explícita— cerrarlo con commitFact.",
+  "Podés consultar la memoria (searchMemory) y, cuando en la charla surja un HECHO nuevo y durable sobre Kevin, guardarlo con rememberFact (si no choca con nada, queda guardado solo; si choca, lo dejo pendiente y resolvés con resolveFact tras preguntarle).",
   TELEGRAM_FORMAT,
 ].join(" ")
 
@@ -93,8 +93,8 @@ export function createCapabilityResolver(): CapabilityResolver {
           channel: "telegram",
           allowedTools: [
             "searchMemory",
-            "proposeFact",
-            "commitFact",
+            "rememberFact",
+            "resolveFact",
             "checkRepoFreshness",
             "syncRepo",
             "recentActivity",
