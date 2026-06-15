@@ -1,10 +1,13 @@
 // Registry de CONECTORES: arma la lista de conectores habilitados (gated por keys). Sumar una fuente nueva
-// (WakaTime, Steam, GitHub-stats, …) = nuevo archivo con su Connector + un push acá. Espeja el registry de actions.
+// = nuevo archivo con su Connector + un push acá. Espeja el registry de actions.
 
 import type { Env } from "../../config.js"
 import type { Connector } from "../../ports/connector.js"
 import { createGithubConnector } from "./github.js"
+import { createGithubStatsConnector } from "./github-stats.js"
 import { createLastfmConnector } from "./lastfm.js"
+import { createSteamConnector } from "./steam.js"
+import { createWakatimeConnector } from "./wakatime.js"
 
 export function buildConnectors(env: Env): Connector[] {
   const connectors: Connector[] = []
@@ -22,6 +25,23 @@ export function buildConnectors(env: Env): Connector[] {
         user: env.GITHUB_USER,
         token: env.GITHUB_TOKEN,
       })
+    )
+  }
+  // github-stats EXIGE token (GraphQL no acepta requests anónimas).
+  if (env.GITHUB_USER && env.GITHUB_TOKEN) {
+    connectors.push(
+      createGithubStatsConnector({
+        user: env.GITHUB_USER,
+        token: env.GITHUB_TOKEN,
+      })
+    )
+  }
+  if (env.WAKATIME_API_KEY) {
+    connectors.push(createWakatimeConnector({ apiKey: env.WAKATIME_API_KEY }))
+  }
+  if (env.STEAM_API_KEY && env.STEAM_ID) {
+    connectors.push(
+      createSteamConnector({ apiKey: env.STEAM_API_KEY, steamId: env.STEAM_ID })
     )
   }
   return connectors
