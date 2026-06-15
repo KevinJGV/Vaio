@@ -21,7 +21,7 @@ cardinalidad con fallo VISIBLE** (nunca silencioso). Cada tool nueva se audita c
 | `proposeFact` | `statement` | string | ✅ lenguaje natural |
 | `commitFact` | `id` | uuid | 🔴 el modelo relaya un uuid (fallo) |
 | `commitFact` | `supersedes` | uuid[] | 🔴 array de uuids → invalida el equivocado **en silencio** |
-| `checkRepoFreshness`/`syncRepo` | `owner`,`repo` | string | 🟡 nombre legible, baja cardinalidad, **fallo visible** → diferido |
+| `checkRepoFreshness`/`syncRepo` | `owner`,`repo` | string | 🟡→✅ **HECHO (2026-06-15)**: ahora `repo` es un `z.enum` cerrado de los slugs curados (ver abajo) |
 | `recentActivity` | — | — | ✅ sin args |
 
 ## Rediseño del flujo de facts (uuid-free)
@@ -76,6 +76,16 @@ El bloque de pendientes **deja de mostrar uuids**. Numera conflictos por ordinal
 `ToolName` (`capabilities.ts`): `"searchMemory" | "rememberFact" | "resolveFact" | …`. Perfil **owner** expone
 las dos nuevas (capa canal); `clearance:"owner"` (capa principal). `ACTIONS` (`registry.ts`) reemplaza
 `proposeFact`/`commitFact`. Archivos: `propose-fact.ts`→`remember-fact.ts`, `commit-fact.ts`→`resolve-fact.ts`.
+
+## Tools de repos uuid-free (2026-06-15 — cierra el diferido 🟡)
+`checkRepoFreshness`/`syncRepo` dejan de tomar `owner`/`repo` como strings libres. El modelo elige de un **set
+cerrado**: `inputSchema` = `z.object({ repo: z.enum(slugs) })` con `slugs = knownRepos.map("owner/repo")`
+(`ActionContext.knownRepos` = `rawSourceRepos(env)`, los repos curados de `RAW_SOURCE_REPOS`). El sistema mapea el
+slug elegido → su `RepoSyncSpec` (`resolveKnownRepo`, `core/actions/repo-select.ts`) y usa `{owner,repo}` como
+antes. `knownRepos` vacío → `inputSchema: z.object({})` + degradación ("no tengo repos que conozca"). El enum
+rechaza typos de casing y repos arbitrarios (verificado por smoke). `isTracked` queda como guard interno.
+Followup (fuera de alcance): si se agrega ingesta on-demand de repos arbitrarios (paso 3 parte 2), el enum
+estático no alcanza → ese repo entra por otro flujo con su propia confirmación (el modelo seguirá sin pasar el id crudo).
 
 ## Guard de durabilidad
 Nota en `core/actions/types.ts` (doc de `ActionDescriptor`): **inputSchema = intención (lenguaje natural) +

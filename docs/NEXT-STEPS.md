@@ -56,7 +56,15 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- _(vacío — sin ítems abiertos)_
+- [?] **uuid-free de las tools de repos (`checkRepoFreshness`/`syncRepo`) — IMPLEMENTADO, pend. verificación +
+  merge** (2026-06-15, rama `feat/repo-tools-uuid-free`). Aplica el Invariante #8 al item que quedó 🟡 en la
+  auditoría: las tools dejan de tomar `owner`/`repo` libres; el modelo elige de un **`z.enum` cerrado** (slugs de
+  los repos curados de `RAW_SOURCE_REPOS` → `ActionContext.knownRepos`); el sistema mapea slug→`{owner,repo}`
+  (`repo-select.ts`). `knownRepos` vacío → degrada. **302 tests**; typecheck/biome/build limpios. Smoke: enum
+  acepta `KevinJGV/Vaio`·`KevinJGV/KevinJGV`, **rechaza** typos y repos arbitrarios. Detalle → spec
+  [`…-llm-no-relay-ids-design.md`](superpowers/specs/2026-06-14-llm-no-relay-ids-design.md) (§Tools de repos).
+  **Falta:** e2e por chat (que el modelo dispare la tool con el slug del enum) + merge a `main`. **Es el #1 del
+  orden de Kevin; sigue #2 streaming de Telegram, #3 acumulación de conectores.**
 > **Diferido (no es WIP) — Streaming/typing en Telegram (#3 del feedback de Kevin, 2026-06-15):** mostrar
 > 'escribiendo…' y/o editar el mensaje progresivamente mientras Vaio responde. Feature de UX; requiere verificar
 > la API de Telegram (context7) + tocar el adapter de Telegram. Su propio par design+plan cuando se priorice.
