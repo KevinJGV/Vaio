@@ -123,7 +123,6 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
         },
         logger,
         freshnessTtlMs: env.FRESHNESS_TTL_MINUTES * 60 * 1000,
-        inlineMaxFiles: env.SYNC_INLINE_MAX_FILES,
       })
       ragEnabled = true
     } else {

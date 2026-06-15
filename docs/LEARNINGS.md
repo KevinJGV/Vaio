@@ -425,3 +425,16 @@ El código typecheckeó sin cambios de API salvo **dos rupturas reales**:
   Best-effort por repo Y por archivo (404/privado/binario no rompen el resto). Cap `maxChunksPerRepo` con log de descartes.
 - **Paso 3 (acceso on-demand como read-action del harness) quedó fuera** — su propio incremento; reusa toda esta
   maquinaria (collector/filtros/secret-scan/chunker/githubRaw). Ver `NEXT-STEPS.md` §"Vaio se nutre solo".
+- **⚠️ NUNCA sincronizar en el HOT PATH del turno — el freshness gate va SIEMPRE en background** (2026-06-15, causa
+  raíz del Followup ② "latencia 183s"). El gate de `searchMemory` (`ensureFresh`) corría un sync **inline** si el
+  repo estaba stale; re-embeber es **secuencial** (de a uno, por el cap de 429 upstream → ver §Embeddings) → hasta
+  20 archivos × varios chunks × ~1-3s **bloqueó la respuesta 183s** (un solo outlier; el baseline de `searchMemory`
+  es ~7-10s = embed query + pgvector + rerank). Diagnóstico **por eliminación**: el exceso de 176s solo podía venir
+  del gate (todo lo demás está acotado en los otros turnos). **Fix:** `ensureFresh` **siempre** dispara el sync en
+  background (`void guardedSync`) y responde con el índice actual; la frescura llega al próximo turno. **Principio
+  (nota de Kevin):** trabajo largo NO es malo si (a) NO bloquea al usuario y (b) hay mecanismo de notificación/retoma
+  (turnos proactivos / Nivel C, estilo Claude Code); lo inaceptable es bloquear sin feedback o el descuido técnico.
+- **Gotcha de optimización latente (no urgente):** en `replaceFile` (neon-memory) el `embedder.embed()` corre
+  **DENTRO** de la `db.transaction` → retiene una conexión del pool (`new Pool` sin `max` = **10** default) durante
+  toda la red del embedding. Con un sync de fondo + el RAG del turno compitiendo → contención del pool. Sacar el
+  embed FUERA de la tx (embeber, después tx corta delete+insert) lo aliviaría. Diferido (Kevin: "largo OK si notifica").

@@ -87,9 +87,17 @@
   +~3.5% tokens (despreciable; la compresión queda solo para el contexto conversacional). **328 tests**;
   typecheck/biome limpios. **e2e ✅:** `/chat` real → `trace_events` muestra el chunk de código verbatim
   (`artist ?? []).map((a) => a.name)`), pasando por el reranker `nemotron-rerank-vl`. Detalle → `LEARNINGS.md`.
-- [ ] **Followup ② — latencia de `searchMemory` (183 s) con `repo sync` concurrente** (visto en la prueba):
-  contención del pool/embeddings cuando un sync incremental corre durante un turno. Medir y, si aplica, serializar/
-  acotar la concurrencia del sync vs. el RAG del turno.
+- [?] **Followup ② — latencia de `searchMemory` (183 s) → CAUSA RAÍZ + FIX (pend. verificación de Kevin).** Causa
+  (por eliminación: baseline ~7s, un solo outlier de 183s): el **freshness gate** de `searchMemory` corría un sync
+  **INLINE** en el hot path del turno (`ensureFresh` → `guardedSync inlineMaxFiles:20`) re-embebiendo hasta 20
+  archivos **secuenciales** (embeddings de a uno por el cap de 429), bloqueando la respuesta ~183s (viola Invariante
+  #1). **Fix (decisión de Kevin + su nota "largo OK si hay notify/resume"):** el gate **nunca** sincroniza inline —
+  **siempre background** (`void guardedSync`), responde YA con el índice actual; la frescura llega al próximo turno
+  (y el futuro Nivel C / turnos proactivos notificará al completar). Quitado el plumbing `inlineMaxFiles` de
+  `createRepoSync` (el tool `syncRepo` mantiene su inline/deferred, path explícito aparte). **328 tests**;
+  typecheck/biome limpios. **e2e ✅:** `/chat` real → `searchMemory` 9.8s (baseline, sin bloqueo). Detalle →
+  `LEARNINGS.md`. **Optimización follow-up (no urgente, Kevin "largo OK"):** el embedding corre DENTRO de la tx de
+  `replaceFile` (retiene conexión del pool max=10) → sacarlo de la tx reduce contención del sync de fondo.
 > **Mejora futura diferida (Kevin "dejémoslo así por ahora", 2026-06-15) — streaming en TOPICS de Telegram:**
 > hoy el streaming en vivo solo va en chats privados (límite de `sendMessageDraft`); en topics aparece de golpe
 > (typing fallback). Para streamear en topics → `editMessageText` (universal, pero "parpadea" al editar y hay que

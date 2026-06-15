@@ -39,8 +39,6 @@ export interface SyncRepoDeps {
   logger?: Logger
   /** TTL del freshness gate (ms): no rechequea un repo si lo hizo hace menos. Default 10 min. */
   freshnessTtlMs?: number
-  /** Umbral de archivos para sync inline vs diferido en el gate. Default 20. */
-  inlineMaxFiles?: number
 }
 
 /** Parsea un source `repo:owner/repo` → spec; null si no es un source de repo. */
@@ -311,7 +309,6 @@ export async function syncRepo(
 /** Implementación del puerto `RepoSyncPort` con las deps atadas (para inyectar a las tools del harness). */
 export function createRepoSync(deps: SyncRepoDeps): RepoSyncPort {
   const ttlMs = deps.freshnessTtlMs ?? 10 * 60 * 1000
-  const inlineMaxFiles = deps.inlineMaxFiles ?? 20
   // Cache TTL del freshness gate (vida de proceso): source → último chequeo (ms epoch via performance.now base).
   const lastChecked = new Map<string, number>()
   // Guard de in-flight (vida de proceso): un repo no tiene 2 syncs corriendo a la vez. El tracker se actualiza
@@ -364,7 +361,6 @@ export function createRepoSync(deps: SyncRepoDeps): RepoSyncPort {
       )
     },
     async ensureFresh(sources) {
-      let refreshed = false
       const now = Date.now()
       for (const source of sources) {
         const spec = parseRepoSource(source)
@@ -378,13 +374,12 @@ export function createRepoSync(deps: SyncRepoDeps): RepoSyncPort {
             token: deps.token,
           })
           if (f.state !== "stale") continue
-          const r = await guardedSync(spec, { inlineMaxFiles })
-          if (r.mode === "incremental" || r.mode === "full") {
-            refreshed = true // se aplicó inline → re-recuperar para incluir lo fresco
-          } else if (r.mode === "deferred") {
-            // Diff grande → refresco completo en background (sin reanudación proactiva = incremento 2).
-            void guardedSync(spec).catch(() => {})
-          }
+          // Stale → sincronizar SIEMPRE en BACKGROUND, NUNCA en el hot path del turno. El sync re-embebe
+          // de a uno (secuencial, por el cap de 429 upstream) → puede tardar; bloquear el turno violaría el
+          // Invariante #1 (se midió 183s). Respondemos YA con el índice actual; la frescura llega para el
+          // próximo turno (y a futuro, la reanudación proactiva / Nivel C notifica al usuario al completar).
+          // El guard de in-flight evita disparar duplicados mientras uno ya corre.
+          void guardedSync(spec).catch(() => {})
         } catch (err) {
           deps.logger?.warn(
             { source, err: err instanceof Error ? err.message : "?" },
@@ -392,7 +387,8 @@ export function createRepoSync(deps: SyncRepoDeps): RepoSyncPort {
           )
         }
       }
-      return { refreshed }
+      // Nunca aplicamos inline → el turno no re-recupera; responde rápido con lo indexado.
+      return { refreshed: false }
     },
   }
 }

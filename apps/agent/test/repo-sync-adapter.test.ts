@@ -362,7 +362,7 @@ describe("createRepoSync.ensureFresh (freshness gate)", () => {
     await p1
   })
 
-  it("stale → sincroniza inline → refreshed:true", async () => {
+  it("stale → NUNCA inline: refreshed:false (responde con lo indexado) y dispara el sync en BACKGROUND", async () => {
     mockGithub((url) => {
       if (url.includes("/commits/")) return { json: { sha: "c2" } } // != c1 → stale
       if (url.includes("/git/trees/"))
@@ -380,7 +380,9 @@ describe("createRepoSync.ensureFresh (freshness gate)", () => {
       policy: DEFAULT_REPO_POLICY,
     })
     const r = await rs.ensureFresh(["repo:kev/vaio"])
-    expect(r.refreshed).toBe(true)
-    expect(calls.replaceFile).toEqual(["README.md"])
+    // NO se aplicó inline → el turno NO re-recupera (responde rápido con el índice actual).
+    expect(r.refreshed).toBe(false)
+    // pero el sync SÍ se disparó en background (no se esperó); converge fuera del hot path.
+    await vi.waitFor(() => expect(calls.replaceFile).toEqual(["README.md"]))
   })
 })
