@@ -28,7 +28,7 @@ export const checkRepoFreshness: ActionDescriptor = {
         : z.object({})
     return tool({
       description:
-        "Verifica si tu copia indexada de un repo que conocés (p.ej. tu propio KevinJGV/Vaio) está al día con GitHub. Es barato. Elegí el repo de la lista. Usala cuando la respuesta dependa del ESTADO ACTUAL del código/arquitectura de un repo. Si da desactualizado, el sistema ya lo pone al día solo en segundo plano (no bloquea, no necesitás hacer nada): respondé con lo que tengas y, si querés, mencionalo al pasar.",
+        "Verifica si tu copia indexada de un repo que conocés (p.ej. tu propio KevinJGV/Vaio) está al día con GitHub. Usala SOLO cuando el usuario pregunte EXPLÍCITAMENTE si estás al día / si tu info es actual — NO en preguntas normales sobre el código (para esas respondé directo; la frescura se mantiene sola). Si da desactualizado, el sistema ya lo pone al día solo en segundo plano (no bloquea, no necesitás hacer nada).",
       inputSchema,
       execute: async (args, { toolCallId }) => {
         const t0 = Date.now()

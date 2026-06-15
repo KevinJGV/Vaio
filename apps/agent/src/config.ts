@@ -72,6 +72,9 @@ const envSchema = z.object({
   // exige reingestar todo (`pnpm ingest`). Por eso no lleva fallback como los demás env de modelos.
   EMBEDDINGS_MODEL: z.string().default("google/gemini-embedding-2"),
   EMBEDDINGS_BASE_URL: z.string().url().default("https://openrouter.ai/api/v1"),
+  // Cuántos embeddings (input único) se piden EN PARALELO (sync/ingest). Acelera vs. 1-por-1 sin saturar el
+  // 429 del cap upstream (el backoff cubre 429 transitorios). Subir con cuidado si el modelo de embeddings aguanta.
+  EMBED_CONCURRENCY: positiveIntWithDefault(4),
 
   // Zona horaria de Kevin para el "sentido del ahora" (fecha/hora inyectada al prompt). IANA TZ.
   OWNER_TIMEZONE: z.string().default("America/Bogota"),

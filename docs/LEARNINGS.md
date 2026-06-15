@@ -442,6 +442,20 @@ El código typecheckeó sin cambios de API salvo **dos rupturas reales**:
   unitario con `db`/`embedder` fakes (afirma embed-antes-de-tx + embed-falla→no-toca-DB); e2e: re-embed forzado de
   1 archivo vía el bg sync → blob_sha/chunks/contenido intactos. El pool sigue sin `max` explícito (default 10); no
   hizo falta tocarlo tras sacar el embed de la tx.
+- **✅ Embeddings con CONCURRENCIA ACOTADA (no 1-por-1)** (2026-06-15). El bg sync era lento (~12s/archivo → 15
+  archivos = ~3min) porque `embed(texts)` los pedía **secuencialmente**. Distinción clave (verificada con context7):
+  el 429 que obligaba a NO batchear es del **batch `input` array** del modelo gemini (OpenRouter→Google) — NO un
+  límite de requests concurrentes. Fix: `embed()` corre `concurrency` workers (default **4**, env `EMBED_CONCURRENCY`)
+  sobre un cursor compartido, input ÚNICO por request, **orden preservado** (`out[i]`); el backoff de `postWithRetry`
+  cubre 429 transitorios. e2e: 12 archivos en **~12s** (vs ~140s secuencial, ~10×), **0 errores 429**. Mejora futura
+  (no hecha): honrar el header `Retry-After` del 429 (hoy backoff exponencial fijo).
+- **Frescura de repos = maintenance SILENCIOSA (no la narra el modelo)** (2026-06-15). Vaio metía "el repo se está
+  poniendo al día" en respuestas no relacionadas + chequeaba `checkRepoFreshness` en cada turno. Insight: el **gate
+  determinístico** de `searchMemory` YA dispara el bg sync solo → el modelo NO necesita chequear para mantener
+  frescura; `checkRepoFreshness` es solo para RESPONDER "¿estás al día?". Prompt (ES+EN) + descripción de la tool:
+  usar `checkRepoFreshness` **solo si preguntan explícitamente** por frescura; nunca narrar el sync en respuestas
+  normales. e2e: "qué stack usás" → solo searchMemory, sin narrar; "estás al día?" → checkRepoFreshness. Encaja con
+  el Invariante #9 (no marear al modelo con orquestación que el sistema ya maneja).
 - **⚠️ El sync NO debe ser una WRITE-ACTION del modelo — la frescura la gestiona el SISTEMA (Invariante #8)**
   (2026-06-15, hermano del fix del gate; lo destaparon logs de Kevin: un turno de **211s**). Arreglar el gate no
   alcanzó: existía un **tool `syncRepo`** que el modelo invocaba explícitamente al ver "stale", y sincronizaba

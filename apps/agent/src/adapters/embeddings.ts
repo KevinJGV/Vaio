@@ -13,6 +13,9 @@ export interface EmbeddingsConfig {
   baseUrl: string
   /** Trunca la salida a N dims (Matryoshka). Debe coincidir con EMBEDDING_DIM del schema. */
   dimensions?: number
+  /** Cuántos embeddings (input ÚNICO) se piden EN PARALELO. Acota la concurrencia para no disparar
+   *  el 429 del cap upstream pero acelera el sync (vs. 1-por-1). Default 4. */
+  concurrency?: number
 }
 
 interface EmbeddingsResponse {
@@ -50,29 +53,47 @@ async function postWithRetry(
 
 export function createEmbedder(cfg: EmbeddingsConfig): Embedder {
   const dim = cfg.dimensions
+  const concurrency = Math.max(1, cfg.concurrency ?? 4)
   // OpenRouter no documenta `dimensions` → puede devolver la dim nativa (3072). Truncamos
   // al prefijo Matryoshka (válido como embedding) para que entre en vector(N). Coseno no
   // necesita renormalizar.
   const truncate = (e: number[]) =>
     dim && e.length > dim ? e.slice(0, dim) : e
 
+  const embedOne = async (text: string): Promise<number[]> => {
+    const body = JSON.stringify({
+      model: cfg.model,
+      input: text,
+      ...(dim ? { dimensions: dim } : {}),
+    })
+    const data = await postWithRetry(cfg, body)
+    const embedding = data[0]?.embedding
+    if (!embedding) throw new Error("Embeddings API: respuesta sin embedding")
+    return truncate(embedding)
+  }
+
   return {
     async embed(texts: string[]): Promise<number[][]> {
-      // De a UNO: el batch (input array) dispara 429 de cap upstream en OpenRouter→Google;
-      // el input único pasa. Más requests, pero confiable para una ingesta puntual.
-      const out: number[][] = []
-      for (const text of texts) {
-        const body = JSON.stringify({
-          model: cfg.model,
-          input: text,
-          ...(dim ? { dimensions: dim } : {}),
-        })
-        const data = await postWithRetry(cfg, body)
-        const embedding = data[0]?.embedding
-        if (!embedding)
-          throw new Error("Embeddings API: respuesta sin embedding")
-        out.push(truncate(embedding))
+      // Input ÚNICO por request (el batch array dispara 429 del cap upstream en OpenRouter→Google),
+      // pero con CONCURRENCIA ACOTADA: `concurrency` workers consumen un cursor compartido → más rápido
+      // que 1-por-1 sin saturar el rate-limit (el 429 transitorio lo cubre el backoff de postWithRetry).
+      // El orden se preserva porque cada resultado se guarda en su índice original (out[i]).
+      const out: number[][] = new Array(texts.length)
+      let next = 0
+      const worker = async (): Promise<void> => {
+        while (true) {
+          const i = next++
+          if (i >= texts.length) return
+          const text = texts[i]
+          if (text === undefined) continue
+          out[i] = await embedOne(text)
+        }
       }
+      const workers = Array.from(
+        { length: Math.min(concurrency, texts.length) },
+        () => worker()
+      )
+      await Promise.all(workers)
       return out
     },
   }

@@ -111,6 +111,13 @@
   background sola** y reporta — el modelo solo consulta, nunca sincroniza ni bloquea. Quitado el plumbing
   `syncInlineMaxFiles`/`SYNC_INLINE_MAX_FILES`; prompt/capabilities actualizados. **325 tests**; typecheck/biome
   limpios. **e2e ✅:** repo **forzado stale** → `/chat` en **12s** (no 191s) + bg sync auto-sanante. → `LEARNINGS.md`.
+- [?] **Refinamientos de freshness (pedido de Kevin tras ver logs) → HECHO (pend. verificación).** (1) **Embeddings
+  con concurrencia acotada** (`EMBED_CONCURRENCY`=4 default; workers sobre cursor, orden preservado): el bg sync de
+  12 archivos bajó de ~140s a **~12s** (~10×), 0 errores 429 (context7: el 429 era del batch-array del modelo, no de
+  requests concurrentes). (2) **Frescura silenciosa**: el modelo ya NO narra el sync en respuestas normales ni
+  chequea por las suyas — `checkRepoFreshness` solo si preguntan explícitamente (el gate determinístico mantiene la
+  frescura solo). **328 tests**; typecheck/biome limpios. **e2e ✅:** "qué stack usás"→solo searchMemory; "estás al
+  día?"→checkRepoFreshness; sync 12 archivos ~12s correcto. → `LEARNINGS.md`. **Mejora futura:** honrar `Retry-After`.
 > **Mejora futura diferida (Kevin "dejémoslo así por ahora", 2026-06-15) — streaming en TOPICS de Telegram:**
 > hoy el streaming en vivo solo va en chats privados (límite de `sendMessageDraft`); en topics aparece de golpe
 > (typing fallback). Para streamear en topics → `editMessageText` (universal, pero "parpadea" al editar y hay que

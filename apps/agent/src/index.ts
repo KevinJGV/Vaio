@@ -105,6 +105,7 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
         model: env.EMBEDDINGS_MODEL,
         baseUrl: env.EMBEDDINGS_BASE_URL,
         dimensions: EMBEDDING_DIM,
+        concurrency: env.EMBED_CONCURRENCY,
       })
       memory = createMemoryStore(db, embedder, logger)
       factStore = createFactStore(db, embedder, {

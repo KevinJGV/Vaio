@@ -47,6 +47,7 @@ async function main(): Promise<void> {
     model: env.EMBEDDINGS_MODEL,
     baseUrl: env.EMBEDDINGS_BASE_URL,
     dimensions: EMBEDDING_DIM,
+    concurrency: env.EMBED_CONCURRENCY,
   })
   const memory = createMemoryStore(db, embedder)
 
