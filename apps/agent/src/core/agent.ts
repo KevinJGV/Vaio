@@ -79,6 +79,10 @@ export interface AgentDeps {
   reranker?: Reranker | null
   /** Pool de candidatos (wide-K) para el rerank. Default 30. */
   rerankCandidates?: number
+  /** Facts curados a recuperar SIEMPRE y anteponer al contexto. Default 4. */
+  factRetrieveMax?: number
+  /** Distancia coseno máx para que un fact cuente como relevante. Default 0.7. */
+  factRetrieveDistance?: number
   /** Sync de repos (frescura + sync incremental). null = sin DB/token → las tools de sync degradan. */
   repoSync?: RepoSyncPort | null
   /** Umbral de archivos para sync inline vs diferido (default 20). */
@@ -150,6 +154,8 @@ export function createAgent(deps: AgentDeps) {
     factStore = null,
     reranker = null,
     rerankCandidates = 30,
+    factRetrieveMax = 4,
+    factRetrieveDistance = 0.7,
     repoSync = null,
     syncInlineMaxFiles = 20,
     connectors = [],
@@ -298,6 +304,8 @@ export function createAgent(deps: AgentDeps) {
           ragIntensity,
           reranker,
           rerankCandidates,
+          factRetrieveMax,
+          factRetrieveDistance,
           repoSync,
           syncInlineMaxFiles,
           connectors,

@@ -166,6 +166,16 @@ describe("buildSystemPrompt", () => {
     expect(p).not.toContain("old1") // el uuid del conflicto NO se muestra
     expect(p).not.toContain("f2") // ni el de la pendiente
   })
+  it("instruye no narrar la búsqueda / no autocorregirse en voz alta", () => {
+    const p = buildSystemPrompt({
+      locale: "es",
+      audience: "owner",
+      policyText: "",
+      summary: "",
+    })
+    expect(p).toMatch(/autocorrij|no narres/i)
+  })
+
   it("sin pendientes, no agrega el bloque", () => {
     const p = buildSystemPrompt({
       locale: "es",

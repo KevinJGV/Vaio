@@ -208,6 +208,8 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
     nativeImages: env.MULTIMODAL_NATIVE_IMAGES,
     reranker,
     rerankCandidates: env.RERANK_CANDIDATES,
+    factRetrieveMax: env.FACT_RETRIEVE_MAX,
+    factRetrieveDistance: env.FACT_RETRIEVE_DISTANCE,
     repoSync,
     syncInlineMaxFiles: env.SYNC_INLINE_MAX_FILES,
     connectors,

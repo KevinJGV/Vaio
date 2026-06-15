@@ -133,6 +133,12 @@ const envSchema = z.object({
   RERANK_MODELS: z.string().optional(),
   // Pool de candidatos (wide-K) que se recupera por vector y se manda a rerankear. Default 30.
   RERANK_CANDIDATES: positiveIntWithDefault(30),
+  // Facts en el retrieval: los hechos curados (owner-confirmed) son TAN importantes como los repos para la
+  // naturalidad. Se recuperan SIEMPRE aparte (no compiten con los ~miles de chunks del repo) y se anteponen al
+  // contexto. MAX = cuántos facts relevantes incluir como máximo; DISTANCE = distancia coseno máx para que un
+  // fact cuente como relevante a la query (generoso; evita inyectar facts claramente off-topic).
+  FACT_RETRIEVE_MAX: positiveIntWithDefault(4),
+  FACT_RETRIEVE_DISTANCE: positiveFloatWithDefault(0.7),
   // Sync incremental de repos: umbral de archivos cambiados para hacerlo INLINE en el chat; más → background. Default 20.
   SYNC_INLINE_MAX_FILES: positiveIntWithDefault(20),
   // Freshness gate: TTL (minutos) — no rechequea la frescura de un repo si lo hizo hace menos. Default 10.

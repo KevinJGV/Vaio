@@ -21,8 +21,16 @@ export interface IndexedFile {
 /** Store de memoria RAG: búsqueda semántica + escritura idempotente por fuente, y operaciones por-archivo
  *  para el sync incremental (re-embeber/borrar solo lo cambiado). */
 export interface MemoryStore {
-  /** Top-k chunks más cercanos a `query` (similaridad coseno). */
+  /** Top-k chunks de DOCUMENTOS más cercanos a `query` (similaridad coseno). Los facts curados se recuperan
+   *  aparte vía `searchFacts` (son tan importantes como los repos → no deben competir con sus chunks). */
   searchMemory(query: string, k?: number): Promise<DocChunk[]>
+  /** Top-k FACTS curados (confirmados, vigentes) relevantes a `query` (coseno < `maxDistance`). Opcional: un
+   *  store sin facts puede no implementarla. Se recuperan SIEMPRE y se anteponen al contexto (verdad
+   *  owner-confirmed). `source:"fact"`. */
+  searchFacts?(
+    query: string,
+    opts?: { k?: number; maxDistance?: number }
+  ): Promise<DocChunk[]>
   /** Embebe e inserta chunks (el embedding se calcula en el adapter). Persiste `path`/`blobSha` si vienen. */
   upsertDocuments(rows: DocChunk[]): Promise<void>
   /** Borra todos los docs de una fuente (para reingestar). */

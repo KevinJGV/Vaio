@@ -214,6 +214,41 @@ describe("searchMemory (descriptor migrado)", () => {
     expect(calls).toBe(1)
   })
 
+  it("antepone los facts curados a los docs del repo (no compiten)", async () => {
+    let factsK = -1
+    const memory: MemoryStore = {
+      searchMemory: async () => [
+        { source: "repo:k/v", url: "u", chunk: "doc-del-repo" },
+      ],
+      searchFacts: async (_q, opts) => {
+        factsK = opts?.k ?? -1
+        return [
+          { source: "fact", url: "", chunk: "A Kevin le gusta el fútbol" },
+        ]
+      },
+      upsertDocuments: async () => {},
+      clearSource: async () => {},
+      listIndexedFiles: async () => [],
+      deleteFiles: async () => {},
+      replaceFile: async () => {},
+    }
+    const events: TraceEvent[] = []
+    const t = searchMemory.build(
+      ctx({ memory, emit: (e) => events.push(e), factRetrieveMax: 4 })
+    )
+    const out = String(
+      await t.execute?.({ query: "gustos" }, { toolCallId: "tc", messages: [] })
+    )
+    expect(factsK).toBe(4)
+    expect(out).toContain("A Kevin le gusta el fútbol")
+    expect(out).toContain("doc-del-repo")
+    // el fact va PRIMERO (lidera el contexto)
+    expect(out.indexOf("fútbol")).toBeLessThan(out.indexOf("doc-del-repo"))
+    expect(events.find((e) => e.type === "tool.result")).toMatchObject({
+      hits: 2,
+    })
+  })
+
   it("con reranker que devuelve [] (falló): degrada a vector top-K", async () => {
     const cands: DocChunk[] = [
       { source: "a", url: "", chunk: "v0" },

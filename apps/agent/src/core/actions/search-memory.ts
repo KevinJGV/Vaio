@@ -22,6 +22,8 @@ export const searchMemory: ActionDescriptor = {
       ragIntensity = "full",
       reranker = null,
       rerankCandidates = 30,
+      factRetrieveMax = 4,
+      factRetrieveDistance = 0.7,
     } = ctx
     const k = ctx.caps.memoryScope.maxK
     return tool({
@@ -69,6 +71,14 @@ export const searchMemory: ActionDescriptor = {
               : cands.slice(0, k)
           }
 
+          // FACTS curados: tan importantes como los repos para la naturalidad → se recuperan SIEMPRE aparte
+          // (no compiten con los chunks del repo) y se ANTEPONEN al contexto. Degrada si el store no los soporta.
+          const facts = memory.searchFacts
+            ? await memory.searchFacts(query, {
+                k: factRetrieveMax,
+                maxDistance: factRetrieveDistance,
+              })
+            : []
           let docs = await retrieve()
           // FRESHNESS GATE (determinístico, TTL interno): si los chunks vienen de un repo:* stale, sincronizar
           // ANTES de responder (no a criterio del modelo). Si algo se sincronizó inline → re-recuperar una vez.
@@ -89,10 +99,12 @@ export const searchMemory: ActionDescriptor = {
               )
             }
           }
+          // Facts PRIMERO (verdad curada que lidera el contexto), luego los docs del repo.
+          const combined = [...facts, ...docs]
           const output =
-            docs.length === 0
+            combined.length === 0
               ? "Sin resultados relevantes en memoria."
-              : docs
+              : combined
                   .map(
                     (d) =>
                       `[${d.source}${d.url ? ` · ${d.url}` : ""}]\n${compressOrRaw(compressor, d.chunk, ragIntensity)}`
@@ -100,12 +112,12 @@ export const searchMemory: ActionDescriptor = {
                   .join("\n\n")
           // Métrica del ahorro Tier 1 sobre los chunks de RAG (el componente dominante,
           // `full`). Espeja el log de conversación en agent.ts para confirmar el ahorro en logs.
-          if (compressor && docs.length > 0) {
-            const before = docs.reduce(
+          if (compressor && combined.length > 0) {
+            const before = combined.reduce(
               (n, d) => n + compressor.countTokens(d.chunk),
               0
             )
-            const after = docs.reduce(
+            const after = combined.reduce(
               (n, d) =>
                 n +
                 compressor.countTokens(
@@ -115,7 +127,12 @@ export const searchMemory: ActionDescriptor = {
             )
             if (before > 0) {
               logger.debug(
-                { before, after, saved: before - after, chunks: docs.length },
+                {
+                  before,
+                  after,
+                  saved: before - after,
+                  chunks: combined.length,
+                },
                 "rag compressed"
               )
             }
@@ -126,7 +143,7 @@ export const searchMemory: ActionDescriptor = {
             toolCallId,
             toolName: "searchMemory",
             ok: true,
-            hits: docs.length,
+            hits: combined.length,
             latencyMs: Date.now() - t0,
             output,
           })

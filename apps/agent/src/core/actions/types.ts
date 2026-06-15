@@ -43,6 +43,10 @@ export interface ActionContext {
   reranker?: Reranker | null
   /** Pool de candidatos (wide-K) a recuperar por vector antes de rerankear. Default 30. */
   rerankCandidates?: number
+  /** Facts curados a recuperar SIEMPRE (aparte de los docs) y anteponer al contexto. Default 4. */
+  factRetrieveMax?: number
+  /** Distancia coseno máx para que un fact cuente como relevante a la query. Default 0.7. */
+  factRetrieveDistance?: number
   /** Sync de repos (frescura + sync incremental). null = sin DB/token → las tools de sync degradan. */
   repoSync?: RepoSyncPort | null
   /** Umbral de archivos para sync inline vs diferido (default 20). */

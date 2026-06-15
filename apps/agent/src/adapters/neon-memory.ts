@@ -10,6 +10,7 @@ import {
   inArray,
   isNotNull,
   isNull,
+  lt,
   sql,
 } from "drizzle-orm"
 import type { Logger } from "../ports/logger.js"
@@ -39,7 +40,8 @@ export function createMemoryStore(
         )
         return []
       }
-      const docs = db
+      // Solo DOCUMENTOS. Los facts se recuperan aparte (searchFacts) para no competir con los chunks del repo.
+      const rows = await db
         .select({
           source: documents.source,
           url: documents.url,
@@ -47,19 +49,6 @@ export function createMemoryStore(
           dist: cosineDistance(documents.embedding, qEmb).as("dist"),
         })
         .from(documents)
-      const facs = db
-        .select({
-          source: sql<string>`'fact'`.as("source"),
-          url: sql<string | null>`null`.as("url"),
-          chunk: facts.statement,
-          dist: cosineDistance(facts.embedding, qEmb).as("dist"),
-        })
-        .from(facts)
-        .where(and(eq(facts.status, "confirmed"), isNull(facts.invalidAt)))
-      const merged = docs.unionAll(facs).as("m")
-      const rows = await db
-        .select({ source: merged.source, url: merged.url, chunk: merged.chunk })
-        .from(merged)
         .orderBy(asc(sql`dist`))
         .limit(k)
       return rows.map((r) => ({
@@ -67,6 +56,32 @@ export function createMemoryStore(
         url: r.url ?? "",
         chunk: r.chunk,
       }))
+    },
+
+    async searchFacts(
+      query: string,
+      opts?: { k?: number; maxDistance?: number }
+    ): Promise<DocChunk[]> {
+      const k = opts?.k ?? 4
+      const [qEmb] = await embedder.embed([query])
+      if (!qEmb) return []
+      const dist = cosineDistance(facts.embedding, qEmb)
+      const where =
+        opts?.maxDistance != null
+          ? and(
+              eq(facts.status, "confirmed"),
+              isNull(facts.invalidAt),
+              lt(dist, opts.maxDistance)
+            )
+          : and(eq(facts.status, "confirmed"), isNull(facts.invalidAt))
+      const rows = await db
+        .select({ chunk: facts.statement, dist: dist.as("dist") })
+        .from(facts)
+        .where(where)
+        .orderBy(asc(sql`dist`))
+        .limit(k)
+      // source "fact" / sin url (el modelo ve "una sola memoria"; el grounding ya distingue facts vs repo).
+      return rows.map((r) => ({ source: "fact", url: "", chunk: r.chunk }))
     },
 
     async upsertDocuments(rows: DocChunk[]): Promise<void> {
