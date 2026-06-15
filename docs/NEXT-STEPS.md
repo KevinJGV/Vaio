@@ -62,6 +62,22 @@
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
 
+**🟢 SENTIDO DEL AHORA + FRAMEWORK DE CONECTORES (gap ①) — VERIFICADO** (2026-06-14, rama
+`feat/raw-repo-ingestion` — aún NO en `main`). El más grande para "del día a día". **(A) Sentido del ahora:**
+`core/time.ts` `formatNow` (Intl, TZ `OWNER_TIMEZONE`=America/Bogota) → bloque "Ahora mismo es …" inyectado al
+prompt cada turno. **(B) Framework de conectores EXTENSIBLE** (`ports/connector.ts`: faceta `live()` + `collect()`
+futuro): conectores **Last.fm** (now-playing/último) + **GitHub** (actividad/pushes recientes) sobre el registry
+`buildConnectors` (gated por keys); tool **`recentActivity`** (read, clearance "anyone", todos los canales) que
+itera los `live()` best-effort on-demand. Sumar fuente (WakaTime/Steam/stats) = archivo + 1 línea. **270 tests**
+(+15); typecheck/biome/build limpios. **e2e ✅:** `/chat` "¿qué día es hoy?" → "domingo, 14 de junio de 2026, 7:36
+p.m. (hora de Kevin)"; "¿qué escucha/pusheó?" → `recentActivity` dispara → 🎵 Last.fm (Rels B) + 💻 GitHub
+(KevinJGV/Vaio main). **Bug cazado por el e2e:** los PushEvent de GitHub vienen SIN `payload.commits` (solo `ref`)
+→ conector robusto con fallback a repo+branch. Specs →
+[`…-connectors-and-now-design.md`](superpowers/specs/2026-06-14-connectors-and-now-design.md) ·
+[`…-plan.md`](superpowers/specs/2026-06-14-connectors-and-now-plan.md). **Followups:** faceta **persist** de
+conectores (collect→memoria, "se nutre solo") · conectores WakaTime/Steam/GitHub-stats (interfaz lista) · mención
+proactiva (⭐).
+
 **🟢 FRESHNESS GATE — no confiarse de embebidos viejos sobre Kevin — VERIFICADO** (2026-06-14, rama
 `feat/raw-repo-ingestion` — aún NO en `main`). Cierra el gap: antes Vaio respondía sobre Kevin por inercia con
 chunks viejos. Hook **determinístico** en `searchMemory` (`RepoSyncPort.ensureFresh`, **TTL 10 min** por repo en
@@ -477,9 +493,9 @@ sigue como parte del followup de adjudicación/staleness de facts (🟠 abajo).
 
 ### 🆕 Gaps estratégicos para "Vaio vivo, al día, del día a día" (identificados 2026-06-14, sin diseñar aún)
 Surgidos al diseñar el freshness gate; cada uno su propio par design+plan cuando se priorice:
-- **Sentido del AHORA + actividad del día a día (el más grande para "del día a día").** Vaio hoy NO tiene noción del
-  tiempo presente (ni se le inyecta la fecha al prompt) ni un feed de actividad reciente (commits de hoy, now-playing,
-  qué cambió esta semana). Un agente "del día a día" debería poder decir "hoy hiciste X, estás con Y".
+- ✅ **Sentido del AHORA + actividad del día a día — HECHO/VERIFICADO (2026-06-14, ver Historial).** Fecha/hora al
+  prompt + framework de conectores (live: now-playing + GitHub). Pendiente: faceta **persist** de conectores
+  (collect→memoria, "se nutre solo") + conectores nuevos (WakaTime/Steam/stats).
 - **Aprendizaje automático** (extracción de facts post-conversación con confianza/HITL) — hoy "se nutre solo" solo
   vía `saveFact` explícito; elevar para que aprenda de la charla sin que se lo digan.
 - **Memoria episódica** (continuidad cross-conversación más allá del resumen rodante por hilo: "¿seguimos con lo de ayer?").

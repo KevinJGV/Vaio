@@ -100,6 +100,26 @@ describe("buildSystemPrompt", () => {
     expect(owner).toContain("Kevin (Vin) himself")
   })
 
+  it("inyecta el bloque 'ahora' (sentido del tiempo) cuando se provee, no cuando no", () => {
+    const con = buildSystemPrompt({
+      locale: "es",
+      audience: "owner",
+      policyText: "P",
+      summary: "",
+      now: "sábado, 14 de junio de 2026, 15:00",
+    })
+    expect(con).toContain(
+      "Ahora mismo es sábado, 14 de junio de 2026, 15:00 (hora de Kevin)"
+    )
+    const sin = buildSystemPrompt({
+      locale: "es",
+      audience: "owner",
+      policyText: "P",
+      summary: "",
+    })
+    expect(sin).not.toContain("(hora de Kevin)") // marcador único del bloque 'ahora'
+  })
+
   it("inyecta el bloque de propuestas pendientes con sus ids", () => {
     const p = buildSystemPrompt({
       locale: "es",

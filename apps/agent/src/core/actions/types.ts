@@ -6,6 +6,7 @@
 import type { TraceEvent } from "@vaio/contracts"
 import type { Tool } from "ai"
 import type { Compressor, Intensity } from "../../ports/compress.js"
+import type { Connector } from "../../ports/connector.js"
 import type { FactStore } from "../../ports/facts.js"
 import type { Logger } from "../../ports/logger.js"
 import type { MemoryStore } from "../../ports/memory.js"
@@ -46,6 +47,8 @@ export interface ActionContext {
   repoSync?: RepoSyncPort | null
   /** Umbral de archivos para sync inline vs diferido (default 20). */
   syncInlineMaxFiles?: number
+  /** Conectores de actividad/estado en vivo (Last.fm, GitHub, …) para la tool recentActivity. */
+  connectors?: Connector[]
 }
 
 /** Descriptor de una acción: metadata de gating + cómo construir su tool del AI SDK.

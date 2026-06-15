@@ -64,6 +64,9 @@ const envSchema = z.object({
   EMBEDDINGS_MODEL: z.string().default("google/gemini-embedding-2"),
   EMBEDDINGS_BASE_URL: z.string().url().default("https://openrouter.ai/api/v1"),
 
+  // Zona horaria de Kevin para el "sentido del ahora" (fecha/hora inyectada al prompt). IANA TZ.
+  OWNER_TIMEZONE: z.string().default("America/Bogota"),
+
   // Ingesta.
   GITHUB_TOKEN: z.string().optional(),
   GITHUB_USER: z.string().default("KevinJGV"),

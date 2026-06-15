@@ -87,7 +87,15 @@ export function buildSystemPrompt(args: {
   summary: string
   /** Propuestas de hechos pendientes de confirmación por el owner (HITL). */
   pendingFacts?: PendingFact[]
+  /** Fecha/hora actual ya formateada (TZ de Kevin) — "sentido del ahora". "" si no se proveyó. */
+  now?: string
 }): string {
+  const now = (args.now ?? "").trim()
+  const nowBlock = now
+    ? args.locale === "en"
+      ? `Right now it's ${now} (Kevin's time).`
+      : `Ahora mismo es ${now} (hora de Kevin).`
+    : ""
   const summary = args.summary.trim()
   const summaryBlock = summary
     ? args.locale === "en"
@@ -108,6 +116,7 @@ export function buildSystemPrompt(args: {
   return [
     personaPrompt(args.locale),
     identityBlock(args.audience, args.locale),
+    nowBlock,
     args.policyText.trim(),
     summaryBlock,
     pendingBlock,

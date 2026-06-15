@@ -9,6 +9,7 @@ import { z } from "zod"
 import { checkRepoFreshness } from "./check-repo-freshness.js"
 import { commitFact } from "./commit-fact.js"
 import { proposeFact } from "./propose-fact.js"
+import { recentActivity } from "./recent-activity.js"
 import { searchMemory } from "./search-memory.js"
 import { syncRepoAction } from "./sync-repo.js"
 import type { ActionContext, ActionDescriptor } from "./types.js"
@@ -20,6 +21,7 @@ export const ACTIONS: ActionDescriptor[] = [
   commitFact,
   checkRepoFreshness,
   syncRepoAction,
+  recentActivity,
 ]
 
 /** ¿El principal cumple el clearance de la acción? */

@@ -5,6 +5,7 @@
 
 import { serve } from "@hono/node-server"
 import { createCompressor } from "./adapters/compress.js"
+import { buildConnectors } from "./adapters/connectors/index.js"
 import { createDb } from "./adapters/db/client.js"
 import { EMBEDDING_DIM } from "./adapters/db/schema.js"
 import { createEmbedder } from "./adapters/embeddings.js"
@@ -43,6 +44,7 @@ import {
 } from "./config.js"
 import { type Agent, createAgent } from "./core/agent.js"
 import { DEFAULT_REPO_POLICY } from "./core/repo-ingest.js"
+import type { Connector } from "./ports/connector.js"
 import type { ConversationStore } from "./ports/conversation.js"
 import type { FactStore } from "./ports/facts.js"
 import type { MediaUnderstanding, Transcriber } from "./ports/media.js"
@@ -87,6 +89,7 @@ let mediaUnderstanding: MediaUnderstanding | null = null
 let speech: SpeechSynthesizer | null = null
 let reranker: Reranker | null = null
 let repoSync: RepoSyncPort | null = null
+let connectors: Connector[] = []
 if (env.OPENROUTER_API_KEY && models.length > 0) {
   let memory: MemoryStore | null = null
   // La memoria conversacional (conversations/messages) solo necesita DB; el RAG necesita además
@@ -184,6 +187,8 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
   } else {
     logger.warn("Sin RERANK_MODELS → rerank OFF (vector top-K).")
   }
+  // Conectores de actividad/estado en vivo (Last.fm now-playing, GitHub actividad) — gated por keys.
+  connectors = buildConnectors(env)
   agent = createAgent({
     model,
     memory,
@@ -202,6 +207,8 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
     rerankCandidates: env.RERANK_CANDIDATES,
     repoSync,
     syncInlineMaxFiles: env.SYNC_INLINE_MAX_FILES,
+    connectors,
+    ownerTimezone: env.OWNER_TIMEZONE,
   })
   // Salida de voz (TTS) — cadena de fallback (model|voice|format). Vacía → Vaio solo habla por texto.
   const ttsChain = speechChain(env)
@@ -276,6 +283,7 @@ logger.info(
     speech: speech !== null,
     rerank: reranker !== null,
     repoSync: repoSync !== null,
+    connectors: connectors.length,
     nativeImages: env.MULTIMODAL_NATIVE_IMAGES,
     telegram: telegram !== undefined,
     models,

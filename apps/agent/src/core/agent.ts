@@ -16,6 +16,7 @@ import {
   streamText,
 } from "ai"
 import type { Compressor, Intensity } from "../ports/compress.js"
+import type { Connector } from "../ports/connector.js"
 import type {
   ConversationContext,
   ConversationStore,
@@ -44,6 +45,7 @@ import { buildUserContent } from "./modality.js"
 import { reportDegraded } from "./observability.js"
 import { type Audience, buildSystemPrompt } from "./prompt.js"
 import { buildSummaryPrompt, shouldSummarize } from "./summary.js"
+import { formatNow } from "./time.js"
 import { compressOrRaw, errMsg, preview } from "./util.js"
 
 export interface AgentDeps {
@@ -81,6 +83,10 @@ export interface AgentDeps {
   repoSync?: RepoSyncPort | null
   /** Umbral de archivos para sync inline vs diferido (default 20). */
   syncInlineMaxFiles?: number
+  /** Conectores de actividad/estado en vivo (Last.fm, GitHub, …) para la tool recentActivity. */
+  connectors?: Connector[]
+  /** Zona horaria de Kevin para el "sentido del ahora" (default America/Bogota). */
+  ownerTimezone?: string
 }
 
 /** Contexto de observabilidad de un turno (lo arma el adapter de canal por request). */
@@ -146,6 +152,8 @@ export function createAgent(deps: AgentDeps) {
     rerankCandidates = 30,
     repoSync = null,
     syncInlineMaxFiles = 20,
+    connectors = [],
+    ownerTimezone = "America/Bogota",
   } = deps
 
   return {
@@ -274,6 +282,7 @@ export function createAgent(deps: AgentDeps) {
           policyText: caps.policyText,
           summary: compressedSummary,
           pendingFacts,
+          now: formatNow(new Date(), ownerTimezone, locale),
         }),
         messages,
         stopWhen: stepCountIs(10),
@@ -291,6 +300,7 @@ export function createAgent(deps: AgentDeps) {
           rerankCandidates,
           repoSync,
           syncInlineMaxFiles,
+          connectors,
         }),
         onChunk({ chunk }) {
           if (chunk.type === "tool-call") {
