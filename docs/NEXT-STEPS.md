@@ -38,6 +38,10 @@
 > (paso 3 parte 1) · (5) **freshness gate** (repo del portafolio = única fuente de verdad; scrape cv/me/contact
 > dropeado) · (6) **sentido del ahora + framework de conectores** extensible (Last.fm/GitHub live, fecha/hora al
 > prompt). **270 tests; typecheck/biome/build limpios.** Detalle por feature → Historial.
+> **Faceta PERSIST de conectores + 3 conectores nuevos (WakaTime/Steam/GitHub-stats) — MERGEADO en `main` +
+> DESPLEGADO** (2026-06-14, ex `feat/connector-persist`): cada fuente = 1 conector con `live()` (ahora) +
+> `collect()` (memoria); `ingest.ts` unifica la ingesta en el framework. **289 tests**; e2e real (ingest+live,
+> 0 fuga de secrets). ⚠️ Para que corran en prod, sus envs van a los secrets de Railway. Detalle → Historial.
 > ⚠️ **Operativo:** la ingesta/sync corrieron contra la DB real; el índice quedó con cap-bajo en `KevinJGV/Vaio`
 > (444 chunks) del e2e — un `pnpm --filter @vaio/agent sync` sin cap (o `SYNC_FORCE_FULL=1`) lo deja full cuando se quiera.
 > **Próximos candidatos (eligen Kevin/yo):** el **paso 3** (acceso on-demand a repos como read-action del harness),
@@ -47,11 +51,10 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [?] **Rama `feat/connector-persist` lista para `main`** — bundlea la **faceta persist** de conectores +
-  los **3 conectores nuevos** (WakaTime/Steam/GitHub-stats), todo verificado e2e (289 tests, ingest+live reales,
-  0 fuga de secrets). Pend.: el "go" de Kevin para mergear (`finishing-a-development-branch`). ⚠️ Deploy: las
-  envs `WAKATIME_API_KEY`/`STEAM_API_KEY`/`STEAM_ID` van a Railway para que los conectores corran en prod (sin
-  ellas degradan limpio = apagados).
+- _(vacío — sin ítems abiertos)_
+> **Recordatorio operativo (no es WIP):** para que los 3 conectores nuevos corran **en prod**, las envs
+> `WAKATIME_API_KEY`/`STEAM_API_KEY`/`STEAM_ID` deben estar en los secrets de Railway (sin ellas degradan
+> limpio = apagados; el resto del agente no se ve afectado).
 > **Diferido/registrado (no es WIP, vive en su fase):** norte **"Vaio se nutre solo"** — fuentes **CRUDAS
 > (código/repos, NO webs)** + self-awareness + tiempo real. **Paso 4 (curación/`saveFact`) ✅ hecho; pasos 1-3
 > (lo crudo) pendientes** → ítem rastreable en **§"🔵 Pendiente FUTURO — Vaio se nutre solo"** (abajo) +
@@ -68,8 +71,8 @@
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
 
-**🟢 CONECTORES NUEVOS: WakaTime · Steam · GitHub-stats — VERIFICADO** (2026-06-14, rama
-`feat/connector-persist` — aún NO en `main`; bundleado con la faceta persist de abajo). Tres fuentes nuevas
+**🟢 CONECTORES NUEVOS: WakaTime · Steam · GitHub-stats — MERGEADO en `main` + DESPLEGADO** (2026-06-14, ex
+`feat/connector-persist`; bundleado con la faceta persist de abajo). Tres fuentes nuevas
 sobre el framework de conectores, cada una con sus dos facetas (`live()` "ahora" + `collect()` memoria durable),
 **cero cambios en el harness** (la tool `recentActivity` y `ingest.ts` las recogen solas). **(A) WakaTime**
 (`WAKATIME_API_KEY`, Basic auth): tiempo de programación medido — `live()` resumen de la semana, `collect()`
@@ -88,8 +91,8 @@ secrets** (verificado en DB); `live()` directo contra las APIs → 🔥 racha 8 
 secuencial (tareas chicas acopladas al registry/config/core; el hook de typecheck haría chocar subagentes
 paralelos). **Followups:** acumulación/patrones en el tiempo (hoy snapshot) · más conectores (interfaz lista).
 
-**🟢 FACETA PERSIST DE CONECTORES — INGESTA UNIFICADA EN EL FRAMEWORK — VERIFICADO** (2026-06-14, rama
-`feat/connector-persist` — aún NO en `main`). Activada la faceta `collect()` de los conectores: cada fuente = UN
+**🟢 FACETA PERSIST DE CONECTORES — INGESTA UNIFICADA EN EL FRAMEWORK — MERGEADO en `main`** (2026-06-14, ex
+`feat/connector-persist`). Activada la faceta `collect()` de los conectores: cada fuente = UN
 conector con `live()` (consultable) + `collect()` (persistible). Migrados **collectGithub/collectLastfm** a
 `connectors/github.ts` + `connectors/lastfm.ts` (renombrados de github-activity/lastfm-now); `ingest.ts` ahora itera
 `buildConnectors().collect()` — el MISMO registry que la tool `recentActivity` (live) → una sola definición por
