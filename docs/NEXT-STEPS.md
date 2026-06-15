@@ -59,13 +59,16 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [~] **Streaming/typing en Telegram (#2 del orden de Kevin) — EN CURSO** (rama `feat/telegram-streaming`). Plan
-  aprobado + specs escritos
-  ([`…-design.md`](superpowers/specs/2026-06-15-telegram-streaming-design.md) ·
-  [`…-plan.md`](superpowers/specs/2026-06-15-telegram-streaming-plan.md)). API verificada con context7:
-  `sendMessageDraft` (texto parcial en vivo, **solo chats privados**, método nuevo/posible-beta) + `sendChatAction`
-  (typing ≤5 s → keepalive cada ~4 s). Enfoque: **draft en privado + typing fallback**, degrada siempre. El core
-  ya expone el `stream`; se consume con throttle. Implementación TDD en marcha (7 fases).
+- [?] **Streaming/typing en Telegram (#2 del orden de Kevin) — IMPLEMENTADO, pend. e2e owner + merge** (rama
+  `feat/telegram-streaming`). En chats **privados**: `sendMessageDraft` muestra el texto parcial **en vivo**
+  (consume el `stream` del core con throttle ~700 ms); al terminar, `sendMessage` persiste el completo. En
+  grupos/topics, reply de voz, o si el bot no soporta el draft → **typing keepalive** ('escribiendo…' cada 4 s).
+  Degrada siempre. Flag `TELEGRAM_DRAFT_STREAMING` (apagable sin redeploy). API verificada con context7.
+  **315 tests** (+10: pumpStream, sendMessageDraft, isPrivate, handleTurn 3 caminos); typecheck/biome/build
+  limpios. Specs → [`…-design.md`](superpowers/specs/2026-06-15-telegram-streaming-design.md) ·
+  [`…-plan.md`](superpowers/specs/2026-06-15-telegram-streaming-plan.md). **Falta:** e2e real por Telegram
+  (privado streamea / topic mantiene typing) + ⚠️ **verificar en runtime que `sendMessageDraft` existe** (es
+  nuevo/posible-beta; si el bot lo rechaza, degrada a typing) + merge a `main`. **Sigue #3: acumulación de conectores.**
 > **Recordatorio operativo (no es WIP):** para que los 3 conectores nuevos corran **en prod**, las envs
 > `WAKATIME_API_KEY`/`STEAM_API_KEY`/`STEAM_ID` deben estar en los secrets de Railway (sin ellas degradan
 > limpio = apagados; el resto del agente no se ve afectado).
