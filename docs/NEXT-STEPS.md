@@ -68,15 +68,20 @@
   owner por Telegram (Vaio decidiendo `supersedes` con la nueva guía) + merge a `main` (tu "go"). ⚠️ Deploy:
   migración `0006` va antes del código (release step lo hace). **↓ La re-verificación espera al ítem de abajo**
   (el flujo se vuelve uuid-free; el modelo dejará de relayar uuids).
-- [~] **Principio "el modelo triggerea, el sistema gestiona los datos" (NO relay de ids/uuids) — EN CURSO**
-  (rama `feat/facts-conflict-adjudication`). Plan aprobado + specs escritos
-  ([`…-design.md`](superpowers/specs/2026-06-14-llm-no-relay-ids-design.md) ·
-  [`…-plan.md`](superpowers/specs/2026-06-14-llm-no-relay-ids-plan.md)). **Decisión fundacional de Kevin:** los
-  LLM no son confiables relayando datos específicos → se gestionan determinísticamente; las tools exponen
-  intención + opciones preestablecidas (enum/ordinal/boolean). Auditoría hecha (violación crítica:
-  `commitFact.id`/`supersedes` = uuids). Pase: documentar el invariante + **flujo de facts uuid-free**
-  (`rememberFact` auto-guarda sin conflicto; `resolveFact` resuelve la pendiente sola y mapea ordinal→uuid).
-  Tools de repos (owner/repo) **diferidas** (riesgo bajo/visible). Implementación TDD en marcha.
+- [?] **Principio "el modelo triggerea, el sistema gestiona los datos" (NO relay de ids/uuids) — IMPLEMENTADO,
+  pend. verificación owner-chat** (rama `feat/facts-conflict-adjudication`). **Decisión fundacional de Kevin:**
+  los LLM no son confiables relayando datos específicos → se gestionan determinísticamente; las tools exponen
+  intención + opciones preestablecidas (enum/ordinal/boolean). **Hecho:** Invariante #8 documentado
+  (`CLAUDE.md` + `SPEC.md` + memoria `llm-no-relay-ids` + guard en `actions/types.ts`); **flujo de facts
+  uuid-free** — `rememberFact(statement)` auto-guarda si no choca / deja pendiente con conflictos por ordinal;
+  `resolveFact(decision, replaces:[ordinales], which?)` resuelve la pendiente sola y mapea ordinal→uuid (el
+  modelo nunca toca un uuid). Tools de repos (owner/repo) **diferidas** (riesgo bajo/visible). **299 tests**;
+  typecheck/biome/build limpios. **e2e Neon uuid-free ✅:** auto-save sin conflicto; reemplazo por `replaces:[0]`
+  invaldó el viejo; 0 uuids en el texto al modelo. Specs →
+  [`…-design.md`](superpowers/specs/2026-06-14-llm-no-relay-ids-design.md) ·
+  [`…-plan.md`](superpowers/specs/2026-06-14-llm-no-relay-ids-plan.md). **Falta:** re-test owner por Telegram
+  (reiniciar el server con este código) + merge a `main`. **Diferido (futuro):** enumerar repos trackeados en el
+  prompt para uuid-free-ar `checkRepoFreshness`/`syncRepo`.
 > **Recordatorio operativo (no es WIP):** para que los 3 conectores nuevos corran **en prod**, las envs
 > `WAKATIME_API_KEY`/`STEAM_API_KEY`/`STEAM_ID` deben estar en los secrets de Railway (sin ellas degradan
 > limpio = apagados; el resto del agente no se ve afectado).
