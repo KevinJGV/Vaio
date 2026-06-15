@@ -59,10 +59,13 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- _(vacío — sin ítems abiertos)_
-> **Diferido (no es WIP) — Streaming/typing en Telegram (#3 del feedback de Kevin, 2026-06-15):** mostrar
-> 'escribiendo…' y/o editar el mensaje progresivamente mientras Vaio responde. Feature de UX; requiere verificar
-> la API de Telegram (context7) + tocar el adapter de Telegram. Su propio par design+plan cuando se priorice.
+- [~] **Streaming/typing en Telegram (#2 del orden de Kevin) — EN CURSO** (rama `feat/telegram-streaming`). Plan
+  aprobado + specs escritos
+  ([`…-design.md`](superpowers/specs/2026-06-15-telegram-streaming-design.md) ·
+  [`…-plan.md`](superpowers/specs/2026-06-15-telegram-streaming-plan.md)). API verificada con context7:
+  `sendMessageDraft` (texto parcial en vivo, **solo chats privados**, método nuevo/posible-beta) + `sendChatAction`
+  (typing ≤5 s → keepalive cada ~4 s). Enfoque: **draft en privado + typing fallback**, degrada siempre. El core
+  ya expone el `stream`; se consume con throttle. Implementación TDD en marcha (7 fases).
 > **Recordatorio operativo (no es WIP):** para que los 3 conectores nuevos corran **en prod**, las envs
 > `WAKATIME_API_KEY`/`STEAM_API_KEY`/`STEAM_ID` deben estar en los secrets de Railway (sin ellas degradan
 > limpio = apagados; el resto del agente no se ve afectado).
