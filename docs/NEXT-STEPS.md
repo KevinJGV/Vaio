@@ -61,10 +61,15 @@
 > `trend:<source>` por clave exacta → "📈 Cómo viene"; mató la competencia con `searchMemory`). Flag `TRENDS_ENABLED`
 > OFF por defecto. **Probado vía Telegram con data sintética sembrada** (4 trends grounded). **328 tests.**
 > Precursor graph-ready (Fase 3). Detalle → Historial. ⚠️ Ver followups + limpieza de seed abajo.
-> **Próximos candidatos (orden de Kevin):** **#4 "seguimos con otros"** → el **paso 3** (on-demand de repos),
-> **Nivel C** (turnos proactivos), **`escalate`** (Fase 2), **extracción automática de facts**, o el **streaming en
-> topics** (editMessageText, diferido). El **portafolio** va DESPUÉS.
-> *(Rerank ✅; facts ✅; repos uuid-free ✅; streaming Telegram ✅; trends #3 ✅ 2026-06-15.)*
+> **Cluster freshness/RAG hardening — EN `main` + VERIFICADO por el Telegram de Kevin** (2026-06-15): RAG verbatim
+> (no comprimir RAG), gate siempre background (no más 183s), eliminado el tool `syncRepo` (**Invariante #9**), embed
+> fuera de la tx, concurrencia de embeddings (~10×) y frescura silenciosa. Detalle → Historial.
+> **Paso 3 parte 2 — `learnRepo` (on-demand de repo público) — MERGEADO en `main`** (2026-06-15): falta solo el e2e
+> conversacional de Kevin por Telegram. Detalle → WIP + Historial.
+> **Próximos candidatos (orden de Kevin):** **Nivel C** (turnos proactivos), **`escalate`** (Fase 2), **extracción
+> automática de facts**, **paso 5** (grafos/Graphiti, Fase 3), o el **streaming en topics** (diferido). El
+> **portafolio** va DESPUÉS.
+> *(Rerank ✅; facts ✅; repos uuid-free ✅; streaming Telegram ✅; trends #3 ✅; freshness/RAG hardening ✅; learnRepo ✅ — 2026-06-15.)*
 
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
@@ -80,44 +85,9 @@
   integración completa en el portafolio**. Hasta entonces, no tocar Railway/secrets. Cuando llegue: `TRENDS_ENABLED=1`
   + `WAKATIME_API_KEY`/`STEAM_API_KEY`/`STEAM_ID` en secrets; `pnpm ingest` acumula la 1ª captura; las tendencias
   reales emergen con la 2ª corrida. (Mismo gate para los 3 conectores nuevos: WakaTime/Steam/GitHub-stats en prod.)
-- [?] **Followup ① — corrupción de texto en `searchMemory` → CAUSA RAÍZ HALLADA + FIX (pend. verificación de Kevin).**
-  NO era el reranker (solo devuelve `index`/`score`, jamás texto) NI un artefacto de log: era **corrupción REAL** —
-  `searchMemory` **comprimía** cada chunk recuperado y cavemem (compresor de PROSA) borra artículos ES+EN
-  (`(a)=>a.name`→`()=>.name`) y espacios-antes-de-puntuación (`artist ?? []`→`artist?? []`); los chunks `repo:*`
-  son código crudo sin fences → tratados como prosa → mutilados. El diferenciador con `recentActivity` (que no
-  corrompe) era que **searchMemory comprimía y recentActivity no**. **Fix:** el RAG va **VERBATIM** al modelo
-  (quitada la compresión de RAG + plumbing muerto: `ragIntensity`/`COMPRESS_INTENSITY_RAG`/`ActionContext.compressor`).
-  +~3.5% tokens (despreciable; la compresión queda solo para el contexto conversacional). **328 tests**;
-  typecheck/biome limpios. **e2e ✅:** `/chat` real → `trace_events` muestra el chunk de código verbatim
-  (`artist ?? []).map((a) => a.name)`), pasando por el reranker `nemotron-rerank-vl`. Detalle → `LEARNINGS.md`.
-- [?] **Followup ② — latencia de `searchMemory` (183 s) → CAUSA RAÍZ + FIX (pend. verificación de Kevin).** Causa
-  (por eliminación: baseline ~7s, un solo outlier de 183s): el **freshness gate** de `searchMemory` corría un sync
-  **INLINE** en el hot path del turno (`ensureFresh` → `guardedSync inlineMaxFiles:20`) re-embebiendo hasta 20
-  archivos **secuenciales** (embeddings de a uno por el cap de 429), bloqueando la respuesta ~183s (viola Invariante
-  #1). **Fix (decisión de Kevin + su nota "largo OK si hay notify/resume"):** el gate **nunca** sincroniza inline —
-  **siempre background** (`void guardedSync`), responde YA con el índice actual; la frescura llega al próximo turno
-  (y el futuro Nivel C / turnos proactivos notificará al completar). Quitado el plumbing `inlineMaxFiles` de
-  `createRepoSync` (el tool `syncRepo` mantiene su inline/deferred, path explícito aparte). **328 tests**;
-  typecheck/biome limpios. **e2e ✅:** `/chat` real → `searchMemory` 9.8s (baseline, sin bloqueo). Detalle →
-  `LEARNINGS.md`. **✅ Optimización HECHA (2026-06-15):** el `embed()` salió de la tx de `replaceFile` (antes
-  retenía una conexión del pool max=10 durante la red); ahora embebe antes + tx corta delete+insert. 327 tests;
-  e2e: re-embed forzado de 1 archivo OK (blob_sha/chunks/contenido intactos). → `LEARNINGS.md`.
-- [?] **Tools de freshness rediseñadas (hermano del Followup ②) → FIX (pend. verificación de Kevin).** Los logs de
-  Kevin mostraron un turno de **211s**: el gate ya iba background, pero el **tool `syncRepo`** que el modelo invocaba
-  explícitamente al ver "stale" sincronizaba **inline** (16 archivos = 191s) + era redundante con el gate + daba
-  estados contradictorios (check "stale" → sync "ya estaba al día"). **Fundó el Invariante #9** (minimizar el
-  encadenamiento; tools auto-contenidas — pedido de Kevin de hacerlo trascendente). **Fix (decisión de Kevin):**
-  **eliminado el tool `syncRepo`**; `checkRepoFreshness` (read) ahora, si detecta stale, **dispara el sync en
-  background sola** y reporta — el modelo solo consulta, nunca sincroniza ni bloquea. Quitado el plumbing
-  `syncInlineMaxFiles`/`SYNC_INLINE_MAX_FILES`; prompt/capabilities actualizados. **325 tests**; typecheck/biome
-  limpios. **e2e ✅:** repo **forzado stale** → `/chat` en **12s** (no 191s) + bg sync auto-sanante. → `LEARNINGS.md`.
-- [?] **Refinamientos de freshness (pedido de Kevin tras ver logs) → HECHO (pend. verificación).** (1) **Embeddings
-  con concurrencia acotada** (`EMBED_CONCURRENCY`=4 default; workers sobre cursor, orden preservado): el bg sync de
-  12 archivos bajó de ~140s a **~12s** (~10×), 0 errores 429 (context7: el 429 era del batch-array del modelo, no de
-  requests concurrentes). (2) **Frescura silenciosa**: el modelo ya NO narra el sync en respuestas normales ni
-  chequea por las suyas — `checkRepoFreshness` solo si preguntan explícitamente (el gate determinístico mantiene la
-  frescura solo). **328 tests**; typecheck/biome limpios. **e2e ✅:** "qué stack usás"→solo searchMemory; "estás al
-  día?"→checkRepoFreshness; sync 12 archivos ~12s correcto. → `LEARNINGS.md`. **Mejora futura:** honrar `Retry-After`.
+> **✅ Cerrados 2026-06-15 (→ Historial "CLUSTER FRESHNESS/RAG HARDENING"), verificados por el Telegram de Kevin:**
+> Followup ① (RAG verbatim) · Followup ② (gate siempre background + embed fuera de tx) · tools de freshness
+> rediseñadas (eliminado `syncRepo`, Invariante #9) · refinamientos (concurrencia de embeddings + frescura silenciosa).
 - [?] **Paso 3 parte 2 — `learnRepo` (ingesta on-demand de repo público de Kevin) — IMPLEMENTADO (pend.
   verificación conversacional de Kevin por Telegram).** Acción `learnRepo` (owner-only, telegram trusted): el modelo
   pasa un NOMBRE, el sistema lo valida contra los repos PÚBLICOS reales de Kevin (excepción #8: fallo visible, sin
@@ -152,6 +122,31 @@
 ---
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
+
+**🟢 CLUSTER FRESHNESS/RAG HARDENING — EN `main` + VERIFICADO por Telegram real de Kevin** (2026-06-15; cerrado
+2026-06-15 con su log "hablame de tu sistema" → solo searchMemory, chunk VERBATIM, sin bloqueo). Seis fixes
+encadenados de esta sesión, todos con TDD + e2e:
+- **(1) RAG VERBATIM (Followup ①):** `searchMemory` **comprimía** los chunks recuperados; cavemem (compresor de
+  PROSA) borraba artículos ES+EN (`(a)=>a.name`→`()=>.name`) y espacios-antes-de-puntuación (`artist ?? []`→
+  `artist?? []`) — corrupción REAL del grounding (peor en código `repo:*` sin fences). Fix: el RAG va **verbatim**
+  (quitada la compresión de RAG + plumbing `ragIntensity`/`COMPRESS_INTENSITY_RAG`/`ActionContext.compressor`); la
+  compresión queda solo para el contexto conversacional. **Verificado en el Telegram de Kevin:** el chunk sale limpio.
+- **(2) FRESHNESS GATE SIEMPRE BACKGROUND (Followup ②):** el gate de `searchMemory` corría un sync **inline** en el
+  hot path (hasta 20 archivos secuenciales → 183s). Fix: `ensureFresh` **nunca** inline, siempre `void guardedSync`;
+  responde con el índice actual, la frescura llega al próximo turno. + **embed FUERA de la tx** en `replaceFile` (no
+  retiene conexión del pool durante la red).
+- **(3) TOOLS DE FRESHNESS REDISEÑADAS — eliminado el tool `syncRepo` (fundó el Invariante #9):** el modelo lo
+  invocaba al ver "stale" y sincronizaba inline (16 archivos = 191s, turno 211s) + redundante + estados
+  contradictorios. Ahora `checkRepoFreshness` (read) dispara el sync en background sola; el modelo solo consulta.
+  Quitado el plumbing `syncInlineMaxFiles`/`SYNC_INLINE_MAX_FILES`.
+- **(4) EMBEDDINGS CON CONCURRENCIA ACOTADA** (`EMBED_CONCURRENCY`=4): bg sync de 12 archivos de ~140s a ~12s
+  (~10×, 0 errores 429 — context7: el 429 era del batch-array, no de requests concurrentes). + **(5) FRESCURA
+  SILENCIOSA:** el modelo no narra el sync en respuestas normales ni chequea por las suyas (`checkRepoFreshness`
+  solo si preguntan explícitamente). **Verificado en el Telegram de Kevin:** "hablame de tu sistema" → solo searchMemory.
+Principios fundados: **Invariante #9** (`tools-self-contained-minimize-chaining`) + memorias
+`long-tasks-ok-if-notify-not-blocking`, `compression-savings-marginal`. Detalle técnico → `LEARNINGS.md`.
+Commits: `fix(rag)…verbatim` · `fix(sync)…background` · `refactor(harness)…syncRepo` · `perf(memory)…tx` ·
+`perf(embeddings)+ux(freshness)`. **Mejora futura (no urgente):** honrar `Retry-After` del 429 en el backoff.
 
 **🟢 STREAMING/TYPING EN TELEGRAM — MERGEADO en `main` + VERIFICADO** (2026-06-15, ex `feat/telegram-streaming`;
 Kevin confirmó el streaming en vivo en el chat privado). En chats **privados** (el chat general de Vaio):
