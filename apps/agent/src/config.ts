@@ -73,6 +73,12 @@ const envSchema = z.object({
   LASTFM_API_KEY: z.string().optional(),
   LASTFM_USER: z.string().optional(),
 
+  // Conector WakaTime (tiempo de programación medido). Opcional → sin key, el conector no corre.
+  WAKATIME_API_KEY: z.string().optional(),
+  // Conector Steam (qué juega / juegos favoritos). Requiere ambas. SteamID64 (perfil de juegos público).
+  STEAM_API_KEY: z.string().optional(),
+  STEAM_ID: z.string().optional(),
+
   // "Vaio se nutre solo" (pasos 1+2): ingesta de fuentes CRUDAS (md + código) de repos curados, incl. el
   // propio repo (self-awareness). csv de "owner/repo[@branch]" (branch omitido → default branch del repo).
   // Vacío/ausente → la fuente no corre (degrada limpio). Reusa GITHUB_TOKEN.
