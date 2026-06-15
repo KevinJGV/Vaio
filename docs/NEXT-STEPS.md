@@ -69,12 +69,11 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [ ] ⚠️ **Limpieza del seed SINTÉTICO de trends (GROUNDING — prioritario).** Para probar #3 sembramos historia
-  **fabricada** en la DB real: snapshots backdateados (-21d) en `connector_snapshots` (`lastfm`/`steam`/`wakatime`/
-  `github-stats`) + sus chunks `trend:*` derivados. **Vaio los narra como reales** → viola grounding si quedan. Y el
-  1er `pnpm ingest` real (con `TRENDS_ENABLED=1`) compararía real-ahora vs el viejo-sintético → 1ª tendencia falsa.
-  **Acción:** `DELETE FROM connector_snapshots WHERE source IN ('lastfm','steam','wakatime','github-stats');` +
-  `DELETE FROM documents WHERE source LIKE 'trend:%';` **antes** de activar trends reales (o como parte de hacerlo).
+- [x] ✅ **Limpieza del seed SINTÉTICO de trends (GROUNDING) — HECHO** (2026-06-15). Se borraron de la DB real los
+  **8** snapshots backdateados (-21d) de `connector_snapshots` (`lastfm`/`steam`/`wakatime`/`github-stats`) + los
+  **4** chunks `trend:*` derivados (en transacción; verificado 0 filas). La violación de grounding (historia
+  fabricada narrada como real) queda resuelta. Nota: ahí estaba el origen del `"se achicó"` del Followup ① ("el
+  espectro musical de Kevin se achicó"). La acumulación real arranca limpia al activar trends.
 - [ ] **Activar trends REALES en prod.** `TRENDS_ENABLED=1` en Railway + (recordatorio) `WAKATIME_API_KEY`/
   `STEAM_API_KEY`/`STEAM_ID` en secrets. Tras limpiar el seed: `pnpm ingest` acumula la 1ª captura real; las
   tendencias reales emergen recién con la 2ª corrida (cuando cambie la actividad). Verificar acumulación real.
