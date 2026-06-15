@@ -166,6 +166,11 @@ export async function syncRepo(
       manifest.length === 0 || !samePolicy || opts?.forceFull === true
     if (isFull) await memory.clearSource(source)
 
+    // Tombstones: archivos descartados antes (secret/no-texto). Se cuentan como "ya procesados" en el diff
+    // (mismo blob_sha → no se re-intentan); en full se descartan (re-evaluar todo desde cero).
+    const prevSkipped = isFull ? [] : (tracked?.skipped ?? [])
+    const skippedMap = new Map(prevSkipped.map((s) => [s.path, s.blobSha]))
+
     const diff = diffRepoTree(
       tree.tree.map((e) => ({
         path: e.path,
@@ -173,7 +178,7 @@ export async function syncRepo(
         ...(e.size != null ? { size: e.size } : {}),
         sha: e.sha,
       })),
-      isFull ? [] : manifest,
+      isFull ? [] : [...manifest, ...prevSkipped],
       policy
     )
 
@@ -196,6 +201,7 @@ export async function syncRepo(
     // Borrar lo que sobra (salvo árbol truncado: una ausencia puede ser truncamiento, no borrado).
     if (!tree.truncated && diff.toDelete.length > 0) {
       await memory.deleteFiles(source, diff.toDelete)
+      for (const path of diff.toDelete) skippedMap.delete(path) // si era tombstone, ya no aplica
     }
 
     // Re-embeber solo lo cambiado. Orden por prioridad: contenido (prosa→código) ANTES que los docs de proceso
@@ -212,13 +218,15 @@ export async function syncRepo(
           `/repos/${slug}/contents/${encodePath(entry.path)}?ref=${encodeURIComponent(branch)}`,
           token
         )
-        // Si dejó de ser texto o trae un secret → quitar lo que hubiera, no indexar.
+        // Si dejó de ser texto o trae un secret → quitar lo que hubiera, no indexar, y TOMBSTONE (registrar su
+        // blob_sha) para no re-intentarlo en cada sync hasta que el archivo cambie.
         if (!isProbablyText(raw) || hasSecret(raw)) {
           await memory.deleteFiles(source, [entry.path])
+          skippedMap.set(entry.path, entry.sha)
           if (hasSecret(raw)) {
             logger?.warn(
               { repo: slug, path: entry.path },
-              "sync: archivo con secret → descartado"
+              "sync: archivo con secret → descartado (tombstone)"
             )
           }
           continue
@@ -241,6 +249,7 @@ export async function syncRepo(
           blobSha: entry.sha,
         }))
         await memory.replaceFile(source, entry.path, rows)
+        skippedMap.delete(entry.path) // se indexó bien → ya no es tombstone
         chunkCount += used.length
         embedded++
       } catch (err) {
@@ -268,6 +277,7 @@ export async function syncRepo(
       status,
       embedded,
       deleted: diff.toDelete.length,
+      skipped: [...skippedMap].map(([path, blobSha]) => ({ path, blobSha })),
     })
 
     logger?.info(

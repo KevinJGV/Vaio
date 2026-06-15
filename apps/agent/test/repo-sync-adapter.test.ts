@@ -163,6 +163,78 @@ describe("syncRepo", () => {
     expect(calls.replaceFile).toEqual(["README.md"])
   })
 
+  it("archivo tombstoned (skipped) al mismo blob_sha → NO se re-intenta", async () => {
+    let leakyFetched = false
+    mockGithub((url) => {
+      if (url.includes("/commits/")) return { json: { sha: "c2" } } // stale
+      if (url.includes("/git/trees/"))
+        return {
+          json: tree([
+            { path: "README.md", sha: "a" }, // unchanged (en manifest)
+            { path: "src/leaky.ts", sha: "s1" }, // tombstoned al sha s1 → NO re-intentar
+          ]),
+        }
+      if (url.includes("/contents/src/leaky.ts")) {
+        leakyFetched = true
+        return { text: "no debería bajarse" }
+      }
+      return { text: "" }
+    })
+    const { mem, calls } = fakeMemory({
+      "repo:kev/vaio": [{ path: "README.md", blobSha: "a" }],
+    })
+    const { tracker, upserts } = fakeTracker({
+      source: "repo:kev/vaio",
+      owner: "kev",
+      repo: "vaio",
+      branch: "main",
+      lastCommitSha: "c1",
+      lastTreeSha: "t",
+      policyVersion: 1,
+      skipped: [{ path: "src/leaky.ts", blobSha: "s1" }],
+    })
+    const r = await syncRepo(
+      { owner: "kev", repo: "vaio", branch: "main" },
+      { memory: mem, tracker, policy: DEFAULT_REPO_POLICY }
+    )
+    expect(leakyFetched).toBe(false) // ni se baja
+    expect(calls.replaceFile).not.toContain("src/leaky.ts")
+    expect(r.unchanged).toBe(2) // README + tombstone ambos "ya procesados"
+    const up = upserts[0] as { skipped: { path: string }[] }
+    expect(up.skipped.map((s) => s.path)).toContain("src/leaky.ts") // se preserva
+  })
+
+  it("archivo con secret → se descarta y queda como tombstone", async () => {
+    mockGithub((url) => {
+      if (url.includes("/commits/")) return { json: { sha: "c2" } }
+      if (url.includes("/git/trees/"))
+        return { json: tree([{ path: "src/leaky.ts", sha: "s9" }]) }
+      if (url.includes("/contents/"))
+        return { text: 'const token = "supersecretvalue123"' }
+      return {}
+    })
+    const { mem, calls } = fakeMemory({
+      "repo:kev/vaio": [{ path: "old.ts", blobSha: "o" }],
+    })
+    const { tracker, upserts } = fakeTracker({
+      source: "repo:kev/vaio",
+      owner: "kev",
+      repo: "vaio",
+      branch: "main",
+      lastCommitSha: "c1",
+      lastTreeSha: "t",
+      policyVersion: 1,
+      skipped: [],
+    })
+    await syncRepo(
+      { owner: "kev", repo: "vaio", branch: "main" },
+      { memory: mem, tracker, policy: DEFAULT_REPO_POLICY }
+    )
+    expect(calls.replaceFile).not.toContain("src/leaky.ts") // descartado, no indexado
+    const up = upserts[0] as { skipped: { path: string; blobSha: string }[] }
+    expect(up.skipped).toContainEqual({ path: "src/leaky.ts", blobSha: "s9" }) // tombstone
+  })
+
   it("diff grande con inlineMaxFiles → deferred (no aplica nada)", async () => {
     mockGithub((url) => {
       if (url.includes("/commits/")) return { json: { sha: "c2" } }

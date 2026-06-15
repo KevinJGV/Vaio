@@ -67,6 +67,10 @@ export const trackedRepos = pgTable("tracked_repos", {
   lastStatus: text("last_status"), // 'ok' | 'partial' | 'error'
   embeddedCount: integer("embedded_count").default(0),
   deletedCount: integer("deleted_count").default(0),
+  // Tombstones: archivos DESCARTADOS al sincronizar (secret/no-texto) con su blob_sha. No tienen chunks en
+  // `documents`, así que sin esto el diff incremental los re-intentaría en CADA sync. Registrarlos por blob_sha
+  // → el diff los trata como "ya procesados" hasta que el blob cambie (entonces se re-evalúan).
+  skipped: jsonb("skipped").$type<{ path: string; blobSha: string }[]>(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 })
 

@@ -1,0 +1,1 @@
+ALTER TABLE "tracked_repos" ADD COLUMN "skipped" jsonb;

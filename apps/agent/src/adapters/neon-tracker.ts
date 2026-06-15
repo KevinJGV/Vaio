@@ -23,6 +23,7 @@ export function createRepoTracker(db: Database): RepoTracker {
         lastCommitSha: row.lastCommitSha,
         lastTreeSha: row.lastTreeSha,
         policyVersion: row.policyVersion,
+        skipped: row.skipped ?? [],
       }
     },
 
@@ -38,6 +39,7 @@ export function createRepoTracker(db: Database): RepoTracker {
         lastStatus: rec.status,
         embeddedCount: rec.embedded,
         deletedCount: rec.deleted,
+        skipped: rec.skipped ?? null,
       }
       await db
         .insert(trackedRepos)

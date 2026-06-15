@@ -13,6 +13,9 @@ export interface TrackedRepo {
   lastTreeSha: string | null
   /** Si cambian los chunkers/policy, bump → fuerza full (el blob-SHA no cambiaría pero los chunks sí). */
   policyVersion: number
+  /** Archivos DESCARTADOS al sincronizar (secret/no-texto) con su blob_sha (tombstones). Sin esto, el diff los
+   *  re-intentaría en cada sync (no tienen chunks en `documents`). Opcional/ausente → []. */
+  skipped?: { path: string; blobSha: string }[]
 }
 
 export interface RepoTracker {
