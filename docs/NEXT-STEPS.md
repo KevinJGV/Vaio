@@ -31,13 +31,15 @@
 > **Fallback uniforme en env de modelos — MERGEADO + EN PROD** (2026-06-14): `TRANSCRIBE_MODELS`/`SUMMARY_MODELS`
 > aceptan cadena (fallback client/server-side); `EMBEDDINGS_MODEL` único a propósito; plural por consistencia.
 > Arregla el bug del audio. Detalle → Historial. **Sin WIP abierto.**
-> **"Vaio se nutre solo" pasos 1+2 — VERIFICADO, en rama `feat/raw-repo-ingestion` (commit 5f9fb93), LISTO PARA
-> MERGE** (2026-06-14): ingesta BATCH de fuentes CRUDAS (md+código) de repos curados vía GitHub API, **incl. el
-> propio repo** (self-awareness). e2e ✅: `repo:KevinJGV/Vaio` + `repo:KevinJGV/KevinJGV` (800 chunks c/u) en
-> `documents`, **0 fuga de secrets** (verificado en DB), `/chat` cita el propio código con procedencia. Detalle →
-> Historial. ⚠️ La ingesta corrió contra la DB real (los chunks YA están), pero el código aún no está en `main`/deploy.
-> ✅ **Followup de grounding (auto-introspección) RESUELTO el mismo día** (ver Historial): Vaio ya habla de su
-> arquitectura/código público; prompt-dump y secret-extraction siguen rechazados (e2e adversarial).
+> **Bundle "memoria viva / retrieval / self-awareness" — MERGEADO en `main`** (2026-06-14, ex
+> `feat/raw-repo-ingestion`): **6 features verificadas e2e** — (1) **ingesta de fuentes CRUDAS** de repos (pasos 1+2,
+> incl. el propio repo = self-awareness) · (2) **grounding de auto-introspección** (Vaio habla de su código público;
+> prompt-dump/secrets rechazados) · (3) **rerank** (2ª etapa RAG) · (4) **sync incremental + frescura autónoma lazy**
+> (paso 3 parte 1) · (5) **freshness gate** (repo del portafolio = única fuente de verdad; scrape cv/me/contact
+> dropeado) · (6) **sentido del ahora + framework de conectores** extensible (Last.fm/GitHub live, fecha/hora al
+> prompt). **270 tests; typecheck/biome/build limpios.** Detalle por feature → Historial.
+> ⚠️ **Operativo:** la ingesta/sync corrieron contra la DB real; el índice quedó con cap-bajo en `KevinJGV/Vaio`
+> (444 chunks) del e2e — un `pnpm --filter @vaio/agent sync` sin cap (o `SYNC_FORCE_FULL=1`) lo deja full cuando se quiera.
 > **Próximos candidatos (eligen Kevin/yo):** el **paso 3** (acceso on-demand a repos como read-action del harness),
 > la **adjudicación de conflictos de `facts`** (§🟠 priorizado), el **Nivel C** (scheduler + push) y/o `escalate`
 > (Fase 2). El **portafolio** va DESPUÉS. *(Rerank ✅ hecho 2026-06-14.)*
@@ -63,7 +65,7 @@
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
 
 **🟢 SENTIDO DEL AHORA + FRAMEWORK DE CONECTORES (gap ①) — VERIFICADO** (2026-06-14, rama
-`feat/raw-repo-ingestion` — aún NO en `main`). El más grande para "del día a día". **(A) Sentido del ahora:**
+`feat/raw-repo-ingestion` — ahora en `main`). El más grande para "del día a día". **(A) Sentido del ahora:**
 `core/time.ts` `formatNow` (Intl, TZ `OWNER_TIMEZONE`=America/Bogota) → bloque "Ahora mismo es …" inyectado al
 prompt cada turno. **(B) Framework de conectores EXTENSIBLE** (`ports/connector.ts`: faceta `live()` + `collect()`
 futuro): conectores **Last.fm** (now-playing/último) + **GitHub** (actividad/pushes recientes) sobre el registry
@@ -79,7 +81,7 @@ conectores (collect→memoria, "se nutre solo") · conectores WakaTime/Steam/Git
 proactiva (⭐).
 
 **🟢 FRESHNESS GATE — no confiarse de embebidos viejos sobre Kevin — VERIFICADO** (2026-06-14, rama
-`feat/raw-repo-ingestion` — aún NO en `main`). Cierra el gap: antes Vaio respondía sobre Kevin por inercia con
+`feat/raw-repo-ingestion` — ahora en `main`). Cierra el gap: antes Vaio respondía sobre Kevin por inercia con
 chunks viejos. Hook **determinístico** en `searchMemory` (`RepoSyncPort.ensureFresh`, **TTL 10 min** por repo en
 memoria): tras recuperar, si los chunks vienen de un `repo:*` stale → sincroniza ANTES de responder (inline si
 chico; background si grande); si refrescó inline, re-recupera. No depende del criterio del modelo. Coste casi nulo
@@ -97,7 +99,7 @@ Specs → [`…-freshness-gate-design.md`](superpowers/specs/2026-06-14-freshnes
 **Cierra el 🟠 freshness gate.** Pendiente menor: el sync full de ambos repos con cap normal (hoy quedó cap bajo del e2e).
 
 **🟢 MEMORIA VIVA DE REPOS — SYNC INCREMENTAL + FRESCURA AUTÓNOMA LAZY (paso 3, parte 1) — VERIFICADO**
-(2026-06-14, rama `feat/raw-repo-ingestion`, commit e8b09d8 — aún NO en `main`). El índice se mantiene fresco
+(2026-06-14, rama `feat/raw-repo-ingestion`, commit e8b09d8 — ahora en `main`). El índice se mantiene fresco
 **solo, barato, lazy y autónomo**: Vaio detecta (1 request) si un repo relevante está desactualizado y, si lo está,
 **sincroniza incrementalmente** (re-embebe SOLO lo cambiado por blob-SHA). **Engine puro** (`core/repo-sync.ts`:
 `diffRepoTree`/`compareFreshness`/`isInlineSync`). **Schema** (migración `0005`, aplicada a Neon): `documents` +=
@@ -117,7 +119,7 @@ en paralelo se pisarían; decisión consciente). Specs →
 [`…-plan.md`](superpowers/specs/2026-06-14-repo-incremental-sync-plan.md). **Cierra el paso 3 parte 1 de "Vaio se
 nutre solo".** Pendiente: **incremento 2 (turnos proactivos ⭐)**, parte 2 (ingesta on-demand de repo nuevo), cron/webhook.
 
-**🟢 RERANK (2ª etapa del RAG) — VERIFICADO** (2026-06-14, rama `feat/raw-repo-ingestion` — aún NO en `main`).
+**🟢 RERANK (2ª etapa del RAG) — VERIFICADO** (2026-06-14, rama `feat/raw-repo-ingestion` — ahora en `main`).
 Trigger disparado por la ingesta de fuentes crudas (corpus ~29 → ~1600, mucho código → similitud vectorial
 ruidosa). `searchMemory` ahora: recupera **wide-K** por vector (`RERANK_CANDIDATES`, default 30) → **rerankea**
 (OpenRouter `/rerank`, single-provider REST, cross-encoder query+chunk) → **recorta al maxK** del canal (6 web /
@@ -132,7 +134,7 @@ wiring `index.ts`/`agent.ts`). **Sin migración.** **232 tests** (+10: rerank-op
 Specs → [`…-rerank-design.md`](superpowers/specs/2026-06-14-rerank-design.md) ·
 [`…-plan.md`](superpowers/specs/2026-06-14-rerank-plan.md). **Cierra el followup "rerank" de §Evolución multimodal.**
 
-**🟢 GROUNDING: AUTO-INTROSPECCIÓN — VERIFICADO** (2026-06-14, rama `feat/raw-repo-ingestion` — aún NO en `main`).
+**🟢 GROUNDING: AUTO-INTROSPECCIÓN — VERIFICADO** (2026-06-14, rama `feat/raw-repo-ingestion` — ahora en `main`).
 Followup del e2e de pasos 1+2: la política del prompt bloqueaba que Vaio hablara de su propio código (se negaba y ni
 consultaba `searchMemory`). Cambio de **wording** (sin código nuevo): `capabilities.ts` (`WEB_POLICY` +
 `untrustedTelegram`), `search-memory.ts` (description), `prompt.ts` (persona ES+EN) → habilitar explicar/citar la
@@ -146,8 +148,8 @@ construido?" → `searchMemory` dispara, cita el repo (CLAUDE.md/index.ts/README
 [`…-plan.md`](superpowers/specs/2026-06-14-self-introspection-grounding-plan.md). Decisión: directo (cambio chico/
 acoplado; la red es el e2e adversarial). **Cierra el followup de grounding de "Vaio se nutre solo".**
 
-**🟢 "VAIO SE NUTRE SOLO" PASOS 1+2 — INGESTA DE FUENTES CRUDAS — VERIFICADO, LISTO PARA MERGE** (2026-06-14,
-rama `feat/raw-repo-ingestion`, commit 5f9fb93 — aún NO en `main`). 1ª materialización del norte (paso 4/curación ya estaba; faltaba el acceso a lo crudo).
+**🟢 "VAIO SE NUTRE SOLO" PASOS 1+2 — INGESTA DE FUENTES CRUDAS — VERIFICADO, EN `main`** (2026-06-14,
+ex `feat/raw-repo-ingestion`, commit 5f9fb93). 1ª materialización del norte (paso 4/curación ya estaba; faltaba el acceso a lo crudo).
 Collector `collectRawRepo` que lee **md+código** de repos curados vía **GitHub API** (Git Trees recursive +
 Contents `vnd.github.raw+json`, verificado context7), **incl. el propio `KevinJGV/Vaio` + `KevinJGV/KevinJGV`**
 (self-awareness). Lógica pura en `core/` (TDD): `secret-scan` (guard de secrets, **skip-no-redact**, alto-recall),
