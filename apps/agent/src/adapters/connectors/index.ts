@@ -3,8 +3,8 @@
 
 import type { Env } from "../../config.js"
 import type { Connector } from "../../ports/connector.js"
-import { createGithubActivityConnector } from "./github-activity.js"
-import { createLastfmConnector } from "./lastfm-now.js"
+import { createGithubConnector } from "./github.js"
+import { createLastfmConnector } from "./lastfm.js"
 
 export function buildConnectors(env: Env): Connector[] {
   const connectors: Connector[] = []
@@ -18,7 +18,7 @@ export function buildConnectors(env: Env): Connector[] {
   }
   if (env.GITHUB_USER) {
     connectors.push(
-      createGithubActivityConnector({
+      createGithubConnector({
         user: env.GITHUB_USER,
         token: env.GITHUB_TOKEN,
       })

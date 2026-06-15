@@ -64,6 +64,18 @@
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
 
+**🟢 FACETA PERSIST DE CONECTORES — INGESTA UNIFICADA EN EL FRAMEWORK — VERIFICADO** (2026-06-14, rama
+`feat/connector-persist` — aún NO en `main`). Activada la faceta `collect()` de los conectores: cada fuente = UN
+conector con `live()` (consultable) + `collect()` (persistible). Migrados **collectGithub/collectLastfm** a
+`connectors/github.ts` + `connectors/lastfm.ts` (renombrados de github-activity/lastfm-now); `ingest.ts` ahora itera
+`buildConnectors().collect()` — el MISMO registry que la tool `recentActivity` (live) → una sola definición por
+fuente. Modelo **snapshot** (reemplaza en `documents`; acumulación/patrones = follow-up). Borrados los
+`sources/{github,lastfm}.ts` viejos; tests migrados a `connectors.test.ts`. **270 tests**; typecheck/biome/build
+limpios. **e2e ✅:** `pnpm ingest` persistió `github` (9) + `lastfm` (1) vía collect(), cv/me/contact limpios, sin
+regresión. Specs → [`…-connector-persist-design.md`](superpowers/specs/2026-06-14-connector-persist-design.md) ·
+[`…-plan.md`](superpowers/specs/2026-06-14-connector-persist-plan.md). **Followups:** acumulación/patrones en el
+tiempo · conectores WakaTime/Steam/GitHub-stats (live+collect) · cleanup de código muerto (collectRawRepo/CV/Portfolio).
+
 **🟢 SENTIDO DEL AHORA + FRAMEWORK DE CONECTORES (gap ①) — VERIFICADO** (2026-06-14, rama
 `feat/raw-repo-ingestion` — ahora en `main`). El más grande para "del día a día". **(A) Sentido del ahora:**
 `core/time.ts` `formatNow` (Intl, TZ `OWNER_TIMEZONE`=America/Bogota) → bloque "Ahora mismo es …" inyectado al

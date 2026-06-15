@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { createGithubActivityConnector } from "../src/adapters/connectors/github-activity.js"
+import { createGithubConnector } from "../src/adapters/connectors/github.js"
 import { buildConnectors } from "../src/adapters/connectors/index.js"
-import { createLastfmConnector } from "../src/adapters/connectors/lastfm-now.js"
+import { createLastfmConnector } from "../src/adapters/connectors/lastfm.js"
 import type { Env } from "../src/config.js"
 
 function mockFetch(handler: (url: string) => { ok?: boolean; json?: unknown }) {
@@ -15,7 +15,7 @@ function mockFetch(handler: (url: string) => { ok?: boolean; json?: unknown }) {
 }
 afterEach(() => vi.unstubAllGlobals())
 
-describe("conector Last.fm (live)", () => {
+describe("conector Last.fm — live()", () => {
   const c = createLastfmConnector({ apiKey: "k", user: "kev" })
   it("now-playing → 'escuchando ahora'", async () => {
     mockFetch(() => ({
@@ -51,8 +51,30 @@ describe("conector Last.fm (live)", () => {
   })
 })
 
-describe("conector GitHub actividad (live)", () => {
-  const c = createGithubActivityConnector({ user: "kev" })
+describe("conector Last.fm — collect()", () => {
+  const c = createLastfmConnector({ apiKey: "k", user: "kev" })
+  it("artistas más escuchados → 1 chunk source 'lastfm'", async () => {
+    mockFetch(() => ({
+      json: {
+        topartists: {
+          artist: [{ name: "Radiohead" }, { name: "Tame Impala" }],
+        },
+      },
+    }))
+    const rows = await c.collect?.()
+    expect(rows).toHaveLength(1)
+    expect(rows?.[0]?.source).toBe("lastfm")
+    expect(rows?.[0]?.chunk).toContain("Radiohead")
+    expect(rows?.[0]?.chunk).toContain("Tame Impala")
+  })
+  it("sin artistas → []", async () => {
+    mockFetch(() => ({ json: { topartists: { artist: [] } } }))
+    expect(await c.collect?.()).toEqual([])
+  })
+})
+
+describe("conector GitHub — live()", () => {
+  const c = createGithubConnector({ user: "kev" })
   it("PushEvent → actividad de código reciente", async () => {
     mockFetch(() => ({
       json: [
@@ -66,26 +88,75 @@ describe("conector GitHub actividad (live)", () => {
     }))
     const out = await c.live()
     expect(out).toContain("kev/vaio: feat: x")
-    expect(out).not.toContain("detalle") // solo la 1ª línea del commit
+    expect(out).not.toContain("detalle")
   })
   it("PushEvent SIN commits (solo ref) → fallback a repo (branch)", async () => {
     mockFetch(() => ({
       json: [
-        { type: "PushEvent", repo: { name: "kev/vaio" }, payload: { ref: "refs/heads/main" } },
-        { type: "PushEvent", repo: { name: "kev/vaio" }, payload: { ref: "refs/heads/main" } },
+        {
+          type: "PushEvent",
+          repo: { name: "kev/vaio" },
+          payload: { ref: "refs/heads/main" },
+        },
+        {
+          type: "PushEvent",
+          repo: { name: "kev/vaio" },
+          payload: { ref: "refs/heads/main" },
+        },
       ],
     }))
     const out = await c.live()
     expect(out).toContain("kev/vaio (main)")
-    // dedup por repo+branch → no repite
     expect(out?.match(/kev\/vaio \(main\)/g)?.length).toBe(1)
   })
-
   it("sin push events → null", async () => {
     mockFetch(() => ({
       json: [{ type: "WatchEvent", repo: { name: "x" }, payload: {} }],
     }))
     expect(await c.live()).toBeNull()
+  })
+})
+
+describe("conector GitHub — collect()", () => {
+  const c = createGithubConnector({ user: "kev" })
+  it("perfil + repos → chunks source 'github', salta fork/archived", async () => {
+    mockFetch((url) => {
+      if (url.endsWith("/users/kev")) {
+        return {
+          json: { name: "Kevin", bio: "dev", public_repos: 2, followers: 10 },
+        }
+      }
+      return {
+        json: [
+          {
+            name: "vaio",
+            description: "agente",
+            language: "TypeScript",
+            stargazers_count: 5,
+            topics: ["ai"],
+            html_url: "https://github.com/kev/vaio",
+            fork: false,
+            archived: false,
+          },
+          {
+            name: "un-fork",
+            description: null,
+            language: null,
+            stargazers_count: 0,
+            html_url: "https://github.com/kev/un-fork",
+            fork: true,
+            archived: false,
+          },
+        ],
+      }
+    })
+    const rows = (await c.collect?.()) ?? []
+    const text = rows.map((r) => r.chunk).join("\n")
+    expect(rows[0]?.source).toBe("github")
+    expect(text).toContain("Kevin")
+    expect(text).toContain("vaio")
+    expect(text).toContain("TypeScript")
+    expect(text).not.toContain("un-fork")
   })
 })
 

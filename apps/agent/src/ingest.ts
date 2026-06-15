@@ -6,14 +6,13 @@
 //     el manifest path/blob_sha del sync).
 // Correr con `pnpm --filter @vaio/agent ingest` (a mano / cron). Para repos: `pnpm --filter @vaio/agent sync`.
 
+import { buildConnectors } from "./adapters/connectors/index.js"
 import { createDb } from "./adapters/db/client.js"
 import { runMigrations } from "./adapters/db/migrate.js"
 import { EMBEDDING_DIM } from "./adapters/db/schema.js"
 import { createEmbedder } from "./adapters/embeddings.js"
 import { createLogger } from "./adapters/logger.js"
 import { createMemoryStore } from "./adapters/neon-memory.js"
-import { collectGithub } from "./adapters/sources/github.js"
-import { collectLastfm } from "./adapters/sources/lastfm.js"
 import { loadConfig } from "./config.js"
 import type { DocChunk } from "./ports/memory.js"
 
@@ -52,27 +51,15 @@ async function main(): Promise<void> {
     await memory.clearSource(source)
   }
 
-  const collectors: { name: string; run: () => Promise<DocChunk[]> }[] = [
-    {
-      name: "github",
-      run: () =>
-        collectGithub({ user: env.GITHUB_USER, token: env.GITHUB_TOKEN }),
-    },
-  ]
-  if (env.LASTFM_API_KEY && env.LASTFM_USER) {
-    const apiKey = env.LASTFM_API_KEY
-    const user = env.LASTFM_USER
-    collectors.push({
-      name: "lastfm",
-      run: () => collectLastfm({ apiKey, user }),
-    })
-  } else {
-    logger.info("lastfm: sin LASTFM_API_KEY/USER, salto.")
-  }
+  // Fuentes = conectores con faceta persist (collect). Mismo `buildConnectors` que la tool recentActivity (live):
+  // una sola definición por fuente. Sumar fuente persistible = un conector con collect() + su key.
+  const collectors = buildConnectors(env).filter((c) => c.collect)
+  if (collectors.length === 0)
+    logger.info("ingest: sin conectores con collect().")
 
   for (const col of collectors) {
     try {
-      const rows = await col.run()
+      const rows = (await col.collect?.()) ?? []
       const bySource = new Map<string, DocChunk[]>()
       for (const r of rows) {
         const arr = bySource.get(r.source) ?? []
