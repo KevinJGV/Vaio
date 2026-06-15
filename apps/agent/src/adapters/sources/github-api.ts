@@ -29,6 +29,37 @@ export async function githubApi<T>(path: string, token?: string): Promise<T> {
   return (await res.json()) as T
 }
 
+/** POST a la GitHub GraphQL API → `data` tipado. Lanza Error con status/body o si el payload trae `errors`
+ *  (lo loguea el llamador). Requiere token (GraphQL no acepta requests anónimas). */
+export async function githubGraphql<T>(
+  query: string,
+  variables: Record<string, unknown>,
+  token: string
+): Promise<T> {
+  const res = await fetch(`${BASE}/graphql`, {
+    method: "POST",
+    headers: {
+      authorization: `bearer ${token}`,
+      "content-type": "application/json",
+      "user-agent": "vaio-ingest",
+    },
+    body: JSON.stringify({ query, variables }),
+  })
+  if (!res.ok) {
+    const body = await res.text().catch(() => "")
+    throw new Error(
+      `GitHub GraphQL → ${res.status}${body ? ` · ${body.slice(0, 200)}` : ""}`
+    )
+  }
+  const json = (await res.json()) as { data?: T; errors?: unknown }
+  if (json.errors || !json.data) {
+    throw new Error(
+      `GitHub GraphQL errores: ${JSON.stringify(json.errors)?.slice(0, 200)}`
+    )
+  }
+  return json.data
+}
+
 /** GET de contenido RAW de un archivo (Contents API con Accept raw) → texto crudo (sin base64). */
 export async function githubRaw(path: string, token?: string): Promise<string> {
   const res = await fetch(`${BASE}${path}`, {
