@@ -1,11 +1,11 @@
 // searchMemory: RAG sobre la memoria del producto (read-only, clearance "anyone"), con `k`
-// acotado por el perfil del canal. Migrado desde el viejo core/tools.ts SIN cambio de
-// comportamiento: misma description, inputSchema, compresión Tier 1 y trazas tool.result.
+// acotado por el perfil del canal. El contexto recuperado va al modelo VERBATIM (no se comprime:
+// comprimir RAG mutilaba el grounding por un ahorro marginal — ver el comentario en `output`).
 
 import { tool } from "ai"
 import { z } from "zod"
 import type { DocChunk } from "../../ports/memory.js"
-import { compressOrRaw, errMsg } from "../util.js"
+import { errMsg } from "../util.js"
 import type { ActionContext, ActionDescriptor } from "./types.js"
 
 export const searchMemory: ActionDescriptor = {
@@ -18,8 +18,6 @@ export const searchMemory: ActionDescriptor = {
       emit,
       ids,
       logger,
-      compressor = null,
-      ragIntensity = "full",
       reranker = null,
       rerankCandidates = 30,
       factRetrieveMax = 4,
@@ -100,6 +98,10 @@ export const searchMemory: ActionDescriptor = {
             }
           }
           // Facts PRIMERO (verdad curada que lidera el contexto), luego los docs del repo.
+          // El contexto recuperado va al modelo CRUDO (verbatim): NO se comprime. Comprimir RAG
+          // mutilaba la fidelidad de grounding (prosa perdía artículos: 'le gusta el fútbol'→'le
+          // gusta fútbol'; el código del repo perdía espacios/operadores: 'a ?? b'→'a?? b') a cambio
+          // de un ahorro marginal (~3.5%, no es la palanca de costo). Ver LEARNINGS.md.
           const combined = [...facts, ...docs]
           const output =
             combined.length === 0
@@ -107,36 +109,9 @@ export const searchMemory: ActionDescriptor = {
               : combined
                   .map(
                     (d) =>
-                      `[${d.source}${d.url ? ` · ${d.url}` : ""}]\n${compressOrRaw(compressor, d.chunk, ragIntensity)}`
+                      `[${d.source}${d.url ? ` · ${d.url}` : ""}]\n${d.chunk}`
                   )
                   .join("\n\n")
-          // Métrica del ahorro Tier 1 sobre los chunks de RAG (el componente dominante,
-          // `full`). Espeja el log de conversación en agent.ts para confirmar el ahorro en logs.
-          if (compressor && combined.length > 0) {
-            const before = combined.reduce(
-              (n, d) => n + compressor.countTokens(d.chunk),
-              0
-            )
-            const after = combined.reduce(
-              (n, d) =>
-                n +
-                compressor.countTokens(
-                  compressor.compress(d.chunk, ragIntensity)
-                ),
-              0
-            )
-            if (before > 0) {
-              logger.debug(
-                {
-                  before,
-                  after,
-                  saved: before - after,
-                  chunks: combined.length,
-                },
-                "rag compressed"
-              )
-            }
-          }
           emit({
             ...ids,
             type: "tool.result",

@@ -62,8 +62,6 @@ export interface AgentDeps {
   compressor?: Compressor | null
   /** Intensidad de compresión del CONTEXTO conversacional (resumen + turnos históricos). */
   convIntensity?: Intensity
-  /** Intensidad de compresión de los chunks de RAG (searchMemory). */
-  ragIntensity?: Intensity
   /** Nº de mensajes acumulados que dispara el resumen rodante. */
   summaryThreshold?: number
   /** Cuántos mensajes recientes se pasan verbatim al modelo. */
@@ -147,7 +145,6 @@ export function createAgent(deps: AgentDeps) {
     capabilities = createCapabilityResolver(),
     compressor = null,
     convIntensity = "lite",
-    ragIntensity = "full",
     summaryThreshold = DEFAULT_SUMMARY_THRESHOLD,
     recentLimit = DEFAULT_RECENT_LIMIT,
     transcriber = null,
@@ -303,8 +300,6 @@ export function createAgent(deps: AgentDeps) {
           emit,
           ids,
           logger: ctx.logger,
-          compressor,
-          ragIntensity,
           reranker,
           rerankCandidates,
           factRetrieveMax,

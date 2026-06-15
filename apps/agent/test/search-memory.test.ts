@@ -85,26 +85,24 @@ describe("searchMemory (descriptor migrado)", () => {
     })
   })
 
-  it("comprime los chunks de RAG si hay compresor", async () => {
+  it("NO comprime los chunks de RAG: el contexto recuperado va al modelo CRUDO (fidelidad de grounding)", async () => {
+    // El chunk trae prosa con artículos + código con operadores/espacios: comprimir
+    // esto los mutila ('le gusta el fútbol'→'le gusta fútbol', 'a ?? b.name'→'a??b.name').
+    const raw = "A Kevin le gusta el fútbol; const x = a ?? b.name"
     const memory: MemoryStore = {
-      searchMemory: async () => [{ source: "cv", url: "", chunk: "chunk-uno" }],
+      searchMemory: async () => [{ source: "cv", url: "", chunk: raw }],
       upsertDocuments: async () => {},
       clearSource: async () => {},
       listIndexedFiles: async () => [],
       deleteFiles: async () => {},
       replaceFile: async () => {},
     }
-    const compressor = {
-      compress: (t: string) => `[C]${t}`,
-      expand: (t: string) => t,
-      countTokens: (t: string) => t.length,
-    }
-    const t = searchMemory.build(ctx({ memory, compressor }))
-    const out = await t.execute?.(
-      { query: "x" },
-      { toolCallId: "tc", messages: [] }
+    const t = searchMemory.build(ctx({ memory }))
+    const out = String(
+      await t.execute?.({ query: "x" }, { toolCallId: "tc", messages: [] })
     )
-    expect(String(out)).toContain("[C]chunk-uno")
+    // Verbatim: artículos, espacios y operadores intactos (searchMemory no comprime el RAG).
+    expect(out).toContain(raw)
   })
 
   it("degrada a cortesía si memory es null", async () => {

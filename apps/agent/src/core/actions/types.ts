@@ -5,7 +5,6 @@
 
 import type { TraceEvent } from "@vaio/contracts"
 import type { Tool } from "ai"
-import type { Compressor, Intensity } from "../../ports/compress.js"
 import type { Connector } from "../../ports/connector.js"
 import type { FactStore } from "../../ports/facts.js"
 import type { Logger } from "../../ports/logger.js"
@@ -34,9 +33,6 @@ export interface ActionContext {
   emit: (e: TraceEvent) => void
   ids: TraceIds
   logger: Logger
-  /** Tier 1: comprime los chunks de RAG antes de inyectarlos al modelo. null = sin comprimir. */
-  compressor?: Compressor | null
-  ragIntensity?: Intensity
   /** Memoria de hechos curados (write-actions). null = sin DB → las acciones degradan. */
   factStore?: FactStore | null
   /** Rerank de la 2ª etapa del RAG. null = sin rerank → searchMemory cae a vector top-K. */

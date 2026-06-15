@@ -201,7 +201,6 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
     summarizer,
     compressor,
     convIntensity: env.COMPRESS_INTENSITY_CONV,
-    ragIntensity: env.COMPRESS_INTENSITY_RAG,
     summaryThreshold: env.SUMMARY_THRESHOLD,
     recentLimit: env.CONVERSATION_RECENT_LIMIT,
     transcriber,

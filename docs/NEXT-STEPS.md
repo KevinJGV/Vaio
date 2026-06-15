@@ -78,10 +78,16 @@
 - [ ] **Activar trends REALES en prod.** `TRENDS_ENABLED=1` en Railway + (recordatorio) `WAKATIME_API_KEY`/
   `STEAM_API_KEY`/`STEAM_ID` en secrets. Tras limpiar el seed: `pnpm ingest` acumula la 1ª captura real; las
   tendencias reales emergen recién con la 2ª corrida (cuando cambie la actividad). Verificar acumulación real.
-- [ ] **Followup ① — corrupción de texto en el path `searchMemory`/rerank** (visto en la prueba): chunks salen con
-  espacios/palabras comidos ("seachicó", "perfil deKevin", "En últimos 21 días") **solo** por `searchMemory`; el
-  storage está sano (`getBySource` trae limpio) y `recentActivity` ya esquiva el problema. Sospechoso: el reranker
-  `nemotron-rerank-vl` o un artefacto de log. Reproducir y aislar (rerank on/off) antes de tocar.
+- [?] **Followup ① — corrupción de texto en `searchMemory` → CAUSA RAÍZ HALLADA + FIX (pend. verificación de Kevin).**
+  NO era el reranker (solo devuelve `index`/`score`, jamás texto) NI un artefacto de log: era **corrupción REAL** —
+  `searchMemory` **comprimía** cada chunk recuperado y cavemem (compresor de PROSA) borra artículos ES+EN
+  (`(a)=>a.name`→`()=>.name`) y espacios-antes-de-puntuación (`artist ?? []`→`artist?? []`); los chunks `repo:*`
+  son código crudo sin fences → tratados como prosa → mutilados. El diferenciador con `recentActivity` (que no
+  corrompe) era que **searchMemory comprimía y recentActivity no**. **Fix:** el RAG va **VERBATIM** al modelo
+  (quitada la compresión de RAG + plumbing muerto: `ragIntensity`/`COMPRESS_INTENSITY_RAG`/`ActionContext.compressor`).
+  +~3.5% tokens (despreciable; la compresión queda solo para el contexto conversacional). **328 tests**;
+  typecheck/biome limpios. **e2e ✅:** `/chat` real → `trace_events` muestra el chunk de código verbatim
+  (`artist ?? []).map((a) => a.name)`), pasando por el reranker `nemotron-rerank-vl`. Detalle → `LEARNINGS.md`.
 - [ ] **Followup ② — latencia de `searchMemory` (183 s) con `repo sync` concurrente** (visto en la prueba):
   contención del pool/embeddings cuando un sync incremental corre durante un turno. Medir y, si aplica, serializar/
   acotar la concurrencia del sync vs. el RAG del turno.

@@ -108,7 +108,6 @@ const envSchema = z.object({
     .optional()
     .transform((v) => v !== "false" && v !== "0"),
   COMPRESS_INTENSITY_CONV: z.enum(["lite", "full", "ultra"]).default("lite"),
-  COMPRESS_INTENSITY_RAG: z.enum(["lite", "full", "ultra"]).default("full"),
 
   // Entrada multimodal (audio/voz + imágenes). Cada modalidad su modelo EXPLÍCITO (no todos cubren todo:
   // visión = VLM por chat; STT = modelo en /audio/transcriptions). Vacío = esa modalidad OFF. Verificar

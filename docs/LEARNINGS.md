@@ -293,6 +293,22 @@ El código typecheckeó sin cambios de API salvo **dos rupturas reales**:
 - **Resolución del paquete:** `@vaio/compress` expone `types`→src (typecheck sin build) y `default`→dist
   (runtime/tests) → su `dist` debe existir para correr/test del agente (lo cubre `pnpm -r build`). 0
   `ERR_MODULE_NOT_FOUND` verificado en boot.
+- **⚠️ NO comprimir el RAG — el compresor es para PROSA, mutila código y degrada grounding** (2026-06-15,
+  causa raíz del followup "corrupción de texto en searchMemory"): `searchMemory` comprimía cada chunk
+  recuperado (`compressOrRaw(compressor, chunk, "full")`) antes de inyectarlo al modelo. cavemem está
+  diseñado para **prosa** y hace dos cosas que **destruyen el contexto RAG**: (1) borra **artículos ES *y EN***
+  (`el/la/los` + `a/the`) → `(a) => a.name` quedaba `() =>.name` y `le gusta el fútbol` quedaba `le gusta
+  fútbol`; (2) borra **espacios antes de puntuación** (`collapseWhitespace`) → `artist ?? []` quedaba
+  `artist?? []`. Los chunks `repo:*` son **código crudo sin fences** → el tokenizer (solo protege ```` ``` ````
+  e `` `inline` ``) los trata como prosa → mutila operadores/nombres. **Era corrupción REAL de la data que ve
+  el modelo** (verificado en `trace_events`, no artefacto de log), envenenando el grounding de facts y del
+  propio código. **Diagnóstico:** el reranker quedó exonerado (solo devuelve `index`/`score`, jamás texto); el
+  diferenciador con `recentActivity` (que no corrompe) era **que searchMemory comprimía y recentActivity no**.
+  **Fix:** el contexto recuperado va al modelo **VERBATIM** (se quitó la compresión de RAG + su plumbing:
+  `ragIntensity`, `COMPRESS_INTENSITY_RAG`, `ActionContext.compressor`). Costo: +~3.5% tokens — **despreciable**
+  y ya sabido que no es la palanca de costo (memoria `compression-savings-marginal`). **Regla:** comprimir RAG
+  es un trade negativo (fidelidad de grounding ≫ 3.5%); la compresión queda **solo** para el contexto
+  conversacional (resumen + turnos), que es prosa real.
 
 ### Integridad documental — workflow anti-drift (jun-2026)
 - **Por qué los docs se pudren**: mezclar historia+estado+futuro en un mismo lugar (las frases "a futuro"
