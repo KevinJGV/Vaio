@@ -79,9 +79,23 @@
   typecheck/biome/build limpios. **e2e Neon uuid-free ✅:** auto-save sin conflicto; reemplazo por `replaces:[0]`
   invaldó el viejo; 0 uuids en el texto al modelo. Specs →
   [`…-design.md`](superpowers/specs/2026-06-14-llm-no-relay-ids-design.md) ·
-  [`…-plan.md`](superpowers/specs/2026-06-14-llm-no-relay-ids-plan.md). **Falta:** re-test owner por Telegram
-  (reiniciar el server con este código) + merge a `main`. **Diferido (futuro):** enumerar repos trackeados en el
+  [`…-plan.md`](superpowers/specs/2026-06-14-llm-no-relay-ids-plan.md). **✅ Validado en el flujo real
+  (2026-06-15):** un reemplazo hecho por Telegram persistió (DB: viejo invalidado + linaje `supersedes`).
+  **Falta:** re-test owner limpio + merge a `main`. **Diferido (futuro):** enumerar repos trackeados en el
   prompt para uuid-free-ar `checkRepoFreshness`/`syncRepo`.
+- [?] **Prioridad de retrieval de facts + persona no narra su búsqueda — IMPLEMENTADO, pend. re-test owner**
+  (2026-06-15, rama `feat/facts-conflict-adjudication`). Surgió del e2e Telegram: un fact curado («le gusta el
+  fútbol») **no afloraba** para una pregunta general (lo tapaban los ~miles de chunks del repo). **#1 Retrieval:**
+  los facts (owner-confirmed, tan importantes como los repos para la naturalidad) se recuperan SIEMPRE aparte
+  (`MemoryStore.searchFacts`, opcional) y se **anteponen** al contexto; `searchMemory` queda **solo-docs** (sin
+  doble conteo). Config `FACT_RETRIEVE_MAX`/`FACT_RETRIEVE_DISTANCE` (umbral generoso evita inyectar facts
+  off-topic). **#2 Persona:** responder con el resultado YA resuelto, sin narrar la búsqueda ni autocorregirse
+  ('no recuerdo… ah sí') — ES+EN. **301 tests**; typecheck/biome/build limpios. **e2e Neon ✅:** 'gustos hobbies'
+  ahora trae el fact del fútbol; `searchMemory` ya no mezcla facts; query off-topic → 0 facts (umbral). **Falta:**
+  re-test owner por Telegram + merge.
+> **Diferido (no es WIP) — Streaming/typing en Telegram (#3 del feedback de Kevin, 2026-06-15):** mostrar
+> 'escribiendo…' y/o editar el mensaje progresivamente mientras Vaio responde. Feature de UX; requiere verificar
+> la API de Telegram (context7) + tocar el adapter de Telegram. Su propio par design+plan cuando se priorice.
 > **Recordatorio operativo (no es WIP):** para que los 3 conectores nuevos corran **en prod**, las envs
 > `WAKATIME_API_KEY`/`STEAM_API_KEY`/`STEAM_ID` deben estar en los secrets de Railway (sin ellas degradan
 > limpio = apagados; el resto del agente no se ve afectado).
