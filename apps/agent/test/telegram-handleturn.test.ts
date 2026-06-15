@@ -1,5 +1,6 @@
 import { Hono } from "hono"
 import { describe, expect, it } from "vitest"
+import type { Variables } from "../src/adapters/http/types.js"
 import type {
   SendAudioOpts,
   SendOpts,
@@ -7,7 +8,33 @@ import type {
 } from "../src/adapters/telegram/client.js"
 import { mountTelegram } from "../src/adapters/telegram/routes.js"
 import type { Agent } from "../src/core/agent.js"
+import type { Logger } from "../src/ports/logger.js"
 import type { TraceSink } from "../src/ports/trace.js"
+
+const noopLog: Logger = {
+  trace() {},
+  debug() {},
+  info() {},
+  warn() {},
+  error() {},
+  child() {
+    return noopLog
+  },
+}
+
+/** App de test con el middleware que setea log/requestId (como en prod), y Telegram montado. */
+function mkApp(deps: Parameters<typeof mountTelegram>[1]): Hono<{
+  Variables: Variables
+}> {
+  const app = new Hono<{ Variables: Variables }>()
+  app.use("*", async (c, next) => {
+    c.set("log", noopLog)
+    c.set("requestId", "r")
+    await next()
+  })
+  mountTelegram(app, deps)
+  return app
+}
 
 function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
   const enc = new TextEncoder()
@@ -60,7 +87,10 @@ const fakeAgent = (chunks: string[], finalText: string): Agent =>
 
 const sink: TraceSink = { emit() {} }
 
-function post(app: Hono, update: unknown): Promise<Response> {
+function post(
+  app: Hono<{ Variables: Variables }>,
+  update: unknown
+): Promise<Response> {
   return app.request("/tg", {
     method: "POST",
     headers: {
@@ -88,8 +118,7 @@ describe("handleTurn — streaming/typing", () => {
     const done = new Promise<void>((r) => {
       resolve = r
     })
-    const app = new Hono()
-    mountTelegram(app, {
+    const app = mkApp({
       agent: fakeAgent(["Hola", " mundo"], "Hola mundo"),
       client: fakeClient(calls, resolve),
       allowedIds: new Set(),
@@ -109,8 +138,7 @@ describe("handleTurn — streaming/typing", () => {
     const done = new Promise<void>((r) => {
       resolve = r
     })
-    const app = new Hono()
-    mountTelegram(app, {
+    const app = mkApp({
       agent: fakeAgent(["x"], "x"),
       client: fakeClient(calls, resolve),
       allowedIds: new Set(),
@@ -131,8 +159,7 @@ describe("handleTurn — streaming/typing", () => {
     const done = new Promise<void>((r) => {
       resolve = r
     })
-    const app = new Hono()
-    mountTelegram(app, {
+    const app = mkApp({
       agent: fakeAgent(["y"], "y"),
       client: fakeClient(calls, resolve, false), // sendMessageDraft → false
       allowedIds: new Set(),

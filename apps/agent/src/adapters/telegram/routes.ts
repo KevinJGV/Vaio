@@ -154,11 +154,24 @@ export function mountTelegram(
       // si el bot no lo soporta (false) → typing keepalive. Degrada siempre (Invariante #1).
       const canDraft =
         deps.draftStreaming !== false && norm.isPrivate && !wantsVoice
-      let reply: string
-      if (
+      // Probe del draft ("Thinking…"): si el bot/versión no lo soporta → false → typing keepalive.
+      const draftOk =
         canDraft &&
         (await deps.client.sendMessageDraft(norm.chatId, norm.updateId, ""))
-      ) {
+      // Observabilidad del camino (antes era invisible qué rama se tomó).
+      log.info(
+        {
+          path: draftOk ? "draft" : "typing",
+          isPrivate: norm.isPrivate,
+          wantsVoice,
+          draftEnabled: deps.draftStreaming !== false,
+        },
+        draftOk
+          ? "tg: streaming en vivo (sendMessageDraft)"
+          : "tg: typing keepalive (sin draft)"
+      )
+      let reply: string
+      if (draftOk) {
         let alive = true
         reply = await pumpStream(stream, async (partial) => {
           if (!alive) return
