@@ -51,29 +51,24 @@
 > **Tools de repos uuid-free + fixes de sync — MERGEADO + DESPLEGADO + VERIFICADO** (2026-06-15, ex
 > `feat/repo-tools-uuid-free`): `check/syncRepo` por enum cerrado (cierra el Invariante #8); **tombstone** de
 > descartados (migración `0007`) y **guard de in-flight** del sync (de los logs de Kevin). **305 tests.** → Historial.
-> **Próximos candidatos (orden de Kevin):** **#2 streaming/typing en Telegram**, **#3 acumulación/patrones de
-> conectores en el tiempo**, y luego el **paso 3** (on-demand de repos), **Nivel C** (turnos proactivos),
-> **`escalate`** (Fase 2) o **extracción automática de facts**. El **portafolio** va DESPUÉS.
-> *(Rerank ✅; facts adjudicación+uuid-free+retrieval ✅; tools de repos uuid-free + sync fixes ✅ 2026-06-15.)*
+> **Streaming/typing en Telegram — MERGEADO en `main` (local) + VERIFICADO** (2026-06-15, ex
+> `feat/telegram-streaming`): `sendMessageDraft` muestra el texto en vivo en chats **privados** (confirmado por
+> Kevin); topics → typing fallback (por diseño, draft es privado-only). **315 tests.** ⚠️ `origin/main` 6 commits
+> atrás (Kevin dev en local main + ngrok; pushear para desplegar). Detalle → Historial.
+> **Próximos candidatos (orden de Kevin):** **#3 acumulación/patrones de conectores en el tiempo**, y luego el
+> **paso 3** (on-demand de repos), **Nivel C** (turnos proactivos), **`escalate`** (Fase 2), **extracción
+> automática de facts**, o el **streaming en topics** (editMessageText, diferido). El **portafolio** va DESPUÉS.
+> *(Rerank ✅; facts ✅; repos uuid-free + sync fixes ✅; streaming Telegram ✅ 2026-06-15.)*
 
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [?] **Streaming/typing en Telegram (#2 del orden de Kevin) — IMPLEMENTADO, pend. e2e owner + merge** (rama
-  `feat/telegram-streaming`). En chats **privados**: `sendMessageDraft` muestra el texto parcial **en vivo**
-  (consume el `stream` del core con throttle ~700 ms); al terminar, `sendMessage` persiste el completo. En
-  grupos/topics, reply de voz, o si el bot no soporta el draft → **typing keepalive** ('escribiendo…' cada 4 s).
-  Degrada siempre. Flag `TELEGRAM_DRAFT_STREAMING` (apagable sin redeploy). API verificada con context7.
-  **315 tests** (+10: pumpStream, sendMessageDraft, isPrivate, handleTurn 3 caminos); typecheck/biome/build
-  limpios. Specs → [`…-design.md`](superpowers/specs/2026-06-15-telegram-streaming-design.md) ·
-  [`…-plan.md`](superpowers/specs/2026-06-15-telegram-streaming-plan.md). **En diagnóstico (2026-06-15):** 1ª
-  prueba (Kevin, dev local+ngrok) no mostró streaming con un mensaje CORTO ("hola vaio"). Hallazgos: (a) `respond`
-  es incremental (descartado buffer eager); (b) **el modelo tiene reasoning** → no emite tokens durante ~7 s de
-  razonamiento y luego ráfaga corta → en mensajes cortos el streaming es imperceptible; (c) faltaba log del camino
-  → **agregado** (`tg: streaming en vivo` / `typing keepalive` con path/isPrivate). **Próximo:** reiniciar dev +
-  probar con prompt de respuesta LARGA + pasar el nuevo log (para ver si el draft entró/2xx). Si entra y 2xx pero
-  no se ve → la renderización del draft no es confiable → pivot a `editMessageText` (universal). `sendMessageDraft`
-  verificado real (Bot API 9.5+). Verificación owner + merge pendientes. **Después: #3 acumulación de conectores.**
+- _(vacío — sin ítems abiertos)_
+> **Mejora futura diferida (Kevin "dejémoslo así por ahora", 2026-06-15) — streaming en TOPICS de Telegram:**
+> hoy el streaming en vivo solo va en chats privados (límite de `sendMessageDraft`); en topics aparece de golpe
+> (typing fallback). Para streamear en topics → `editMessageText` (universal, pero "parpadea" al editar y hay que
+> throttlear ~1/s). Su propio mini design+plan cuando se priorice.
+> **Próximo del orden de Kevin:** #3 acumulación/patrones de conectores en el tiempo.
 > **Recordatorio operativo (no es WIP):** para que los 3 conectores nuevos corran **en prod**, las envs
 > `WAKATIME_API_KEY`/`STEAM_API_KEY`/`STEAM_ID` deben estar en los secrets de Railway (sin ellas degradan
 > limpio = apagados; el resto del agente no se ve afectado).
@@ -92,6 +87,19 @@
 ---
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
+
+**🟢 STREAMING/TYPING EN TELEGRAM — MERGEADO en `main` + VERIFICADO** (2026-06-15, ex `feat/telegram-streaming`;
+Kevin confirmó el streaming en vivo en el chat privado). En chats **privados** (el chat general de Vaio):
+`sendMessageDraft` (Bot API 9.5+, verificado con context7) muestra el texto **parcial en vivo** — se consume el
+`stream` del core (el mismo que el web) con un helper `pumpStream` throttleado (~700 ms); al cerrar, `sendMessage`
+persiste el completo. En **topics/hilos** (no privados), reply de voz, o si el bot no soporta el draft → **typing
+keepalive** (`sendChatAction` cada 4 s) + mensaje final. Degrada siempre (Invariante #1). `normalize.isPrivate`
+decide el camino; flag `TELEGRAM_DRAFT_STREAMING` (apagable). Observabilidad del camino (`tg: streaming en vivo` /
+`typing keepalive`). **315 tests** (+10); typecheck/biome/build limpios. Specs →
+[`…-telegram-streaming-design.md`](superpowers/specs/2026-06-15-telegram-streaming-design.md) ·
+[`…-plan.md`](superpowers/specs/2026-06-15-telegram-streaming-plan.md). **Diferido (Kevin):** streaming en topics
+vía `editMessageText` (el draft es privado-only). ⚠️ `origin/main` aún 6 commits atrás (Kevin desarrolla en local
+main + ngrok; pushear cuando quiera desplegar a Railway).
 
 **🟢 TOOLS DE REPOS uuid-free + FIXES DE SYNC (tombstone + guard) — MERGEADO en `main` + DESPLEGADO + VERIFICADO**
 (2026-06-15, ex `feat/repo-tools-uuid-free`; Kevin confirmó en prod que el tombstone anda y el repo se actualiza
