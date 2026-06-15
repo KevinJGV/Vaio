@@ -81,4 +81,57 @@ describe("proposeFact / commitFact", () => {
       .execute?.({ statement: "X" }, { toolCallId: "tc", messages: [] })
     expect(String(out)).toMatch(/no configurada/i)
   })
+
+  it("proposeFact lista los conflictos detectados e instruye supersedes", async () => {
+    const fs = inMemoryFacts()
+    // un fact confirmado del mismo principal → el siguiente propose lo trae como conflicto
+    await proposeFact
+      .build(ctx(fs))
+      .execute?.(
+        { statement: "A Kevin le gusta X" },
+        { toolCallId: "t1", messages: [] }
+      )
+    await commitFact
+      .build(ctx(fs))
+      .execute?.(
+        { id: "f1", decision: "confirm" },
+        { toolCallId: "t2", messages: [] }
+      )
+    const out = await proposeFact
+      .build(ctx(fs))
+      .execute?.(
+        { statement: "A Kevin ya no le gusta X" },
+        { toolCallId: "t3", messages: [] }
+      )
+    expect(String(out)).toMatch(/chocar/i)
+    expect(String(out)).toMatch(/f1/)
+    expect(String(out)).toMatch(/supersedes/i)
+  })
+
+  it("commitFact pasa supersedes y avisa el reemplazo", async () => {
+    const fs = inMemoryFacts()
+    await proposeFact
+      .build(ctx(fs))
+      .execute?.(
+        { statement: "le gusta X" },
+        { toolCallId: "t1", messages: [] }
+      )
+    await commitFact
+      .build(ctx(fs))
+      .execute?.(
+        { id: "f1", decision: "confirm" },
+        { toolCallId: "t2", messages: [] }
+      )
+    await proposeFact
+      .build(ctx(fs))
+      .execute?.({ statement: "ahora Y" }, { toolCallId: "t3", messages: [] })
+    const out = await commitFact
+      .build(ctx(fs))
+      .execute?.(
+        { id: "f2", decision: "confirm", supersedes: ["f1"] },
+        { toolCallId: "t4", messages: [] }
+      )
+    expect(String(out)).toMatch(/reemplac/i)
+    expect(fs.rows().find((r) => r.id === "f1")?.invalidAt).not.toBeNull()
+  })
 })

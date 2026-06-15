@@ -106,7 +106,10 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
         dimensions: EMBEDDING_DIM,
       })
       memory = createMemoryStore(db, embedder, logger)
-      factStore = createFactStore(db, embedder)
+      factStore = createFactStore(db, embedder, {
+        conflictDistance: env.FACT_CONFLICT_DISTANCE,
+        conflictCandidates: env.FACT_CONFLICT_CANDIDATES,
+      })
       // Sync incremental de repos (frescura + re-embeber solo lo cambiado). Reusa la policy de ingesta.
       repoSync = createRepoSync({
         memory,

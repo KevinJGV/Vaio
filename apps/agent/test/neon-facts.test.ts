@@ -48,4 +48,66 @@ describe("FactStore (contrato, vía fake)", () => {
     })
     expect(await fs.listPending("k")).toHaveLength(1)
   })
+
+  it("propose surface un fact confirmado vigente del mismo principal como conflicto; no de otro principal", async () => {
+    const fs = inMemoryFacts()
+    const { id: viejo } = await fs.propose({
+      statement: "A Kevin le gusta X",
+      principalId: "k",
+      channel: "telegram",
+    })
+    await fs.commit(viejo)
+    // mismo principal → aparece como candidato a conflicto
+    const { conflicts } = await fs.propose({
+      statement: "A Kevin ya no le gusta X",
+      principalId: "k",
+      channel: "telegram",
+    })
+    expect(conflicts.map((c) => c.id)).toContain(viejo)
+    // otro principal → no ve el conflicto
+    const { conflicts: otros } = await fs.propose({
+      statement: "algo",
+      principalId: "otro",
+      channel: "telegram",
+    })
+    expect(otros).toHaveLength(0)
+  })
+
+  it("commit con supersedes invalida el viejo y guarda el linaje; sin supersedes lo deja vigente", async () => {
+    const fs = inMemoryFacts()
+    const { id: viejo } = await fs.propose({
+      statement: "A Kevin le gusta X",
+      principalId: "k",
+      channel: "telegram",
+    })
+    await fs.commit(viejo)
+    const { id: nuevo } = await fs.propose({
+      statement: "Ahora le gusta Y",
+      principalId: "k",
+      channel: "telegram",
+    })
+    expect(await fs.commit(nuevo, { supersedes: [viejo] })).toBe(true)
+    const viejoRow = fs.rows().find((r) => r.id === viejo)
+    const nuevoRow = fs.rows().find((r) => r.id === nuevo)
+    expect(viejoRow?.invalidAt).not.toBeNull() // el viejo quedó invalidado
+    expect(nuevoRow?.supersedes).toEqual([viejo]) // linaje guardado
+    // un fact que no se contradice: commit SIN supersedes no toca a nadie
+    const { id: coexiste } = await fs.propose({
+      statement: "También le gusta Z",
+      principalId: "k",
+      channel: "telegram",
+    })
+    await fs.commit(coexiste)
+    expect(fs.rows().find((r) => r.id === nuevo)?.invalidAt).toBeNull()
+  })
+
+  it("commit con supersedes a un id inexistente/no-confirmado no rompe", async () => {
+    const fs = inMemoryFacts()
+    const { id } = await fs.propose({
+      statement: "X",
+      principalId: "k",
+      channel: "telegram",
+    })
+    expect(await fs.commit(id, { supersedes: ["nope"] })).toBe(true)
+  })
 })

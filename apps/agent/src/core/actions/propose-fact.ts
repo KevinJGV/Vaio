@@ -37,14 +37,28 @@ export const proposeFact: ActionDescriptor = {
           return output
         }
         try {
-          const { id } = await ctx.factStore.propose({
+          const { id, conflicts } = await ctx.factStore.propose({
             statement,
             principalId: ctx.principal.id,
             channel: ctx.principal.channel,
             conversationId: ctx.ids.conversationId,
             turnId: ctx.ids.turnId,
           })
-          const output = `Propuesta registrada (id ${id}). Pedile confirmación al usuario; si dice que sí, llamá commitFact con ese id.`
+          let output = `Propuesta registrada (id ${id}). Pedile confirmación al usuario; si dice que sí, llamá commitFact con ese id.`
+          if (conflicts.length > 0) {
+            const list = conflicts
+              .map((c) => {
+                const when = c.validAt
+                  ? ` (guardado el ${c.validAt.toLocaleDateString("es")})`
+                  : ""
+                return `  - [${c.id}] «${c.statement}»${when}`
+              })
+              .join("\n")
+            output +=
+              `\n⚠️ Puede chocar con hechos ya guardados:\n${list}\n` +
+              "Si REALMENTE se contradicen y el usuario confirma reemplazar, pasá esos id(s) en commitFact " +
+              "como `supersedes`. Si solo se parecen pero conviven (no se contradicen), NO los pases."
+          }
           ctx.emit({
             ...ctx.ids,
             type: "tool.result",
