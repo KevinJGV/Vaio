@@ -40,7 +40,7 @@ export function createWakatimeConnector(cfg: { apiKey: string }): Connector {
     async live(): Promise<string | null> {
       try {
         const data = await get("last_7_days")
-        if (!data || !data.total_seconds) return null
+        if (!data?.total_seconds) return null
         const langs = topByPercent(data.languages ?? [], 3)
         const total = data.human_readable_total ?? "un rato"
         return langs

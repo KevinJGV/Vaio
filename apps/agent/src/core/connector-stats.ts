@@ -18,7 +18,6 @@ export function currentStreak(days: Day[], today: string): number {
       streak++
     } else if (day.date === today) {
       // El día en curso aún sin commits no rompe la racha: seguí mirando ayer.
-      continue
     } else {
       break
     }
@@ -60,7 +59,10 @@ export function aggregateLanguages(
   const total = [...bytes.values()].reduce((a, b) => a + b, 0)
   if (total === 0) return []
   return [...bytes.entries()]
-    .map(([name, size]) => ({ name, percent: Math.round((size / total) * 100) }))
+    .map(([name, size]) => ({
+      name,
+      percent: Math.round((size / total) * 100),
+    }))
     .sort((a, b) => b.percent - a.percent)
     .slice(0, 5)
 }
