@@ -84,6 +84,22 @@ export function createMemoryStore(
       return rows.map((r) => ({ source: "fact", url: "", chunk: r.chunk }))
     },
 
+    async getBySource(source: string): Promise<DocChunk[]> {
+      const rows = await db
+        .select({
+          source: documents.source,
+          url: documents.url,
+          chunk: documents.chunk,
+        })
+        .from(documents)
+        .where(eq(documents.source, source))
+      return rows.map((r) => ({
+        source: r.source,
+        url: r.url ?? "",
+        chunk: r.chunk,
+      }))
+    },
+
     async upsertDocuments(rows: DocChunk[]): Promise<void> {
       if (rows.length === 0) return
       const embeddings = await embedder.embed(rows.map((r) => r.chunk))

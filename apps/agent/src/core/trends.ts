@@ -16,6 +16,12 @@ export function hashContent(s: string): string {
   return createHash("sha256").update(normalizeForHash(s)).digest("hex")
 }
 
+/** Source canónico del chunk de tendencia derivado de un conector. ÚNICA fuente de verdad del prefijo: lo
+ *  ESCRIBE trend-ingest y lo LEE recentActivity (por source exacto, no semántico → Invariante #8). */
+export function trendSource(source: string): string {
+  return `trend:${source}`
+}
+
 const DAY_MS = 86_400_000
 
 /** Ítems heurísticos de un snapshot: la lista tras ":" separada por comas, sin "(…)"/"N%"/puntuación. Grounded:

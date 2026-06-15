@@ -31,6 +31,10 @@ export interface MemoryStore {
     query: string,
     opts?: { k?: number; maxDistance?: number }
   ): Promise<DocChunk[]>
+  /** Chunks de un source por match EXACTO (lectura determinística, NO semántica). Opcional: lo usa
+   *  recentActivity para traer el último `trend:<source>` derivado y complementar lo live (Invariante #8: el
+   *  sistema trae el dato por clave, el modelo no lo relaya). Un store sin esto degrada (solo live). */
+  getBySource?(source: string): Promise<DocChunk[]>
   /** Embebe e inserta chunks (el embedding se calcula en el adapter). Persiste `path`/`blobSha` si vienen. */
   upsertDocuments(rows: DocChunk[]): Promise<void>
   /** Borra todos los docs de una fuente (para reingestar). */

@@ -7,7 +7,7 @@ import type { Locale } from "@vaio/contracts"
 import type { MemoryStore } from "../ports/memory.js"
 import type { SnapshotStore } from "../ports/snapshot-store.js"
 import type { TrendSummarizer } from "../ports/trend.js"
-import { buildTrendPrompt, deterministicTrend } from "./trends.js"
+import { buildTrendPrompt, deterministicTrend, trendSource } from "./trends.js"
 
 export interface TrendDeps {
   snapshots: SnapshotStore
@@ -46,10 +46,8 @@ export async function runConnectorTrend(
   }
   if (!text.trim()) return "empty"
 
-  const trendSource = `trend:${source}`
-  await deps.memory.clearSource(trendSource) // el trend es el ÚLTIMO derivado (reemplaza)
-  await deps.memory.upsertDocuments([
-    { source: trendSource, url: "", chunk: text },
-  ])
+  const ts = trendSource(source)
+  await deps.memory.clearSource(ts) // el trend es el ÚLTIMO derivado (reemplaza)
+  await deps.memory.upsertDocuments([{ source: ts, url: "", chunk: text }])
   return "derived"
 }
