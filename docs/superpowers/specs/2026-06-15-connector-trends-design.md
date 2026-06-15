@@ -110,6 +110,24 @@ OPENROUTER_API_KEY, trendChain(env), logger, attribution))` (espeja `index.ts`).
 Siempre responde / ingest no rompe (degradación LLM→determinístico→skip). Grounding (system sin hechos; tendencia
 derivada de datos). ports/adapters-lite (`core/trends` puro; I/O en adapters; `ingest` cablea). Sin secrets en logs.
 
+## Acceso: complemento en `recentActivity` (refinamiento post-prueba, 2026-06-15)
+**Hallazgo en prueba real (Telegram):** el chunk `trend:*` aflora bien por `searchMemory` cuando el modelo la
+llama, pero `recentActivity` (el AHORA) y los trends (la EVOLUCIÓN) **se solapan semánticamente** sobre "¿cómo
+viene?" → el modelo elige no-determinísticamente y a veces se queda **solo con lo live** (caso "¿cómo viene el
+código?" no llamó `searchMemory` → perdió `trend:github-stats`/`trend:wakatime`). No era "el trend se ahoga en el
+RAG" sino **competencia de selección de tool**.
+**Decisión (Kevin):** que **UNA** tool cubra ambos sentidos del tiempo. `recentActivity` lee por **source
+EXACTO** el último `trend:<connector.name>` y lo anexa bajo "📈 Cómo viene" (determinístico — Invariante #8: el
+sistema trae el dato por clave; el modelo no lo relaya). Los trends **siguen en memoria** (searchMemory los trae en
+preguntas profundas = cinturón + tirantes). Inerte sin trends (OFF → solo live, legacy).
+- `ports/memory`: `getBySource?(source)` opcional (espeja `searchFacts?`); adapter `neon-memory` lo implementa.
+- `core/trends`: `trendSource(source)` = única fuente de verdad del prefijo (lo escribe trend-ingest, lo lee
+  recentActivity).
+- **Bonus (verificado e2e):** `getBySource` trae el texto **crudo y limpio** → esquiva la **corrupción de texto**
+  (espacios/palabras comidas: "seachicó", "perfil deKevin") que aparece **solo** por el path `searchMemory`/rerank.
+  El storage está sano → la corrupción es del retrieval/rerank (o artefacto de log). **Followup aparte** (verificar
+  y corregir). Otro followup colateral: `searchMemory` tardó **183 s** con un `repo sync` concurrente (contención).
+
 ## Evolución a grafos (Fase 3 — Graphiti) — forward-link
 Esta feature es el **precursor pragmático "antes del grafo"**. Cuando llegue el grafo temporal bi-temporal
 (Graphiti, Fase 3): los **entes** (artistas/juegos/lenguajes/géneros) pasan a **nodos** con aristas bi-temporales

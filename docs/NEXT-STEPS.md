@@ -70,12 +70,18 @@
   listRecent → `buildTrendPrompt` (grounded ES/EN) → `summarize`/`deterministicTrend` → upsert. Flag
   `TRENDS_ENABLED` **OFF por defecto**. Alcance rico con clasificación (vía LLM), chunks en memoria,
   timestamp-aware. **Precursor graph-ready** (Fase 3): `SnapshotStore` + `payload` jsonb (ver §forward-link del
-  design). **326 tests** (+11); typecheck/biome/build limpios. **e2e Neon ✅:** append/dedup/listRecent/prune
-  reales + LLM derivó tendencia grounded ("en los últimos 14 días… incorporó Hades II (8h)… añadió Cuphead").
-  Specs → [`…-design.md`](superpowers/specs/2026-06-15-connector-trends-design.md) ·
+  design). **e2e Neon ✅:** append/dedup/listRecent/prune reales + LLM derivó tendencia grounded.
+  **Probado vía Telegram con data sintética sembrada** (los 4 trends grounded; Vaio los narró bien).
+  **Refinamiento aplicado (post-prueba):** `recentActivity` ahora **complementa lo live con la tendencia** (lee
+  `trend:<source>` por clave exacta → "📈 Cómo viene") porque competía con `searchMemory` por la decisión y a
+  veces perdía el arco (caso "¿cómo viene el código?" → solo live). `getBySource?` en MemoryStore + `trendSource()`.
+  **328 tests** (+13 total); typecheck/biome/build limpios; e2e `getBySource` trae los 4 trends limpios. Specs →
+  [`…-design.md`](superpowers/specs/2026-06-15-connector-trends-design.md) (§complemento) ·
   [`…-plan.md`](superpowers/specs/2026-06-15-connector-trends-plan.md). **Falta:** activar `TRENDS_ENABLED=1` +
-  `pnpm ingest` ×2 (con cambios reales) + verificar que Vaio menciona la tendencia + merge. **Followup:** si el
-  chunk `trend:*` no aflora en el RAG (se ahoga como pasó con los facts) → prioridad de retrieval estilo `searchFacts`.
+  `pnpm ingest` ×2 (con cambios reales) → verificar acumulación real + merge. **Followups colaterales (vistos en la
+  prueba, aparte de trends):** ① **corrupción de texto** ("seachicó", "perfil deKevin") **solo** por el path
+  `searchMemory`/rerank (storage sano — `getBySource` trae limpio) → verificar/corregir; ② `searchMemory` tardó
+  **183 s** con un `repo sync` concurrente → contención pool/embeddings, revisar.
 > **Mejora futura diferida (Kevin "dejémoslo así por ahora", 2026-06-15) — streaming en TOPICS de Telegram:**
 > hoy el streaming en vivo solo va en chats privados (límite de `sendMessageDraft`); en topics aparece de golpe
 > (typing fallback). Para streamear en topics → `editMessageText` (universal, pero "parpadea" al editar y hay que
