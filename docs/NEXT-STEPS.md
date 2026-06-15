@@ -682,6 +682,26 @@ Surgidos al diseñar el freshness gate; cada uno su propio par design+plan cuand
   `i18n/{es,en}.ts` + `cv.ts`, no en el markup). Queda como principio general: si a futuro un repo trocea pobre
   (Astro/MDX/JSON ruidoso) → mejor extracción/chunking consciente de estructura.
 
+### 🔵 Pendiente FUTURO — Queries VIVAS a GitHub (metadata + estado: lenguajes/topics/commits, CI/PRs/deploys)
+**Planteado por Kevin (2026-06-15).** El RAG tiene el **contenido** de los repos; `recentActivity` el **feed** de
+actividad; `github-stats` totales agregados. Pero **nada cubre preguntas de METADATA/ESTADO VIVO** que no se pueden
+responder con lo ingestado y que las tools actuales no alcanzan. Ejemplos de Kevin:
+- "¿Qué proyectos tienen Java?" → repos por **lenguaje** (GitHub Search `language:java user:…` o `/repos`+`/languages`).
+- "¿Hay algún trabajo con más de X commits?" → **commit counts** por repo (GraphQL `history.totalCount`).
+- "¿Hay algún repo con el topic '[topicX]'?" → **topics** (REST/GraphQL `repositoryTopics`).
+- "¿Tengo algún CI que no haya pasado?" → **GitHub Actions / check runs** (`/actions/runs`, conclusion≠success).
+- "¿Tengo algún PR reciente sin mergear aún?" → **Pulls/Search** (`is:pr is:open` / `/pulls`).
+- "¿Está desplegado?" → ⚠️ el estado de **deploy vive en Railway**, no en GitHub (nuance: o GitHub Deployments API, o
+  un conector Railway aparte) — decidir al diseñar.
+**Por qué es su propia capacidad:** es **estado dinámico**, NO se ingiere al RAG (cambia todo el tiempo) ni es
+"actividad" (recentActivity). Se consulta **en vivo** vía GitHub REST/GraphQL/Search (ya hay `githubApi`/
+`githubGraphql` + el conector github como base). **Diseño (al priorizar, su propio brainstorming → design+plan):**
+respetar **Invariante #8** — NO exponer un query GitHub libre al modelo; o un set de **tools focalizadas
+parametrizadas** (enum/opciones: lenguaje, topic, estado-de-PR, etc.) o una tool de intención que el sistema mapea a
+la query real, con **fallo visible**. **Invariante #9** — auto-contenidas (resuelven + devuelven estado). Owner-only
+las que toquen estado privado; público-only lo que alimente el chat público. Posible reuso del `OwnerRepoCatalog` y
+del listado de repos. Encaja con el norte "Vaio harness personal" (consultar su propio mundo de dev en tiempo real).
+
 ### 🔵 Pendiente FUTURO — Neon como DB reactiva estilo Convex
 El **hot-sync de esquema** (`db:push`) ya da la DX de "el esquema sigue al código". La **reactividad real**
 (queries que se actualizan solas, suscripciones) es otra cosa: Neon/Postgres no la trae. Opciones a futuro
