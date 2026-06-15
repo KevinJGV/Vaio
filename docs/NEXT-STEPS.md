@@ -66,9 +66,14 @@
   Degrada siempre. Flag `TELEGRAM_DRAFT_STREAMING` (apagable sin redeploy). API verificada con context7.
   **315 tests** (+10: pumpStream, sendMessageDraft, isPrivate, handleTurn 3 caminos); typecheck/biome/build
   limpios. Specs → [`…-design.md`](superpowers/specs/2026-06-15-telegram-streaming-design.md) ·
-  [`…-plan.md`](superpowers/specs/2026-06-15-telegram-streaming-plan.md). **Falta:** e2e real por Telegram
-  (privado streamea / topic mantiene typing) + ⚠️ **verificar en runtime que `sendMessageDraft` existe** (es
-  nuevo/posible-beta; si el bot lo rechaza, degrada a typing) + merge a `main`. **Sigue #3: acumulación de conectores.**
+  [`…-plan.md`](superpowers/specs/2026-06-15-telegram-streaming-plan.md). **En diagnóstico (2026-06-15):** 1ª
+  prueba (Kevin, dev local+ngrok) no mostró streaming con un mensaje CORTO ("hola vaio"). Hallazgos: (a) `respond`
+  es incremental (descartado buffer eager); (b) **el modelo tiene reasoning** → no emite tokens durante ~7 s de
+  razonamiento y luego ráfaga corta → en mensajes cortos el streaming es imperceptible; (c) faltaba log del camino
+  → **agregado** (`tg: streaming en vivo` / `typing keepalive` con path/isPrivate). **Próximo:** reiniciar dev +
+  probar con prompt de respuesta LARGA + pasar el nuevo log (para ver si el draft entró/2xx). Si entra y 2xx pero
+  no se ve → la renderización del draft no es confiable → pivot a `editMessageText` (universal). `sendMessageDraft`
+  verificado real (Bot API 9.5+). Verificación owner + merge pendientes. **Después: #3 acumulación de conectores.**
 > **Recordatorio operativo (no es WIP):** para que los 3 conectores nuevos corran **en prod**, las envs
 > `WAKATIME_API_KEY`/`STEAM_API_KEY`/`STEAM_ID` deben estar en los secrets de Railway (sin ellas degradan
 > limpio = apagados; el resto del agente no se ve afectado).
