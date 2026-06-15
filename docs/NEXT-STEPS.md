@@ -48,33 +48,18 @@
 > **adjudicación de conflictos** (invalidar bi-temporal el viejo + linaje), **principio Invariante #8** "el modelo
 > triggerea, el sistema gestiona los datos" (flujo de facts **uuid-free** `rememberFact`/`resolveFact`) y
 > **prioridad de retrieval de facts** (se anteponen al contexto). **301 tests.** Detalle → Historial.
-> **Próximos candidatos (eligen Kevin/yo):** el **paso 3** (acceso on-demand a repos como read-action del harness),
-> el **Nivel C** (scheduler + push / turnos proactivos), **`escalate`** (Fase 2), **streaming/typing en Telegram**,
-> o **extracción automática de facts** post-conversación. El **portafolio** va DESPUÉS.
-> *(Rerank ✅; adjudicación+uuid-free+retrieval de facts ✅ 2026-06-15.)*
+> **Tools de repos uuid-free + fixes de sync — MERGEADO + DESPLEGADO + VERIFICADO** (2026-06-15, ex
+> `feat/repo-tools-uuid-free`): `check/syncRepo` por enum cerrado (cierra el Invariante #8); **tombstone** de
+> descartados (migración `0007`) y **guard de in-flight** del sync (de los logs de Kevin). **305 tests.** → Historial.
+> **Próximos candidatos (orden de Kevin):** **#2 streaming/typing en Telegram**, **#3 acumulación/patrones de
+> conectores en el tiempo**, y luego el **paso 3** (on-demand de repos), **Nivel C** (turnos proactivos),
+> **`escalate`** (Fase 2) o **extracción automática de facts**. El **portafolio** va DESPUÉS.
+> *(Rerank ✅; facts adjudicación+uuid-free+retrieval ✅; tools de repos uuid-free + sync fixes ✅ 2026-06-15.)*
 
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [?] **uuid-free de las tools de repos (`checkRepoFreshness`/`syncRepo`) — IMPLEMENTADO, pend. verificación +
-  merge** (2026-06-15, rama `feat/repo-tools-uuid-free`). Aplica el Invariante #8 al item que quedó 🟡 en la
-  auditoría: las tools dejan de tomar `owner`/`repo` libres; el modelo elige de un **`z.enum` cerrado** (slugs de
-  los repos curados de `RAW_SOURCE_REPOS` → `ActionContext.knownRepos`); el sistema mapea slug→`{owner,repo}`
-  (`repo-select.ts`). `knownRepos` vacío → degrada. **302 tests**; typecheck/biome/build limpios. Smoke: enum
-  acepta `KevinJGV/Vaio`·`KevinJGV/KevinJGV`, **rechaza** typos y repos arbitrarios. Detalle → spec
-  [`…-llm-no-relay-ids-design.md`](superpowers/specs/2026-06-14-llm-no-relay-ids-design.md) (§Tools de repos).
-  **Falta:** e2e por chat (que el modelo dispare la tool con el slug del enum) + merge a `main`. **Es el #1 del
-  orden de Kevin; sigue #2 streaming de Telegram, #3 acumulación de conectores.**
-- [?] **Fixes de sync de repos (de logs e2e de Kevin, 2026-06-15) — IMPLEMENTADO, pend. merge** (misma rama
-  `feat/repo-tools-uuid-free`). Dos bugs destapados al ver los logs: **(A) tombstone de descartados** — un archivo
-  descartado al sincronizar (secret/no-texto, p.ej. 5 tests con keys falsas) no tenía chunks en `documents` → el
-  diff lo veía "nuevo" en CADA sync → re-leído+re-warned perpetuo. Fix: registrarlos por blob_sha en
-  `tracked_repos.skipped` (migración **0007** aplicada); el diff los trata como "ya procesados" hasta que el blob
-  cambie. **(B) guard de in-flight** — el tracker se actualiza al final del sync, así que un sync largo en vuelo
-  hacía que cada `searchMemory`/`syncRepo` viera "stale" y disparara OTRO sync full concurrente (3 rondas en los
-  logs). Fix: `Set` de in-flight por repo en `createRepoSync`; una 2ª sync concurrente se saltea. **305 tests**;
-  typecheck/biome/build limpios; e2e Neon del diagnóstico. **Auto-heal:** el 1er sync tras este fix tombstonea los
-  5 (1 warning final) y listo. **Falta:** merge a `main`.
+- _(vacío — sin ítems abiertos)_
 > **Diferido (no es WIP) — Streaming/typing en Telegram (#3 del feedback de Kevin, 2026-06-15):** mostrar
 > 'escribiendo…' y/o editar el mensaje progresivamente mientras Vaio responde. Feature de UX; requiere verificar
 > la API de Telegram (context7) + tocar el adapter de Telegram. Su propio par design+plan cuando se priorice.
@@ -96,6 +81,18 @@
 ---
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
+
+**🟢 TOOLS DE REPOS uuid-free + FIXES DE SYNC (tombstone + guard) — MERGEADO en `main` + DESPLEGADO + VERIFICADO**
+(2026-06-15, ex `feat/repo-tools-uuid-free`; Kevin confirmó en prod que el tombstone anda y el repo se actualiza
+bien). **(1) uuid-free de `checkRepoFreshness`/`syncRepo`** (cierra el último 🟡 del Invariante #8): las tools
+dejan de tomar `owner`/`repo` libres; el modelo elige de un **`z.enum` cerrado** (slugs de `RAW_SOURCE_REPOS` →
+`ActionContext.knownRepos`); el sistema mapea slug→`{owner,repo}` (`repo-select.ts`). Smoke: rechaza typos y repos
+arbitrarios. **(2) Tombstone de descartados** (de los logs de Kevin): un archivo descartado al sincronizar
+(secret/no-texto) no dejaba chunks → el diff lo re-intentaba en cada sync. Fix: `tracked_repos.skipped` (migración
+`0007`) registra los descartados por blob_sha → "ya procesados" hasta que cambien. **(3) Guard de in-flight**: un
+`Set` por repo en `createRepoSync` evita syncs full concurrentes del mismo repo (root cause de las "3 rondas").
+**305 tests; typecheck/biome/build limpios.** Specs → `…-llm-no-relay-ids-design.md` (§Tools de repos). Followups
+diferidos: streaming/typing en Telegram (#2), acumulación de conectores (#3), ingesta on-demand de repo nuevo.
 
 **🟢 ARCO FACTS: ADJUDICACIÓN + PRINCIPIO uuid-free + PRIORIDAD DE RETRIEVAL — MERGEADO en `main` + DESPLEGADO**
 (2026-06-14/15, ex `feat/facts-conflict-adjudication`; **verificado por Kevin en prod**). Tres features encadenadas
