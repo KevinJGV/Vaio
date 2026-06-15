@@ -30,7 +30,7 @@ export interface TelegramUpdate {
     document?: TgFile & { file_name?: string }
     /** id del topic/hilo (forum topics; en chats privados de bots con topic-mode). Opcional. */
     message_thread_id?: number
-    chat: { id: number }
+    chat: { id: number; type?: string } // "private" | "group" | "supergroup" | "channel"
     from?: { id: number; language_code?: string }
   }
 }
@@ -53,6 +53,8 @@ export type NormalizeResult =
       locale: Locale
       /** Presente sólo si el mensaje vino en un topic/hilo de Telegram. */
       threadId?: number
+      /** Chat privado 1:1 (no grupo/supergrupo/canal) → habilita el streaming por `sendMessageDraft`. */
+      isPrivate: boolean
     }
   | { kind: "ignore"; reason: string }
   | {
@@ -194,5 +196,6 @@ export function normalizeUpdate(
     attachments: media.attachments,
     locale,
     ...threadId,
+    isPrivate: msg.chat.type === "private",
   }
 }

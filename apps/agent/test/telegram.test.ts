@@ -47,7 +47,16 @@ describe("normalizeUpdate", () => {
       text: "hola",
       attachments: [],
       locale: "es",
+      isPrivate: false, // chat sin type → no privado
     })
+  })
+
+  it("chat.type='private' → turn.isPrivate true (habilita el streaming por draft)", () => {
+    const r = normalizeUpdate(
+      update({ chat: { id: 999, type: "private" } }),
+      allowed
+    )
+    expect(r).toMatchObject({ kind: "turn", isPrivate: true })
   })
 
   it("sin texto ni media → ignore(no-content)", () => {
@@ -236,6 +245,44 @@ describe("createTelegramClient.sendMessage", () => {
       messageThreadId: 5,
     })
     expect(calls[0]?.message_thread_id).toBe(5)
+  })
+})
+
+describe("createTelegramClient.sendMessageDraft", () => {
+  const realFetch = globalThis.fetch
+  afterEach(() => {
+    globalThis.fetch = realFetch
+  })
+
+  it("postea draft_id + text plano (sin parse_mode) y devuelve ok", async () => {
+    let url = ""
+    let body: Record<string, unknown> = {}
+    globalThis.fetch = (async (u: string, init?: RequestInit) => {
+      url = String(u)
+      body = JSON.parse(String(init?.body)) as Record<string, unknown>
+      return new Response('{"ok":true,"result":true}', { status: 200 })
+    }) as typeof fetch
+
+    const ok = await createTelegramClient("T", noopLogger).sendMessageDraft(
+      123,
+      77,
+      "parcial"
+    )
+    expect(ok).toBe(true)
+    expect(url).toContain("/sendMessageDraft")
+    expect(body).toMatchObject({ chat_id: 123, draft_id: 77, text: "parcial" })
+    expect(body.parse_mode).toBeUndefined() // plano (HTML a medias rompería)
+  })
+
+  it("no-2xx (bot no lo soporta) → false (el llamador degrada a typing)", async () => {
+    globalThis.fetch = (async () =>
+      new Response("not found", { status: 404 })) as typeof fetch
+    const ok = await createTelegramClient("T", noopLogger).sendMessageDraft(
+      1,
+      2,
+      ""
+    )
+    expect(ok).toBe(false)
   })
 })
 

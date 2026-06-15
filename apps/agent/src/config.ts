@@ -160,6 +160,12 @@ const envSchema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
   TELEGRAM_ALLOWED_USER_IDS: z.string().optional(), // csv de telegram user ids
+  // Streaming en Telegram: muestra el texto parcial EN VIVO en chats privados vía sendMessageDraft (en grupos/
+  // topics o si el bot no lo soporta → cae a "escribiendo…"). ON salvo "false"/"0" (apagable en prod sin redeploy).
+  TELEGRAM_DRAFT_STREAMING: z
+    .string()
+    .optional()
+    .transform((v) => v !== "false" && v !== "0"),
   // Id de Telegram de Kevin (owner). Sólo ese id resuelve a `trusted` (perfil pleno/agéntico);
   // cualquier otro = visitante capado (Vaio lo presenta). Sin esto, nadie es owner.
   OWNER_TELEGRAM_ID: z.coerce.number().int().optional(),

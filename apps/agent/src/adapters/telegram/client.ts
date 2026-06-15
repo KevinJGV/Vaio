@@ -32,6 +32,14 @@ export interface TelegramClient {
     action: "typing",
     opts?: SendOpts
   ): Promise<void>
+  /** Stremea un texto PARCIAL en vivo (preview efímero, animado por `draftId`). Solo chats PRIVADOS. `text`
+   *  vacío = placeholder "Thinking…". Devuelve `ok` (false en no-2xx) → el llamador degrada a typing. Al
+   *  terminar hay que `sendMessage` para persistir (el draft es efímero). */
+  sendMessageDraft(
+    chatId: number,
+    draftId: number,
+    text: string
+  ): Promise<boolean>
   setWebhook(url: string, secret: string): Promise<void>
 }
 
@@ -142,6 +150,14 @@ export function createTelegramClient(
           ? { message_thread_id: opts.messageThreadId }
           : {}
       await call("sendChatAction", { chat_id: chatId, action, ...thread })
+    },
+    async sendMessageDraft(chatId, draftId, text) {
+      // Texto PLANO (sin parse_mode: un HTML a medias rompería el parseo). Solo privados → sin thread.
+      return call("sendMessageDraft", {
+        chat_id: chatId,
+        draft_id: draftId,
+        text,
+      })
     },
     async setWebhook(url, secret) {
       await call("setWebhook", { url, secret_token: secret })

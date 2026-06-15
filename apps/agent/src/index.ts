@@ -253,6 +253,7 @@ if (
     allowedIds: telegramAllowedIds(env),
     webhookSecret: env.TELEGRAM_WEBHOOK_SECRET,
     ownerId: env.OWNER_TELEGRAM_ID,
+    draftStreaming: env.TELEGRAM_DRAFT_STREAMING,
     sink,
     // Descarga de media de Telegram (audio/voz + imágenes). El core decide transcribir/describir.
     media: createTelegramMedia(

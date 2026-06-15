@@ -21,6 +21,10 @@ import {
   type NormalizeResult,
   normalizeUpdate,
 } from "./normalize.js"
+import { pumpStream } from "./stream-draft.js"
+
+/** Cap del texto del draft (preview en vivo). El mensaje final persiste completo (troceado a 4096). */
+const MAX_DRAFT = 4096
 
 export interface TelegramDeps {
   /** null → el agente degrada a cortesía (sin OpenRouter configurado). */
@@ -35,6 +39,9 @@ export interface TelegramDeps {
   media?: TelegramMedia
   /** Síntesis de voz (TTS). undefined = Vaio solo responde por texto. */
   speech?: SpeechSynthesizer
+  /** Streaming por `sendMessageDraft` en chats privados (texto parcial en vivo). Default true; si el bot no
+   *  lo soporta o no es privado → cae a typing keepalive. */
+  draftStreaming?: boolean
 }
 
 type Turn = Extract<NormalizeResult, { kind: "turn" }>
@@ -116,19 +123,56 @@ export function mountTelegram(
         // Sólo el owner (Kevin) es de confianza → perfil pleno; el resto = visitante capado.
         trusted: isOwnerId(deps.ownerId, norm.fromId),
       }
-      const { text } = await deps.agent.respond(
+      const { stream, text } = await deps.agent.respond(
         req,
         { logger: log, sink: deps.sink, requestId },
         resolved
       )
-      const reply = await text
-      // Salida de voz (TTS): default texto; voz si entró voz (espejo) o el usuario la pidió.
+      // Salida de voz (TTS): default texto; voz si entró voz (espejo) o el usuario la pidió. Decidible por la
+      // ENTRADA (afecta si streameamos texto en vivo o no).
       const wantsVoice =
         deps.speech != null &&
         shouldSpeak({
           inboundHadAudio: resolved.some((m) => m.kind === "audio"),
           userText: norm.text,
         })
+
+      // typing keepalive: refresca "escribiendo…" (la acción dura ≤5 s) inmediatamente y cada 4 s.
+      const withTyping = async (fn: () => Promise<string>): Promise<string> => {
+        void deps.client.sendChatAction(norm.chatId, "typing", send)
+        const iv = setInterval(() => {
+          void deps.client.sendChatAction(norm.chatId, "typing", send)
+        }, 4000)
+        try {
+          return await fn()
+        } finally {
+          clearInterval(iv)
+        }
+      }
+
+      // Streaming EN VIVO por sendMessageDraft: solo en privado, para texto (no voz). Probe con "Thinking…";
+      // si el bot no lo soporta (false) → typing keepalive. Degrada siempre (Invariante #1).
+      const canDraft =
+        deps.draftStreaming !== false && norm.isPrivate && !wantsVoice
+      let reply: string
+      if (
+        canDraft &&
+        (await deps.client.sendMessageDraft(norm.chatId, norm.updateId, ""))
+      ) {
+        let alive = true
+        reply = await pumpStream(stream, async (partial) => {
+          if (!alive) return
+          const sent = await deps.client.sendMessageDraft(
+            norm.chatId,
+            norm.updateId,
+            partial.slice(0, MAX_DRAFT)
+          )
+          if (!sent) alive = false // el bot dejó de aceptar drafts → no más (no rompe el turno)
+        })
+      } else {
+        reply = await withTyping(() => text)
+      }
+
       if (wantsVoice && deps.speech) {
         const spoken = await deps.speech.synthesize(
           stripForSpeech(reply),
