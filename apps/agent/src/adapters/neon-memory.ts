@@ -155,27 +155,34 @@ export function createMemoryStore(
       path: string,
       rows: DocChunk[]
     ): Promise<void> {
-      // Atómico: borra los chunks del archivo y reinserta los nuevos en una sola tx (si el embed falla,
-      // el delete se revierte → nunca queda el archivo a medias).
+      // Embebemos ANTES de la tx: la red del embedding (lenta, secuencial por el cap de 429) NO debe
+      // retener una conexión del pool (`new Pool` sin max = 10) durante toda su duración → reduce la
+      // contención del sync de fondo vs. el RAG del turno. Si el embed falla, lanzamos sin tocar la DB
+      // (no se borra nada). La tx queda CORTA: solo delete+insert atómicos → el archivo nunca queda a medias.
+      const condition = and(
+        eq(documents.source, source),
+        eq(documents.path, path)
+      )
+      if (rows.length === 0) {
+        await db.delete(documents).where(condition)
+        return
+      }
+      const embeddings = await embedder.embed(rows.map((r) => r.chunk))
+      const values = rows.map((r, i) => {
+        const embedding = embeddings[i]
+        if (!embedding)
+          throw new Error("Embeddings desalineados con los chunks.")
+        return {
+          source: r.source,
+          url: r.url,
+          chunk: r.chunk,
+          path: r.path ?? null,
+          blobSha: r.blobSha ?? null,
+          embedding,
+        }
+      })
       await db.transaction(async (tx) => {
-        await tx
-          .delete(documents)
-          .where(and(eq(documents.source, source), eq(documents.path, path)))
-        if (rows.length === 0) return
-        const embeddings = await embedder.embed(rows.map((r) => r.chunk))
-        const values = rows.map((r, i) => {
-          const embedding = embeddings[i]
-          if (!embedding)
-            throw new Error("Embeddings desalineados con los chunks.")
-          return {
-            source: r.source,
-            url: r.url,
-            chunk: r.chunk,
-            path: r.path ?? null,
-            blobSha: r.blobSha ?? null,
-            embedding,
-          }
-        })
+        await tx.delete(documents).where(condition)
         await tx.insert(documents).values(values)
       })
     },

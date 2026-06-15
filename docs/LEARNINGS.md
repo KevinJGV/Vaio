@@ -434,10 +434,14 @@ El código typecheckeó sin cambios de API salvo **dos rupturas reales**:
   background (`void guardedSync`) y responde con el índice actual; la frescura llega al próximo turno. **Principio
   (nota de Kevin):** trabajo largo NO es malo si (a) NO bloquea al usuario y (b) hay mecanismo de notificación/retoma
   (turnos proactivos / Nivel C, estilo Claude Code); lo inaceptable es bloquear sin feedback o el descuido técnico.
-- **Gotcha de optimización latente (no urgente):** en `replaceFile` (neon-memory) el `embedder.embed()` corre
-  **DENTRO** de la `db.transaction` → retiene una conexión del pool (`new Pool` sin `max` = **10** default) durante
-  toda la red del embedding. Con un sync de fondo + el RAG del turno compitiendo → contención del pool. Sacar el
-  embed FUERA de la tx (embeber, después tx corta delete+insert) lo aliviaría. Diferido (Kevin: "largo OK si notifica").
+- **✅ Embed FUERA de la transacción en `replaceFile`** (2026-06-15, HECHO). Antes el `embedder.embed()` corría
+  **DENTRO** de la `db.transaction` → retenía una conexión del pool (`new Pool` sin `max` = **10** default) durante
+  toda la red del embedding (lenta, secuencial) → contención con el RAG del turno y otros syncs. Ahora: **embebés
+  ANTES** (si falla, lanzás sin tocar la DB → nada a medias) y la **tx queda CORTA**: solo `delete`+`insert`
+  atómicos. Misma semántica (atomicidad + safety ante fallo de embed), sin retener el pool durante la red. Test
+  unitario con `db`/`embedder` fakes (afirma embed-antes-de-tx + embed-falla→no-toca-DB); e2e: re-embed forzado de
+  1 archivo vía el bg sync → blob_sha/chunks/contenido intactos. El pool sigue sin `max` explícito (default 10); no
+  hizo falta tocarlo tras sacar el embed de la tx.
 - **⚠️ El sync NO debe ser una WRITE-ACTION del modelo — la frescura la gestiona el SISTEMA (Invariante #8)**
   (2026-06-15, hermano del fix del gate; lo destaparon logs de Kevin: un turno de **211s**). Arreglar el gate no
   alcanzó: existía un **tool `syncRepo`** que el modelo invocaba explícitamente al ver "stale", y sincronizaba

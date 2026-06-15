@@ -99,8 +99,9 @@
   (y el futuro Nivel C / turnos proactivos notificará al completar). Quitado el plumbing `inlineMaxFiles` de
   `createRepoSync` (el tool `syncRepo` mantiene su inline/deferred, path explícito aparte). **328 tests**;
   typecheck/biome limpios. **e2e ✅:** `/chat` real → `searchMemory` 9.8s (baseline, sin bloqueo). Detalle →
-  `LEARNINGS.md`. **Optimización follow-up (no urgente, Kevin "largo OK"):** el embedding corre DENTRO de la tx de
-  `replaceFile` (retiene conexión del pool max=10) → sacarlo de la tx reduce contención del sync de fondo.
+  `LEARNINGS.md`. **✅ Optimización HECHA (2026-06-15):** el `embed()` salió de la tx de `replaceFile` (antes
+  retenía una conexión del pool max=10 durante la red); ahora embebe antes + tx corta delete+insert. 327 tests;
+  e2e: re-embed forzado de 1 archivo OK (blob_sha/chunks/contenido intactos). → `LEARNINGS.md`.
 - [?] **Tools de freshness rediseñadas (hermano del Followup ②) → FIX (pend. verificación de Kevin).** Los logs de
   Kevin mostraron un turno de **211s**: el gate ya iba background, pero el **tool `syncRepo`** que el modelo invocaba
   explícitamente al ver "stale" sincronizaba **inline** (16 archivos = 191s) + era redundante con el gate + daba
