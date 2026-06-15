@@ -161,6 +161,8 @@ export const facts = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     expiredAt: timestamp("expired_at", { withTimezone: true }),
     decidedAt: timestamp("decided_at", { withTimezone: true }),
+    // Linaje de adjudicación: ids de facts que ESTE invalidó al confirmarse (null = no reemplazó a ninguno).
+    supersedes: jsonb("supersedes").$type<string[]>(),
   },
   (t) => [
     index("facts_embedding_idx")
