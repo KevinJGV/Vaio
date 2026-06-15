@@ -51,7 +51,12 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- _(vacío — sin ítems abiertos)_
+- [~] **Adjudicación de conflictos de `facts`** (§🟠 abajo) — EN CURSO (rama `feat/facts-conflict-adjudication`).
+  Plan aprobado + specs escritos
+  ([`…-design.md`](superpowers/specs/2026-06-14-facts-conflict-adjudication-design.md) ·
+  [`…-plan.md`](superpowers/specs/2026-06-14-facts-conflict-adjudication-plan.md)). Decisiones cerradas:
+  detección por cercanía + el modelo juzga · resolución plegada a la confirmación (detecta al proponer) ·
+  linaje `supersedes`. Implementación TDD en marcha (8 fases).
 > **Recordatorio operativo (no es WIP):** para que los 3 conectores nuevos corran **en prod**, las envs
 > `WAKATIME_API_KEY`/`STEAM_API_KEY`/`STEAM_ID` deben estar en los secrets de Railway (sin ellas degradan
 > limpio = apagados; el resto del agente no se ve afectado).
