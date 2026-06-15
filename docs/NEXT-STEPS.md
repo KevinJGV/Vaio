@@ -44,55 +44,19 @@
 > 0 fuga de secrets). ⚠️ Para que corran en prod, sus envs van a los secrets de Railway. Detalle → Historial.
 > ⚠️ **Operativo:** la ingesta/sync corrieron contra la DB real; el índice quedó con cap-bajo en `KevinJGV/Vaio`
 > (444 chunks) del e2e — un `pnpm --filter @vaio/agent sync` sin cap (o `SYNC_FORCE_FULL=1`) lo deja full cuando se quiera.
+> **Arco FACTS — MERGEADO en `main` + DESPLEGADO + VERIFICADO** (2026-06-14/15, ex `feat/facts-conflict-adjudication`):
+> **adjudicación de conflictos** (invalidar bi-temporal el viejo + linaje), **principio Invariante #8** "el modelo
+> triggerea, el sistema gestiona los datos" (flujo de facts **uuid-free** `rememberFact`/`resolveFact`) y
+> **prioridad de retrieval de facts** (se anteponen al contexto). **301 tests.** Detalle → Historial.
 > **Próximos candidatos (eligen Kevin/yo):** el **paso 3** (acceso on-demand a repos como read-action del harness),
-> la **adjudicación de conflictos de `facts`** (§🟠 priorizado), el **Nivel C** (scheduler + push) y/o `escalate`
-> (Fase 2). El **portafolio** va DESPUÉS. *(Rerank ✅ hecho 2026-06-14.)*
+> el **Nivel C** (scheduler + push / turnos proactivos), **`escalate`** (Fase 2), **streaming/typing en Telegram**,
+> o **extracción automática de facts** post-conversación. El **portafolio** va DESPUÉS.
+> *(Rerank ✅; adjudicación+uuid-free+retrieval de facts ✅ 2026-06-15.)*
 
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [?] **Adjudicación de conflictos de `facts`** — IMPLEMENTADO, pend. verificación owner-chat de Kevin (rama
-  `feat/facts-conflict-adjudication`, sin mergear). `propose` detecta facts confirmados cercanos (coseno, mismo
-  principal); `commit` con `supersedes` invalida bi-temporal el viejo + guarda linaje (col `supersedes`,
-  migración `0006` aplicada). La adjudicación pasa al ESCRIBIR (no al recuperar). **294 tests** (+5); typecheck/
-  biome/build limpios. **e2e directo contra Neon ✅:** "Real Madrid"→"Barcelona" detectó+reemplazó (viejo
-  invalidado, `searchMemory` ya no lo trae); pizza/pasta coexisten (surfacea pero no invalida). **Refinamiento
-  post-e2e Telegram (2026-06-14):** el e2e real destapó que el flujo de 2 turnos perdía los ids del conflicto
-  (el modelo nunca pasaba `supersedes` → no se invalidaba). Fix: `listPending` recomputa los conflictos con el
-  embedding guardado y `prompt.ts` los muestra con sus ids; `proposeFact` sin conflicto auto-guarda (sin pedir
-  confirmación); candidatos 3→2 (la distancia coseno no separa real de falso — el modelo juzga). **297 tests**;
-  e2e Neon: `listPending` expone el id → commit invalida. Facts de prueba limpiados (queda «no le gusta el
-  fútbol»). Specs →
-  [`…-design.md`](superpowers/specs/2026-06-14-facts-conflict-adjudication-design.md) (§Refinamiento) ·
-  [`…-plan.md`](superpowers/specs/2026-06-14-facts-conflict-adjudication-plan.md). **Falta:** re-verificación
-  owner por Telegram (Vaio decidiendo `supersedes` con la nueva guía) + merge a `main` (tu "go"). ⚠️ Deploy:
-  migración `0006` va antes del código (release step lo hace). **↓ La re-verificación espera al ítem de abajo**
-  (el flujo se vuelve uuid-free; el modelo dejará de relayar uuids).
-- [?] **Principio "el modelo triggerea, el sistema gestiona los datos" (NO relay de ids/uuids) — IMPLEMENTADO,
-  pend. verificación owner-chat** (rama `feat/facts-conflict-adjudication`). **Decisión fundacional de Kevin:**
-  los LLM no son confiables relayando datos específicos → se gestionan determinísticamente; las tools exponen
-  intención + opciones preestablecidas (enum/ordinal/boolean). **Hecho:** Invariante #8 documentado
-  (`CLAUDE.md` + `SPEC.md` + memoria `llm-no-relay-ids` + guard en `actions/types.ts`); **flujo de facts
-  uuid-free** — `rememberFact(statement)` auto-guarda si no choca / deja pendiente con conflictos por ordinal;
-  `resolveFact(decision, replaces:[ordinales], which?)` resuelve la pendiente sola y mapea ordinal→uuid (el
-  modelo nunca toca un uuid). Tools de repos (owner/repo) **diferidas** (riesgo bajo/visible). **299 tests**;
-  typecheck/biome/build limpios. **e2e Neon uuid-free ✅:** auto-save sin conflicto; reemplazo por `replaces:[0]`
-  invaldó el viejo; 0 uuids en el texto al modelo. Specs →
-  [`…-design.md`](superpowers/specs/2026-06-14-llm-no-relay-ids-design.md) ·
-  [`…-plan.md`](superpowers/specs/2026-06-14-llm-no-relay-ids-plan.md). **✅ Validado en el flujo real
-  (2026-06-15):** un reemplazo hecho por Telegram persistió (DB: viejo invalidado + linaje `supersedes`).
-  **Falta:** re-test owner limpio + merge a `main`. **Diferido (futuro):** enumerar repos trackeados en el
-  prompt para uuid-free-ar `checkRepoFreshness`/`syncRepo`.
-- [?] **Prioridad de retrieval de facts + persona no narra su búsqueda — IMPLEMENTADO, pend. re-test owner**
-  (2026-06-15, rama `feat/facts-conflict-adjudication`). Surgió del e2e Telegram: un fact curado («le gusta el
-  fútbol») **no afloraba** para una pregunta general (lo tapaban los ~miles de chunks del repo). **#1 Retrieval:**
-  los facts (owner-confirmed, tan importantes como los repos para la naturalidad) se recuperan SIEMPRE aparte
-  (`MemoryStore.searchFacts`, opcional) y se **anteponen** al contexto; `searchMemory` queda **solo-docs** (sin
-  doble conteo). Config `FACT_RETRIEVE_MAX`/`FACT_RETRIEVE_DISTANCE` (umbral generoso evita inyectar facts
-  off-topic). **#2 Persona:** responder con el resultado YA resuelto, sin narrar la búsqueda ni autocorregirse
-  ('no recuerdo… ah sí') — ES+EN. **301 tests**; typecheck/biome/build limpios. **e2e Neon ✅:** 'gustos hobbies'
-  ahora trae el fact del fútbol; `searchMemory` ya no mezcla facts; query off-topic → 0 facts (umbral). **Falta:**
-  re-test owner por Telegram + merge.
+- _(vacío — sin ítems abiertos)_
 > **Diferido (no es WIP) — Streaming/typing en Telegram (#3 del feedback de Kevin, 2026-06-15):** mostrar
 > 'escribiendo…' y/o editar el mensaje progresivamente mientras Vaio responde. Feature de UX; requiere verificar
 > la API de Telegram (context7) + tocar el adapter de Telegram. Su propio par design+plan cuando se priorice.
@@ -114,6 +78,25 @@
 ---
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
+
+**🟢 ARCO FACTS: ADJUDICACIÓN + PRINCIPIO uuid-free + PRIORIDAD DE RETRIEVAL — MERGEADO en `main` + DESPLEGADO**
+(2026-06-14/15, ex `feat/facts-conflict-adjudication`; **verificado por Kevin en prod**). Tres features encadenadas
+que cierran el ciclo de curación de facts: **(1) Adjudicación de conflictos** — `rememberFact`/`resolveFact`
+detectan facts confirmados cercanos al proponer y, al confirmar, **invalidan bi-temporal** el viejo + guardan
+linaje (`supersedes`, migración `0006`); la adjudicación pasa al ESCRIBIR (no al recuperar). **(2) Principio
+fundacional "el modelo triggerea, el sistema gestiona los datos" (Invariante #8):** los LLM no relayan
+ids/uuids/objetos → las tools exponen intención + opciones preestablecidas (enum/ordinal/boolean) y el sistema
+mapea (ordinal→uuid). El flujo de facts quedó **uuid-free** (`rememberFact(statement)` auto-guarda sin conflicto;
+`resolveFact(decision, replaces:[ordinales], which?)` resuelve la pendiente sola). Documentado en `CLAUDE.md` +
+`SPEC.md` + memoria `llm-no-relay-ids` + guard en `actions/types.ts`. **(3) Prioridad de retrieval de facts:** los
+facts curados (tan importantes como los repos) se recuperan SIEMPRE aparte (`searchFacts`) y se anteponen al
+contexto; `searchMemory` quedó solo-docs (`FACT_RETRIEVE_MAX`/`DISTANCE`). + persona no narra su búsqueda
+('no recuerdo… ah sí'). **301 tests; typecheck/biome/build limpios.** e2e Neon en cada paso + **e2e owner real por
+Telegram** (reemplazo persiste, fact aflora en pregunta general). Specs →
+[`…-facts-conflict-adjudication-{design,plan}.md`](superpowers/specs/2026-06-14-facts-conflict-adjudication-design.md)
+· [`…-llm-no-relay-ids-{design,plan}.md`](superpowers/specs/2026-06-14-llm-no-relay-ids-design.md). **Followups
+diferidos:** streaming/typing en Telegram (#3); uuid-free de las tools de repos (owner/repo); extracción
+automática de facts post-conversación; Nivel C (turnos proactivos).
 
 **🟢 CONECTORES NUEVOS: WakaTime · Steam · GitHub-stats — MERGEADO en `main` + DESPLEGADO** (2026-06-14, ex
 `feat/connector-persist`; bundleado con la faceta persist de abajo). Tres fuentes nuevas
