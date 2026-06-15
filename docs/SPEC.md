@@ -86,6 +86,13 @@ OpenRouter: models:[barato, fallback, llama-free]  → "siempre responde" + cach
   `cosineDistance`. Embeddings con **`gemini-embedding-2`** vía OpenRouter (ver "Embeddings & ingesta
   multimodal"). Migraciones con `drizzle-kit` (la inicial antepone `CREATE EXTENSION vector`).
   Puerto `MemoryStore` (adapter `neon-memory`); tool `searchMemory(query)` → top-k → contexto al system.
+- **Diseño de tools (harness) — "el modelo triggerea, el sistema gestiona los datos"** (invariante #8): las
+  tools del modelo exponen **solo intención** (lenguaje natural) **+ opciones preestablecidas** (enum/ordinal/
+  boolean); los **ids/uuids/objetos** se resuelven **determinísticamente** en el sistema (cache/persistencia),
+  nunca los relaya el modelo (los LLM fallan emitiendo estructuras). Ej.: el flujo de facts es **uuid-free** —
+  `rememberFact(statement)` y `resolveFact(decision, replaces:[ordinales])`; el sistema mapea ordinal→uuid desde
+  la pendiente que ya cargó. Excepciones: pocas, con fallo **visible**. Detalle →
+  `docs/superpowers/specs/2026-06-14-llm-no-relay-ids-design.md`.
 - **Embeddings**: **`gemini-embedding-2`** vía OpenRouter (multimodal, 3072→**1536** Matryoshka) — ver "Embeddings & ingesta multimodal".
 - **Ingesta** (`ingest.ts`, a mano y luego cron Railway):
   - `cv.vindevsito.dev/` y `/en/` → texto limpio del CV.

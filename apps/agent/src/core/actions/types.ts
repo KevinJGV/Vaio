@@ -52,7 +52,13 @@ export interface ActionContext {
 }
 
 /** Descriptor de una acción: metadata de gating + cómo construir su tool del AI SDK.
- *  Sumar una acción = nuevo archivo con su `ActionDescriptor` + listarlo en `ACTIONS` (registry). */
+ *  Sumar una acción = nuevo archivo con su `ActionDescriptor` + listarlo en `ACTIONS` (registry).
+ *
+ *  ⚓ INVARIANTE #8 (CLAUDE.md) — el modelo TRIGGEREA, el sistema gestiona los DATOS: el `inputSchema` de la
+ *  tool expone SOLO intención (lenguaje natural) + opciones preestablecidas (enum / ordinal pequeño / boolean).
+ *  NUNCA pidas que el modelo pase ids/uuids/objetos/arrays que el sistema pueda resolver determinísticamente
+ *  (cache/persistencia) — los LLM fallan emitiendo estructuras. Excepción: datos de baja cardinalidad con fallo
+ *  VISIBLE. Ej.: `resolveFact` toma ordinales y el sistema mapea ordinal→uuid; nunca el uuid directo. */
 export interface ActionDescriptor {
   name: ToolName
   /** Marca write-actions (efecto fuera de la conversación). Hoy todas false. */

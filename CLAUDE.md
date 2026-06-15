@@ -28,6 +28,13 @@ lateral) y —más adelante— por Telegram y correo. **TypeScript** · **Hono**
 5. **Secrets jamás en git ni en logs**; el chat público no expone el system prompt ni secrets.
 6. **Respondé en el idioma del usuario** (`locale`).
 7. **Evidencia antes de "listo"**: typecheck/biome/test/run. Nunca declares hecho sin haberlo corrido.
+8. **El modelo TRIGGEREA; el sistema gestiona los DATOS.** Los LLM no son confiables relayando datos
+   específicos/estructurados (ids, uuids, objetos, arrays) — cada estructura que deban emitir es una ventana de
+   fallo. Toda lógica que los requiera se gestiona **determinísticamente** (cache/persistencia del sistema); las
+   **tools del modelo exponen solo intención** (lenguaje natural) **+ opciones preestablecidas** (enum / ordinal
+   pequeño / boolean). El sistema mapea esas opciones a los ids/objetos reales. **Excepciones: pocas y
+   controladas** — selección de opciones, o datos de baja cardinalidad con **fallo VISIBLE** (nunca silencioso).
+   **Auditá cada tool nueva contra esto** (ver `docs/superpowers/specs/2026-06-14-llm-no-relay-ids-design.md`).
 
 ---
 
