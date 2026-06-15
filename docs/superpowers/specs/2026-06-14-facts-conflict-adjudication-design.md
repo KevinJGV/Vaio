@@ -6,6 +6,23 @@
 > ([`2026-06-13-savefact-curation-hitl-design.md`](2026-06-13-savefact-curation-hitl-design.md)). Esta iteración
 > agrega el **motor de adjudicación** que el diseño original dejó como "futuro".
 
+## Refinamiento post-e2e Telegram (2026-06-14) — bug de continuidad + auto-save
+El e2e real por Telegram destapó que el flujo de 2 turnos **perdía los ids de conflicto**: se detectan al
+**proponer** (turno N) pero se confirma en el turno N+1, y para entonces los ids eran inalcanzables (el historial
+solo persiste `user`/`assistant`, no los tool results; el bloque de pendientes mostraba solo `[id] «stmt»`;
+`searchMemory` no expone ids) → el modelo nunca pasaba `supersedes` → `invalid_at` nunca se marcaba (verificado
+en DB: 4 facts contradictorios todos vigentes). **Hallazgo de medición:** la distancia coseno NO separa conflicto
+real de falso (real "fútbol" 0.213 vs falso "hamburguesas~fútbol" 0.192 — el falso más cerca); el embedding capta
+la **estructura** ("A Kevin le gusta X") más que la contradicción → ningún umbral los separa; **el modelo es el
+juez** (filtró bien). Cambios:
+1. **`listPending` recomputa los conflictos de cada pendiente con el embedding YA guardado** (sin re-embeber, sin
+   migración) → `PendingFact.conflicts: ConflictCandidate[]`; `prompt.ts` los renderiza con sus ids → el turno de
+   confirmación tiene los ids para `supersedes`. Helper `findNearConfirmed` reusado por `propose` y `listPending`.
+2. **Auto-save sin conflicto:** `proposeFact` sin conflictos instruye commitear **en el acto** (sin pedir
+   confirmación; el owner ya lo pidió). La confirmación queda **solo** para resolver conflictos.
+3. **Menos candidatos** (`FACT_CONFLICT_CANDIDATES` 3→2) + wording "podría reemplazar, vos decidís".
+Pendiente: re-verificación owner por Telegram (comportamiento de Vaio con la nueva guía del prompt).
+
 ## Objetivo
 Que `saveFact` deje de ser **solo aditivo**: al confirmar un hecho que contradice uno vigente, **invalidar el
 viejo** (bi-temporal: marcar, nunca borrar) en vez de acumular dos `confirmed` que `searchMemory` devuelve

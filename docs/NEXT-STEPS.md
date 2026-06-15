@@ -56,11 +56,17 @@
   principal); `commit` con `supersedes` invalida bi-temporal el viejo + guarda linaje (col `supersedes`,
   migración `0006` aplicada). La adjudicación pasa al ESCRIBIR (no al recuperar). **294 tests** (+5); typecheck/
   biome/build limpios. **e2e directo contra Neon ✅:** "Real Madrid"→"Barcelona" detectó+reemplazó (viejo
-  invalidado, `searchMemory` ya no lo trae); pizza/pasta coexisten (surfacea pero no invalida). Specs →
-  [`…-design.md`](superpowers/specs/2026-06-14-facts-conflict-adjudication-design.md) ·
-  [`…-plan.md`](superpowers/specs/2026-06-14-facts-conflict-adjudication-plan.md). **Falta:** e2e owner real por
-  Telegram (Vaio decidiendo `supersedes` desde la charla) + merge a `main` (tu "go"). ⚠️ Deploy: migración `0006`
-  va antes del código (release step lo hace).
+  invalidado, `searchMemory` ya no lo trae); pizza/pasta coexisten (surfacea pero no invalida). **Refinamiento
+  post-e2e Telegram (2026-06-14):** el e2e real destapó que el flujo de 2 turnos perdía los ids del conflicto
+  (el modelo nunca pasaba `supersedes` → no se invalidaba). Fix: `listPending` recomputa los conflictos con el
+  embedding guardado y `prompt.ts` los muestra con sus ids; `proposeFact` sin conflicto auto-guarda (sin pedir
+  confirmación); candidatos 3→2 (la distancia coseno no separa real de falso — el modelo juzga). **297 tests**;
+  e2e Neon: `listPending` expone el id → commit invalida. Facts de prueba limpiados (queda «no le gusta el
+  fútbol»). Specs →
+  [`…-design.md`](superpowers/specs/2026-06-14-facts-conflict-adjudication-design.md) (§Refinamiento) ·
+  [`…-plan.md`](superpowers/specs/2026-06-14-facts-conflict-adjudication-plan.md). **Falta:** re-verificación
+  owner por Telegram (Vaio decidiendo `supersedes` con la nueva guía) + merge a `main` (tu "go"). ⚠️ Deploy:
+  migración `0006` va antes del código (release step lo hace).
 > **Recordatorio operativo (no es WIP):** para que los 3 conectores nuevos corran **en prod**, las envs
 > `WAKATIME_API_KEY`/`STEAM_API_KEY`/`STEAM_ID` deben estar en los secrets de Railway (sin ellas degradan
 > limpio = apagados; el resto del agente no se ve afectado).
