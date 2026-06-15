@@ -86,10 +86,18 @@ export const searchMemory: ActionDescriptor = {
               docs.map((d) => d.source).filter((s) => s.startsWith("repo:"))
             ),
           ]
+          let behindNote = ""
           if (repoSources.length > 0 && ctx.repoSync) {
             try {
-              const { refreshed } = await ctx.repoSync.ensureFresh(repoSources)
+              const { refreshed, behind } =
+                await ctx.repoSync.ensureFresh(repoSources)
               if (refreshed) docs = await retrieve()
+              // El sync va en BACKGROUND → este turno responde con el índice PRE-sync. Si está `behind`,
+              // surfaceamos la staleness para que el modelo sea honesto (no orquesta el sync — Invariante #9;
+              // solo reporta que puede faltar lo MUY reciente). Se auto-sana en el próximo turno.
+              if (behind)
+                behindNote =
+                  "[nota del sistema: tu copia indexada de uno de estos repos estaba un poco atrás de GitHub; ya se está actualizando sola en segundo plano. Respondé con lo que tenés, pero si la pregunta depende de cambios MUY recientes, aclaralo al pasar (que puede que aún no los tengas), sin dramatizar.]"
             } catch (err) {
               logger.warn(
                 { err: errMsg(err) },
@@ -103,7 +111,7 @@ export const searchMemory: ActionDescriptor = {
           // gusta fútbol'; el código del repo perdía espacios/operadores: 'a ?? b'→'a?? b') a cambio
           // de un ahorro marginal (~3.5%, no es la palanca de costo). Ver LEARNINGS.md.
           const combined = [...facts, ...docs]
-          const output =
+          const body =
             combined.length === 0
               ? "Sin resultados relevantes en memoria."
               : combined
@@ -112,6 +120,7 @@ export const searchMemory: ActionDescriptor = {
                       `[${d.source}${d.url ? ` · ${d.url}` : ""}]\n${d.chunk}`
                   )
                   .join("\n\n")
+          const output = behindNote ? `${behindNote}\n\n${body}` : body
           emit({
             ...ids,
             type: "tool.result",

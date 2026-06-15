@@ -36,8 +36,11 @@ export interface RepoSyncPort {
   /** ¿El repo ya está trackeado? (los repos nuevos/arbitrarios se deniegan en parte 1). */
   isTracked(spec: RepoSyncSpec): Promise<boolean>
   /** Freshness GATE (determinístico, con TTL interno): por cada source `repo:owner/repo`, si no se chequeó dentro
-   *  del TTL, verifica frescura y, si está stale, sincroniza (inline si chico; background si grande). Los sources
-   *  que no sean `repo:*` se ignoran. Devuelve `refreshed:true` si algún repo se sincronizó INLINE (→ re-recuperar).
-   *  Nunca tira. */
-  ensureFresh(sources: string[]): Promise<{ refreshed: boolean }>
+   *  del TTL, verifica frescura y, si está stale, dispara el sync en BACKGROUND (nunca inline → no bloquea el turno).
+   *  Los sources que no sean `repo:*` se ignoran. Devuelve `refreshed` (true solo si algo se aplicó INLINE → hoy
+   *  siempre false) y `behind` (true si algún repo recuperado estaba ATRÁS y se está actualizando en background →
+   *  el turno responde con el índice pre-sync; searchMemory lo surfacea para que el modelo lo flaggee). Nunca tira. */
+  ensureFresh(
+    sources: string[]
+  ): Promise<{ refreshed: boolean; behind?: boolean }>
 }

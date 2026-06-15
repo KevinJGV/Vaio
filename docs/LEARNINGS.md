@@ -456,6 +456,17 @@ El código typecheckeó sin cambios de API salvo **dos rupturas reales**:
   usar `checkRepoFreshness` **solo si preguntan explícitamente** por frescura; nunca narrar el sync en respuestas
   normales. e2e: "qué stack usás" → solo searchMemory, sin narrar; "estás al día?" → checkRepoFreshness. Encaja con
   el Invariante #9 (no marear al modelo con orquestación que el sistema ya maneja).
+- **⚠️ Followup de la silenciosa: el SISTEMA debe INFORMAR la staleness, no solo gestionarla en silencio**
+  (2026-06-15, lo cazó Kevin: "el agente no se fijó si sus conocimientos estaban frescos"). La silenciosa
+  **sobrecorrigió**: como el gate es **background**, el turno actual responde del índice **pre-sync**; y al quitarle
+  al modelo el chequeo proactivo, **nada le avisaba que estaba atrás** → Vaio respondía confiado con info un toque
+  vieja, sin flaggear. Diagnóstico por timing: turno 16:38 → el bg sync del gate completó 16:40 (después). Fix: el
+  gate (`ensureFresh`) devuelve **`behind`** (algún repo recuperado estaba stale / sync en vuelo); `searchMemory`
+  antepone una **`[nota del sistema: … está un poco atrás …]`** al output; el prompt le dice al modelo que sea
+  HONESTO si ve esa nota (avisar al pasar que puede faltar lo MUY reciente, sin drama). Sistema **detecta + informa**;
+  el modelo no orquesta (#9), no bloquea (#1). e2e: índice forzado stale → Vaio flaggea "se estaba actualizando…
+  puede que algún cambio muy reciente aún no lo tenga" + self-heal. **Lección:** "silencioso" ≠ "opaco" — gestionar
+  algo en background NO exime de informarle al usuario su estado (mismo espíritu que `long-tasks-ok-if-notify-not-blocking`).
 - **⚠️ El sync NO debe ser una WRITE-ACTION del modelo — la frescura la gestiona el SISTEMA (Invariante #8)**
   (2026-06-15, hermano del fix del gate; lo destaparon logs de Kevin: un turno de **211s**). Arreglar el gate no
   alcanzó: existía un **tool `syncRepo`** que el modelo invocaba explícitamente al ver "stale", y sincronizaba

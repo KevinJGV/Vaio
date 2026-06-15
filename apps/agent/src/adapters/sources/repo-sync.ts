@@ -362,9 +362,17 @@ export function createRepoSync(deps: SyncRepoDeps): RepoSyncPort {
     },
     async ensureFresh(sources) {
       const now = Date.now()
+      // `behind` = algún repo recuperado este turno está ATRÁS del remoto y se está actualizando en background
+      // → el turno responde con el índice pre-sync; searchMemory lo surfacea para que el modelo sea honesto.
+      let behind = false
       for (const source of sources) {
         const spec = parseRepoSource(source)
         if (!spec) continue // no-repo (cv/me/github/lastfm/fact) → no fresh-able acá
+        // Si ya hay un sync en vuelo para este repo (de un turno anterior, aún sin terminar) → sigue atrás.
+        if (inFlight.has(source)) {
+          behind = true
+          continue
+        }
         const seen = lastChecked.get(source)
         if (seen != null && now - seen < ttlMs) continue // TTL: chequeado hace poco → confiar
         lastChecked.set(source, now)
@@ -374,6 +382,7 @@ export function createRepoSync(deps: SyncRepoDeps): RepoSyncPort {
             token: deps.token,
           })
           if (f.state !== "stale") continue
+          behind = true
           // Stale → sincronizar SIEMPRE en BACKGROUND, NUNCA en el hot path del turno. El sync re-embebe
           // de a uno (secuencial, por el cap de 429 upstream) → puede tardar; bloquear el turno violaría el
           // Invariante #1 (se midió 183s). Respondemos YA con el índice actual; la frescura llega para el
@@ -388,7 +397,7 @@ export function createRepoSync(deps: SyncRepoDeps): RepoSyncPort {
         }
       }
       // Nunca aplicamos inline → el turno no re-recupera; responde rápido con lo indexado.
-      return { refreshed: false }
+      return { refreshed: false, behind }
     },
   }
 }

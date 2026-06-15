@@ -212,6 +212,39 @@ describe("searchMemory (descriptor migrado)", () => {
     expect(calls).toBe(1)
   })
 
+  it("freshness gate: si un repo recuperado está ATRÁS (behind, refrescándose en bg), el output lo AVISA al modelo", async () => {
+    const memory: MemoryStore = {
+      searchMemory: async () => [
+        { source: "repo:kev/vaio", url: "u", chunk: "código actual" },
+      ],
+      upsertDocuments: async () => {},
+      clearSource: async () => {},
+      listIndexedFiles: async () => [],
+      deleteFiles: async () => {},
+      replaceFile: async () => {},
+    }
+    const repoSync = {
+      freshness: async () => ({ state: "stale" as const }),
+      sync: async () => ({
+        mode: "incremental" as const,
+        embedded: 1,
+        deleted: 0,
+        unchanged: 0,
+      }),
+      isTracked: async () => true,
+      ensureFresh: async () => ({ refreshed: false, behind: true }),
+    }
+    const out = String(
+      await searchMemory
+        .build(ctx({ memory, repoSync }))
+        .execute?.({ query: "kevin" }, { toolCallId: "tc", messages: [] })
+    )
+    // El sistema surfacea la staleness para que el modelo la flaggee (honesto, sin orquestar).
+    expect(out.toLowerCase()).toMatch(/atrás|segundo plano|actualiz|reciente/)
+    // y el contenido recuperado sigue ahí
+    expect(out).toContain("código actual")
+  })
+
   it("antepone los facts curados a los docs del repo (no compiten)", async () => {
     let factsK = -1
     const memory: MemoryStore = {

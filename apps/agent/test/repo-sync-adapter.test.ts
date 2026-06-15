@@ -382,7 +382,21 @@ describe("createRepoSync.ensureFresh (freshness gate)", () => {
     const r = await rs.ensureFresh(["repo:kev/vaio"])
     // NO se aplicó inline → el turno NO re-recupera (responde rápido con el índice actual).
     expect(r.refreshed).toBe(false)
-    // pero el sync SÍ se disparó en background (no se esperó); converge fuera del hot path.
+    // pero MARCA `behind` (el repo estaba atrás + se está actualizando) → searchMemory lo surfacea al modelo.
+    expect(r.behind).toBe(true)
+    // y el sync SÍ se disparó en background (no se esperó); converge fuera del hot path.
     await vi.waitFor(() => expect(calls.replaceFile).toEqual(["README.md"]))
+  })
+
+  it("fresh → behind:false (no avisa de staleness si está al día)", async () => {
+    mockGithub((url) => {
+      if (url.includes("/commits/")) return { json: { sha: "c1" } } // == lastCommitSha → fresh
+      return {}
+    })
+    const { mem } = fakeMemory({ "repo:kev/vaio": [{ path: "a", blobSha: "x" }] })
+    const { tracker } = fakeTracker(trackedFresh())
+    const rs = createRepoSync({ memory: mem, tracker, policy: DEFAULT_REPO_POLICY })
+    const r = await rs.ensureFresh(["repo:kev/vaio"])
+    expect(r.behind).toBe(false)
   })
 })

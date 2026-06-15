@@ -88,6 +88,13 @@
 > **✅ Cerrados 2026-06-15 (→ Historial "CLUSTER FRESHNESS/RAG HARDENING"), verificados por el Telegram de Kevin:**
 > Followup ① (RAG verbatim) · Followup ② (gate siempre background + embed fuera de tx) · tools de freshness
 > rediseñadas (eliminado `syncRepo`, Invariante #9) · refinamientos (concurrencia de embeddings + frescura silenciosa).
+- [?] **Followup de la "frescura silenciosa" — el SISTEMA INFORMA la staleness (pend. re-verificación de Kevin por
+  Telegram).** Kevin cazó que la silenciosa **sobrecorrigió**: el gate es background → el turno responde del índice
+  pre-sync, y sin el chequeo del modelo, **nada avisaba que estaba atrás** → Vaio respondía confiado sin flaggear
+  (turno 16:38; el bg sync completó 16:40, después). **Fix:** `ensureFresh` devuelve **`behind`**; `searchMemory`
+  antepone `[nota del sistema: … está un poco atrás …]`; el prompt le pide ser honesto si ve la nota. **349 tests**;
+  typecheck/biome limpios. **e2e ✅:** índice forzado stale → Vaio flaggea "se estaba actualizando… puede que falte
+  lo muy reciente" + self-heal. **Falta:** tu confirmación conversacional por Telegram. Detalle → `LEARNINGS.md`.
 - [?] **Paso 3 parte 2 — `learnRepo` (ingesta on-demand de repo público de Kevin) — IMPLEMENTADO (pend.
   verificación conversacional de Kevin por Telegram).** Acción `learnRepo` (owner-only, telegram trusted): el modelo
   pasa un NOMBRE, el sistema lo valida contra los repos PÚBLICOS reales de Kevin (excepción #8: fallo visible, sin
@@ -143,6 +150,9 @@ encadenados de esta sesión, todos con TDD + e2e:
   (~10×, 0 errores 429 — context7: el 429 era del batch-array, no de requests concurrentes). + **(5) FRESCURA
   SILENCIOSA:** el modelo no narra el sync en respuestas normales ni chequea por las suyas (`checkRepoFreshness`
   solo si preguntan explícitamente). **Verificado en el Telegram de Kevin:** "hablame de tu sistema" → solo searchMemory.
+  ⚠️ **Followup (Kevin lo cazó después):** la silenciosa sobrecorrigió → Vaio respondía del índice pre-sync **sin
+  flaggear** que estaba atrás. Fix: el SISTEMA informa la staleness (`ensureFresh.behind` → nota en `searchMemory` →
+  el modelo lo flaggea honesto). En el WIP `[?]` "frescura silenciosa — el sistema informa" (pend. re-verif. de Kevin).
 Principios fundados: **Invariante #9** (`tools-self-contained-minimize-chaining`) + memorias
 `long-tasks-ok-if-notify-not-blocking`, `compression-savings-marginal`. Detalle técnico → `LEARNINGS.md`.
 Commits: `fix(rag)…verbatim` · `fix(sync)…background` · `refactor(harness)…syncRepo` · `perf(memory)…tx` ·
