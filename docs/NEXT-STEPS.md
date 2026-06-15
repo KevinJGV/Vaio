@@ -55,38 +55,41 @@
 > `feat/telegram-streaming`): `sendMessageDraft` muestra el texto en vivo en chats **privados** (confirmado por
 > Kevin); topics → typing fallback (por diseño, draft es privado-only). **315 tests.** ⚠️ `origin/main` 6 commits
 > atrás (Kevin dev en local main + ngrok; pushear para desplegar). Detalle → Historial.
-> **Próximos candidatos (orden de Kevin):** **#3 acumulación/patrones de conectores en el tiempo**, y luego el
-> **paso 3** (on-demand de repos), **Nivel C** (turnos proactivos), **`escalate`** (Fase 2), **extracción
-> automática de facts**, o el **streaming en topics** (editMessageText, diferido). El **portafolio** va DESPUÉS.
-> *(Rerank ✅; facts ✅; repos uuid-free + sync fixes ✅; streaming Telegram ✅ 2026-06-15.)*
+> **Acumulación + patrones de conectores ("trends", #3) — MERGEADO en `main` + DESPLEGADO** (2026-06-15, ex
+> `feat/connector-trends`): serie temporal `connector_snapshots` (migración `0008`) + tendencia derivada por LLM
+> (degrada a delta determinístico) → chunk `trend:<source>`; **`recentActivity` la complementa** con lo live (lee
+> `trend:<source>` por clave exacta → "📈 Cómo viene"; mató la competencia con `searchMemory`). Flag `TRENDS_ENABLED`
+> OFF por defecto. **Probado vía Telegram con data sintética sembrada** (4 trends grounded). **328 tests.**
+> Precursor graph-ready (Fase 3). Detalle → Historial. ⚠️ Ver followups + limpieza de seed abajo.
+> **Próximos candidatos (orden de Kevin):** **#4 "seguimos con otros"** → el **paso 3** (on-demand de repos),
+> **Nivel C** (turnos proactivos), **`escalate`** (Fase 2), **extracción automática de facts**, o el **streaming en
+> topics** (editMessageText, diferido). El **portafolio** va DESPUÉS.
+> *(Rerank ✅; facts ✅; repos uuid-free ✅; streaming Telegram ✅; trends #3 ✅ 2026-06-15.)*
 
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [?] **Acumulación + patrones de conectores ("trends") (#3) — IMPLEMENTADO + e2e Neon, pend. owner + merge**
-  (rama `feat/connector-trends`). Tabla `connector_snapshots` (serie temporal, migración **0008** aplicada) +
-  derivación de tendencia con LLM (degrada a delta determinístico) → chunk `trend:<source>` en `documents`
-  (`searchMemory` lo trae solo). Cada ingest: collect → snapshot vigente → append (dedup por hash) → prune →
-  listRecent → `buildTrendPrompt` (grounded ES/EN) → `summarize`/`deterministicTrend` → upsert. Flag
-  `TRENDS_ENABLED` **OFF por defecto**. Alcance rico con clasificación (vía LLM), chunks en memoria,
-  timestamp-aware. **Precursor graph-ready** (Fase 3): `SnapshotStore` + `payload` jsonb (ver §forward-link del
-  design). **e2e Neon ✅:** append/dedup/listRecent/prune reales + LLM derivó tendencia grounded.
-  **Probado vía Telegram con data sintética sembrada** (los 4 trends grounded; Vaio los narró bien).
-  **Refinamiento aplicado (post-prueba):** `recentActivity` ahora **complementa lo live con la tendencia** (lee
-  `trend:<source>` por clave exacta → "📈 Cómo viene") porque competía con `searchMemory` por la decisión y a
-  veces perdía el arco (caso "¿cómo viene el código?" → solo live). `getBySource?` en MemoryStore + `trendSource()`.
-  **328 tests** (+13 total); typecheck/biome/build limpios; e2e `getBySource` trae los 4 trends limpios. Specs →
-  [`…-design.md`](superpowers/specs/2026-06-15-connector-trends-design.md) (§complemento) ·
-  [`…-plan.md`](superpowers/specs/2026-06-15-connector-trends-plan.md). **Falta:** activar `TRENDS_ENABLED=1` +
-  `pnpm ingest` ×2 (con cambios reales) → verificar acumulación real + merge. **Followups colaterales (vistos en la
-  prueba, aparte de trends):** ① **corrupción de texto** ("seachicó", "perfil deKevin") **solo** por el path
-  `searchMemory`/rerank (storage sano — `getBySource` trae limpio) → verificar/corregir; ② `searchMemory` tardó
-  **183 s** con un `repo sync` concurrente → contención pool/embeddings, revisar.
+- [ ] ⚠️ **Limpieza del seed SINTÉTICO de trends (GROUNDING — prioritario).** Para probar #3 sembramos historia
+  **fabricada** en la DB real: snapshots backdateados (-21d) en `connector_snapshots` (`lastfm`/`steam`/`wakatime`/
+  `github-stats`) + sus chunks `trend:*` derivados. **Vaio los narra como reales** → viola grounding si quedan. Y el
+  1er `pnpm ingest` real (con `TRENDS_ENABLED=1`) compararía real-ahora vs el viejo-sintético → 1ª tendencia falsa.
+  **Acción:** `DELETE FROM connector_snapshots WHERE source IN ('lastfm','steam','wakatime','github-stats');` +
+  `DELETE FROM documents WHERE source LIKE 'trend:%';` **antes** de activar trends reales (o como parte de hacerlo).
+- [ ] **Activar trends REALES en prod.** `TRENDS_ENABLED=1` en Railway + (recordatorio) `WAKATIME_API_KEY`/
+  `STEAM_API_KEY`/`STEAM_ID` en secrets. Tras limpiar el seed: `pnpm ingest` acumula la 1ª captura real; las
+  tendencias reales emergen recién con la 2ª corrida (cuando cambie la actividad). Verificar acumulación real.
+- [ ] **Followup ① — corrupción de texto en el path `searchMemory`/rerank** (visto en la prueba): chunks salen con
+  espacios/palabras comidos ("seachicó", "perfil deKevin", "En últimos 21 días") **solo** por `searchMemory`; el
+  storage está sano (`getBySource` trae limpio) y `recentActivity` ya esquiva el problema. Sospechoso: el reranker
+  `nemotron-rerank-vl` o un artefacto de log. Reproducir y aislar (rerank on/off) antes de tocar.
+- [ ] **Followup ② — latencia de `searchMemory` (183 s) con `repo sync` concurrente** (visto en la prueba):
+  contención del pool/embeddings cuando un sync incremental corre durante un turno. Medir y, si aplica, serializar/
+  acotar la concurrencia del sync vs. el RAG del turno.
 > **Mejora futura diferida (Kevin "dejémoslo así por ahora", 2026-06-15) — streaming en TOPICS de Telegram:**
 > hoy el streaming en vivo solo va en chats privados (límite de `sendMessageDraft`); en topics aparece de golpe
 > (typing fallback). Para streamear en topics → `editMessageText` (universal, pero "parpadea" al editar y hay que
 > throttlear ~1/s). Su propio mini design+plan cuando se priorice.
-> **Próximo del orden de Kevin:** #3 acumulación/patrones de conectores en el tiempo.
+> **Próximo del orden de Kevin:** #4 "seguimos con otros" (tras cerrar la limpieza del seed + decidir followups).
 > **Recordatorio operativo (no es WIP):** para que los 3 conectores nuevos corran **en prod**, las envs
 > `WAKATIME_API_KEY`/`STEAM_API_KEY`/`STEAM_ID` deben estar en los secrets de Railway (sin ellas degradan
 > limpio = apagados; el resto del agente no se ve afectado).
