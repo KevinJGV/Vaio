@@ -15,6 +15,15 @@ function positiveIntWithDefault(def: number) {
   )
 }
 
+/** Float positivo con default, tolerante a string vacío (mismo patrón que positiveIntWithDefault, sin `.int()`).
+ *  Para umbrales fraccionarios (p.ej. distancia coseno). */
+function positiveFloatWithDefault(def: number) {
+  return z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.coerce.number().positive().default(def)
+  )
+}
+
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(8787),
 
@@ -148,6 +157,13 @@ const envSchema = z.object({
   // Id de Telegram de Kevin (owner). Sólo ese id resuelve a `trusted` (perfil pleno/agéntico);
   // cualquier otro = visitante capado (Vaio lo presenta). Sin esto, nadie es owner.
   OWNER_TELEGRAM_ID: z.coerce.number().int().optional(),
+
+  // Adjudicación de conflictos de facts: al PROPONER un hecho, se buscan facts confirmados cercanos para que
+  // Vaio decida si el nuevo reemplaza a uno viejo. DISTANCE = distancia coseno máx para considerar "cercano"
+  // (generoso a propósito: el modelo + el owner filtran la contradicción real; el umbral solo corta ruido lejano).
+  // CANDIDATES = cuántos candidatos sugerir como máx.
+  FACT_CONFLICT_DISTANCE: positiveFloatWithDefault(0.45),
+  FACT_CONFLICT_CANDIDATES: positiveIntWithDefault(3),
 })
 
 export type Env = z.infer<typeof envSchema>
