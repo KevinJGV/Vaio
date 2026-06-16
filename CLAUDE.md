@@ -47,6 +47,15 @@ lateral) y —más adelante— por Telegram y correo. **TypeScript** · **Hono**
    `checkRepoFreshness`+`syncRepo` (dos tools que el modelo encadenaba, con estados async contradictorios y un sync
    inline de 191s) en **una sola** `checkRepoFreshness` que consulta, **dispara el sync en background sola** y
    reporta — el modelo solo consulta, el sistema gestiona. Ver memoria `tools-self-contained-minimize-chaining`.
+10. **POCAS tools-intención EXTENSIBLES (la batuta anti-tool-bloat). Medí CADA acción/tool nueva contra esto.**
+    Pocas tools-**intención** que crecen por **parámetros/filtros** > muchas micro-tools > **god-tool** (lo peor: una
+    tool con enum de operaciones obliga al modelo a elegir+orquestar → viola el #9). Antes de crear una tool preguntá:
+    *"¿es una intención del usuario que crece por params, o estoy inflando el abanico?"*. Una feature nueva entra como
+    **param de una tool existente**, NO como tool nueva (ej.: `findRepos({language?, topic?})` es la ÚNICA tool de
+    "consultar repos"; CI/PRs/deploy a futuro = filtros de ESA tool). Las **señales** de disponibilidad van por
+    **detectores** (notas del sistema), no por tools. Cada "plugin" (GitHub, Spotify, …) expone **2-3 tools-intención**,
+    no N; la lógica vive en adapters/ports/connectors/detectores detrás. Evitar el tool-bloat a toda costa = Vaio
+    escalable. Ver memoria `few-extensible-intent-tools`.
 
 ---
 

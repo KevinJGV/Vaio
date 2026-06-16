@@ -8,11 +8,16 @@ import type { Logger } from "../../ports/logger.js"
 import type { OwnerRepoCatalog } from "../../ports/owner-repos.js"
 import { githubApi } from "./github-api.js"
 
-/** Forma (parcial) de un repo en `GET /users/{user}/repos`. Tipo propio: incluye `private` (clave para el filtro). */
+/** Forma (parcial) de un repo en `GET /users/{user}/repos`. Tipo propio: incluye `private` (clave para el filtro)
+ *  + metadata (language/topics/description/stars) que GitHub ya devuelve (ver `connectors/github.ts`). */
 interface GhRepoListItem {
   name: string
   private: boolean
   default_branch?: string
+  language?: string | null
+  topics?: string[]
+  description?: string | null
+  stargazers_count?: number
 }
 
 const PER_PAGE = 100
@@ -23,7 +28,14 @@ const MAX_PAGES = 3
 export function publicReposOnly(list: GhRepoListItem[]): OwnerRepo[] {
   return list
     .filter((r) => r.private === false)
-    .map((r) => ({ name: r.name, defaultBranch: r.default_branch ?? "main" }))
+    .map((r) => ({
+      name: r.name,
+      defaultBranch: r.default_branch ?? "main",
+      language: r.language ?? null,
+      topics: r.topics ?? [],
+      description: r.description ?? null,
+      stars: r.stargazers_count ?? 0,
+    }))
 }
 
 export function createOwnerRepoCatalog(deps: {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { createUnindexedRepoDetector } from "../src/core/detectors/unindexed-repo.js"
+import type { RetrievedChunk } from "../src/ports/knowledge-detector.js"
 import type { OwnerRepoCatalog } from "../src/ports/owner-repos.js"
 import type { RepoSyncPort } from "../src/ports/repo-sync.js"
 
@@ -24,58 +25,71 @@ const det = (names: string[], tracked = false) =>
     repoSync: repoSync(tracked),
   })
 
+const gh = (chunk: string): RetrievedChunk[] => [{ source: "github", chunk }]
+
 describe("UnindexedRepoDetector", () => {
-  it("la query matchea un repo del owner NO indexado → nota learnRepo (caso ACME)", async () => {
+  it("señal NOMBRE exacto (caso ACME) → nota learnRepo con repo set", async () => {
     const hint = await det(["ACME", "Vaio"]).detect({
       query: "ACME",
-      retrievedSources: ["fact", "github"], // NO hay repo:*/ACME → no está indexado
+      retrieved: [{ source: "fact", chunk: "" }],
     })
+    expect(hint?.repo).toBe("ACME")
     expect(hint?.note).toContain("ACME")
     expect(hint?.note.toLowerCase()).toContain("learnrepo")
   })
 
-  it("case/separador-insensitive: 'acme' matchea 'ACME'", async () => {
-    const hint = await det(["ACME"]).detect({
-      query: "hablame de acme a secas",
-      retrievedSources: [],
+  it("señal NOMBRE multi-palabra: 'Tastrack' → 'Tastrack_Challenge' (segmento distintivo)", async () => {
+    const hint = await det(["Tastrack_Challenge", "Vaio"]).detect({
+      query: "hablame de Tastrack",
+      retrieved: [],
     })
-    expect(hint?.note).toContain("ACME")
+    expect(hint?.repo).toBe("Tastrack_Challenge")
   })
 
-  it("si su contenido YA está recuperado (repo:*) → null (no sugiere traer lo que ya tenés)", async () => {
+  it("señal CONTENIDO: una descripción github recuperada menciona un repo no indexado → nota", async () => {
+    const hint = await det(["ACME"]).detect({
+      query: "hablame de e-commerce", // no nombra ACME
+      retrieved: gh(
+        'Repo "ACME" (1★): Sistema de control de acceso. Lenguaje: Java.'
+      ),
+    })
+    expect(hint?.repo).toBe("ACME")
+  })
+
+  it("segmento COMÚN no dispara (no falso positivo)", async () => {
+    const hint = await det(["Work-Project_A", "Work-Project_B"]).detect({
+      query: "work",
+      retrieved: [],
+    })
+    expect(hint).toBeNull() // 'work' aparece en 2 → no distintivo
+  })
+
+  it("si su contenido YA está recuperado (repo:*) → null", async () => {
     const hint = await det(["ACME"]).detect({
       query: "ACME",
-      retrievedSources: ["repo:KevinJGV/ACME"],
+      retrieved: [{ source: "repo:KevinJGV/ACME", chunk: "código" }],
     })
     expect(hint).toBeNull()
   })
 
-  it("si el repo ya está trackeado → null (el freshness gate lo cubre)", async () => {
+  it("si el repo ya está trackeado → null (lo cubre el freshness gate)", async () => {
     const hint = await det(["ACME"], true).detect({
       query: "ACME",
-      retrievedSources: [],
+      retrieved: [],
     })
     expect(hint).toBeNull()
   })
 
-  it("ningún token de la query matchea un repo → null", async () => {
+  it("ningún token/mención matchea → null", async () => {
     expect(
       await det(["ACME", "Vaio"]).detect({
         query: "hablame de tu sistema",
-        retrievedSources: [],
+        retrieved: [],
       })
     ).toBeNull()
   })
 
-  it("nombres muy cortos (<3) no matchean (evita falsos positivos)", async () => {
-    expect(
-      await det(["ci"]).detect({ query: "ci", retrievedSources: [] })
-    ).toBeNull()
-  })
-
   it("catálogo vacío → null", async () => {
-    expect(
-      await det([]).detect({ query: "ACME", retrievedSources: [] })
-    ).toBeNull()
+    expect(await det([]).detect({ query: "ACME", retrieved: [] })).toBeNull()
   })
 })

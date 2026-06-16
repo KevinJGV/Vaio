@@ -183,9 +183,15 @@ describe("searchMemory (descriptor migrado)", () => {
       deleteFiles: async () => {},
       replaceFile: async () => {},
     }
-    let runCtx: { query: string; retrievedSources: string[] } | null = null
+    let runCtx: {
+      query: string
+      retrieved: { source: string; chunk: string }[]
+    } | null = null
     const detectors = {
-      run: async (c: { query: string; retrievedSources: string[] }) => {
+      run: async (c: {
+        query: string
+        retrieved: { source: string; chunk: string }[]
+      }) => {
         runCtx = c
         return ["[nota del sistema: tenés un repo X sin indexar]"]
       },
@@ -204,10 +210,10 @@ describe("searchMemory (descriptor migrado)", () => {
     expect(out.indexOf("sin indexar")).toBeLessThan(
       out.indexOf("código actual")
     )
-    // El registry recibe la query + los sources recuperados.
+    // El registry recibe la query + los chunks recuperados (source + texto).
     expect(runCtx).toMatchObject({
       query: "ACME",
-      retrievedSources: ["repo:kev/vaio"],
+      retrieved: [{ source: "repo:kev/vaio", chunk: "código actual" }],
     })
   })
 

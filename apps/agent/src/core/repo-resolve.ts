@@ -3,10 +3,15 @@
 // cardinalidad y el sistema lo VALIDA acá (match claro → procede; ambiguo → desambiguar; sin match → fallo
 // visible con sugerencias). Nunca asume: un nombre que no resuelve limpio NO se ingiere.
 
-/** Repo público del owner (ya filtrado por el adapter). `name` = slug de GitHub; `defaultBranch` para el sync. */
+/** Repo público del owner (ya filtrado por el adapter). `name` = slug de GitHub; `defaultBranch` para el sync.
+ *  Campos de metadata (opcionales): los usa `findRepos` (filtrar por lenguaje/topic) y futuros consumidores. */
 export interface OwnerRepo {
   name: string
   defaultBranch: string
+  language?: string | null
+  topics?: string[]
+  description?: string | null
+  stars?: number
 }
 
 export type RepoResolution =
@@ -86,4 +91,46 @@ export function resolveRepoName(
     .slice(0, MAX_SUGGESTIONS)
     .map((x) => x.name)
   return { kind: "none", suggestions }
+}
+
+/**
+ * Repos del catálogo cuyo NOMBRE aparece en la query. CONSERVADOR (para no falsos positivos):
+ *   (1) un token de la query == el nombre normalizado COMPLETO de un repo, o
+ *   (2) un token == un SEGMENTO normalizado DISTINTIVO (aparece en UN solo repo del catálogo, len ≥ 4) →
+ *       catchea multi-palabra "Tastrack"→"Tastrack_Challenge" sin disparar con segmentos comunes
+ *       ("work"/"project"/"sql", que aparecen en varios). PURO.
+ */
+export function reposNamedInQuery(
+  query: string,
+  repos: OwnerRepo[]
+): OwnerRepo[] {
+  if (repos.length === 0) return []
+  const tokens = new Set(
+    query
+      .split(/[^\p{L}\p{N}]+/u)
+      .map(normalizeRepoName)
+      .filter((t) => t.length >= 3)
+  )
+  if (tokens.size === 0) return []
+  // Frecuencia de cada segmento normalizado a través del catálogo → distintividad (segmento de UN solo repo).
+  const segCount = new Map<string, number>()
+  const repoSegs = repos.map((r) => {
+    const segs = r.name
+      .split(/[-_.\s]+/)
+      .map(normalizeRepoName)
+      .filter((s) => s.length > 0)
+    for (const s of new Set(segs)) segCount.set(s, (segCount.get(s) ?? 0) + 1)
+    return segs
+  })
+  const out: OwnerRepo[] = []
+  repos.forEach((r, i) => {
+    const exact = tokens.has(normalizeRepoName(r.name))
+    const distinctiveSeg =
+      !exact &&
+      (repoSegs[i] ?? []).some(
+        (s) => s.length >= 4 && segCount.get(s) === 1 && tokens.has(s)
+      )
+    if (exact || distinctiveSeg) out.push(r)
+  })
+  return out
 }

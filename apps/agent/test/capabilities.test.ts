@@ -73,6 +73,18 @@ describe("createCapabilityResolver", () => {
     ).not.toContain("learnRepo")
   })
 
+  it("findRepos (read, metadata pública) está en los 3 perfiles (web, visitante, owner)", () => {
+    for (const [ch, tr] of [
+      ["web", false],
+      ["telegram", false],
+      ["telegram", true],
+    ] as const) {
+      expect(resolver.resolve(ch, principal(ch, tr)).allowedTools).toContain(
+        "findRepos"
+      )
+    }
+  })
+
   it("ambas policies de telegram piden formato HTML", () => {
     expect(
       resolver.resolve("telegram", principal("telegram", true)).policyText

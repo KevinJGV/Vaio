@@ -4,18 +4,27 @@
 // El sistema detecta + informa; el modelo NO orquesta (Invariante #9). Ver
 // docs/superpowers/specs/2026-06-15-knowledge-detectors-design.md.
 
+/** Un chunk recuperado por searchMemory (source + texto), para que los detectores inspeccionen contenido. */
+export interface RetrievedChunk {
+  source: string
+  chunk: string
+}
+
 /** Contexto del turno para el probe de un detector. */
 export interface DetectContext {
   /** La query que el modelo pasó a searchMemory este turno. */
   query: string
-  /** Los `source` que searchMemory YA recuperó (repo:*, github, fact, trend:*, …). */
-  retrievedSources: string[]
+  /** Lo que searchMemory YA recuperó (source + texto): un detector puede mirar los `source` (repo:*, github, fact…)
+   *  y/o el contenido (p.ej. parsear los nombres de repo que menciona una descripción del conector github). */
+  retrieved: RetrievedChunk[]
 }
 
 /** Una señal de disponibilidad que el detector quiere surfacear al modelo. */
 export interface DetectionHint {
   /** Texto "[nota del sistema: …]" que se antepone al output de searchMemory; el modelo lo lee y acciona. */
   note: string
+  /** Repo al que refiere (si aplica) → el registry deduplica para no emitir dos notas del mismo repo. */
+  repo?: string
 }
 
 export interface KnowledgeDetector {

@@ -21,7 +21,19 @@ export function createDetectorRegistry(
       const hints = await Promise.all(
         detectors.map((d) => d.detect(ctx).catch(() => null))
       )
-      return hints.flatMap((h) => (h ? [h.note] : [])).slice(0, maxNotes)
+      // Dedup por `repo` (no dos notas del mismo repo, p.ej. señal-nombre + señal-contenido). Las notas sin `repo`
+      // pasan todas. Mantiene la PRIMERA de cada repo (orden de registro de los detectores).
+      const seenRepos = new Set<string>()
+      const notes: string[] = []
+      for (const h of hints) {
+        if (!h) continue
+        if (h.repo) {
+          if (seenRepos.has(h.repo)) continue
+          seenRepos.add(h.repo)
+        }
+        notes.push(h.note)
+      }
+      return notes.slice(0, maxNotes)
     },
   }
 }

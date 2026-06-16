@@ -13,9 +13,11 @@ export function createFreshnessDetector(
 ): KnowledgeDetector {
   return {
     name: "freshness",
-    async detect({ retrievedSources }) {
+    async detect({ retrieved }) {
       const repoSources = [
-        ...new Set(retrievedSources.filter((s) => s.startsWith("repo:"))),
+        ...new Set(
+          retrieved.map((r) => r.source).filter((s) => s.startsWith("repo:"))
+        ),
       ]
       if (repoSources.length === 0) return null
       try {

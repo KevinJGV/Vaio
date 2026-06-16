@@ -12,6 +12,7 @@ export type ToolName =
   | "resolveFact"
   | "checkRepoFreshness"
   | "learnRepo"
+  | "findRepos"
   | "recentActivity"
 
 export interface CapabilityProfile {
@@ -68,7 +69,12 @@ const TELEGRAM_POLICY = [
 function untrustedTelegram(): CapabilityProfile {
   return {
     channel: "telegram",
-    allowedTools: ["searchMemory", "checkRepoFreshness", "recentActivity"],
+    allowedTools: [
+      "searchMemory",
+      "checkRepoFreshness",
+      "findRepos",
+      "recentActivity",
+    ],
     memoryScope: { sources: PUBLIC_SOURCES, maxK: 6 },
     policyText: [
       "Estás en Telegram con alguien que NO es Kevin. Sos su carta de presentación:",
@@ -93,6 +99,7 @@ export function createCapabilityResolver(): CapabilityResolver {
             "resolveFact",
             "checkRepoFreshness",
             "learnRepo",
+            "findRepos",
             "recentActivity",
           ],
           memoryScope: { maxK: 8 },
@@ -102,7 +109,12 @@ export function createCapabilityResolver(): CapabilityResolver {
       // web (capado): mismo tool set que hoy, pero menos alcance + política pública.
       return {
         channel: "web",
-        allowedTools: ["searchMemory", "checkRepoFreshness", "recentActivity"],
+        allowedTools: [
+      "searchMemory",
+      "checkRepoFreshness",
+      "findRepos",
+      "recentActivity",
+    ],
         memoryScope: { sources: PUBLIC_SOURCES, maxK: 6 },
         policyText: WEB_POLICY,
       }

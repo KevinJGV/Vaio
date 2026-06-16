@@ -5,10 +5,14 @@ import type {
   KnowledgeDetector,
 } from "../src/ports/knowledge-detector.js"
 
-const ctx: DetectContext = { query: "x", retrievedSources: [] }
-const det = (name: string, note: string | null): KnowledgeDetector => ({
+const ctx: DetectContext = { query: "x", retrieved: [] }
+const det = (
+  name: string,
+  note: string | null,
+  repo?: string
+): KnowledgeDetector => ({
   name,
-  detect: async () => (note ? { note } : null),
+  detect: async () => (note ? { note, ...(repo ? { repo } : {}) } : null),
 })
 
 describe("createDetectorRegistry", () => {
@@ -38,6 +42,15 @@ describe("createDetectorRegistry", () => {
       { maxNotes: 2 }
     )
     expect(await reg.run(ctx)).toEqual(["1", "2"])
+  })
+
+  it("deduplica notas del MISMO repo (mantiene la 1ª); las sin repo pasan todas", async () => {
+    const reg = createDetectorRegistry([
+      det("a", "[nombre: ACME]", "ACME"),
+      det("b", "[contenido: ACME]", "ACME"), // mismo repo → se descarta
+      det("c", "[freshness]"), // sin repo → pasa
+    ])
+    expect(await reg.run(ctx)).toEqual(["[nombre: ACME]", "[freshness]"])
   })
 
   it("sin detectores → []", async () => {

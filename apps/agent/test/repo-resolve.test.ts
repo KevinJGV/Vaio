@@ -1,8 +1,42 @@
 import { describe, expect, it } from "vitest"
 import type { OwnerRepo } from "../src/core/repo-resolve.js"
-import { normalizeRepoName, resolveRepoName } from "../src/core/repo-resolve.js"
+import {
+  normalizeRepoName,
+  reposNamedInQuery,
+  resolveRepoName,
+} from "../src/core/repo-resolve.js"
 
 const r = (name: string): OwnerRepo => ({ name, defaultBranch: "main" })
+
+describe("reposNamedInQuery", () => {
+  it("nombre exacto (un token) → match", () => {
+    const out = reposNamedInQuery("hablame de ACME", [r("ACME"), r("Vaio")])
+    expect(out.map((x) => x.name)).toEqual(["ACME"])
+  })
+
+  it("multi-palabra por segmento DISTINTIVO: 'Tastrack' → 'Tastrack_Challenge'", () => {
+    const out = reposNamedInQuery("contame de Tastrack", [
+      r("Tastrack_Challenge"),
+      r("Vaio"),
+    ])
+    expect(out.map((x) => x.name)).toEqual(["Tastrack_Challenge"])
+  })
+
+  it("segmento COMÚN (en varios repos) NO matchea (conservador)", () => {
+    expect(
+      reposNamedInQuery("work", [r("Work-Project_A"), r("Work-Project_B")])
+    ).toEqual([])
+  })
+
+  it("token corto / sin relación → []", () => {
+    expect(reposNamedInQuery("hablame de tu sistema", [r("ACME")])).toEqual([])
+    expect(reposNamedInQuery("ci", [r("ci")])).toEqual([]) // <3 / corto
+  })
+
+  it("catálogo vacío → []", () => {
+    expect(reposNamedInQuery("ACME", [])).toEqual([])
+  })
+})
 
 describe("normalizeRepoName", () => {
   it("baja a minúsculas y colapsa separadores (-_ .) y espacios", () => {

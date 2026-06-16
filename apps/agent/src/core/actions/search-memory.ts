@@ -102,7 +102,10 @@ export const searchMemory: ActionDescriptor = {
             try {
               notes = await ctx.detectors.run({
                 query,
-                retrievedSources: [...new Set(combined.map((d) => d.source))],
+                retrieved: combined.map((d) => ({
+                  source: d.source,
+                  chunk: d.chunk,
+                })),
               })
             } catch (err) {
               logger.warn(

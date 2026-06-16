@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest"
 import { createFreshnessDetector } from "../src/core/detectors/freshness.js"
 import type { RepoSyncPort } from "../src/ports/repo-sync.js"
 
+/** Helper: arma `retrieved` (chunks) a partir de una lista de sources (el chunk no importa para freshness). */
+const rs = (...sources: string[]) =>
+  sources.map((source) => ({ source, chunk: "" }))
+
 function repoSync(
   behind: boolean,
   spy?: { ensureCalledWith?: string[] }
@@ -23,7 +27,7 @@ describe("FreshnessDetector", () => {
     const d = createFreshnessDetector(repoSync(true, spy))
     const hint = await d.detect({
       query: "x",
-      retrievedSources: ["fact", "repo:kev/vaio", "github"],
+      retrieved: rs("fact", "repo:kev/vaio", "github"),
     })
     expect(spy.ensureCalledWith).toEqual(["repo:kev/vaio"]) // solo los repo:*
     expect(hint?.note.toLowerCase()).toMatch(/atrás|segundo plano|actualiz/)
@@ -32,7 +36,7 @@ describe("FreshnessDetector", () => {
   it("behind:false → null (no avisa)", async () => {
     const d = createFreshnessDetector(repoSync(false))
     expect(
-      await d.detect({ query: "x", retrievedSources: ["repo:kev/vaio"] })
+      await d.detect({ query: "x", retrieved: rs("repo:kev/vaio") })
     ).toBeNull()
   })
 
@@ -40,7 +44,7 @@ describe("FreshnessDetector", () => {
     const spy: { ensureCalledWith?: string[] } = {}
     const d = createFreshnessDetector(repoSync(true, spy))
     expect(
-      await d.detect({ query: "x", retrievedSources: ["fact", "github"] })
+      await d.detect({ query: "x", retrieved: rs("fact", "github") })
     ).toBeNull()
     expect(spy.ensureCalledWith).toBeUndefined()
   })
@@ -61,7 +65,7 @@ describe("FreshnessDetector", () => {
     }
     const d = createFreshnessDetector(broken)
     expect(
-      await d.detect({ query: "x", retrievedSources: ["repo:kev/vaio"] })
+      await d.detect({ query: "x", retrieved: rs("repo:kev/vaio") })
     ).toBeNull()
   })
 })

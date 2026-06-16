@@ -7,33 +7,37 @@ import {
 afterEach(() => vi.unstubAllGlobals())
 
 describe("publicReposOnly (puro)", () => {
-  it("filtra private===true y mapea a {name, defaultBranch}", () => {
+  it("filtra private===true y mapea name/defaultBranch + metadata (language/topics/description/stars)", () => {
     const out = publicReposOnly([
       {
         name: "a",
         private: false,
         default_branch: "main",
-        fork: false,
-        archived: false,
+        language: "Java",
+        topics: ["cli", "java"],
+        description: "un cli",
+        stargazers_count: 3,
       },
+      { name: "b", private: true, default_branch: "main" },
+      { name: "c", private: false, default_branch: "dev" }, // sin metadata → defaults
+    ])
+    expect(out).toEqual([
       {
-        name: "b",
-        private: true,
-        default_branch: "main",
-        fork: false,
-        archived: false,
+        name: "a",
+        defaultBranch: "main",
+        language: "Java",
+        topics: ["cli", "java"],
+        description: "un cli",
+        stars: 3,
       },
       {
         name: "c",
-        private: false,
-        default_branch: "dev",
-        fork: true,
-        archived: true,
+        defaultBranch: "dev",
+        language: null,
+        topics: [],
+        description: null,
+        stars: 0,
       },
-    ])
-    expect(out).toEqual([
-      { name: "a", defaultBranch: "main" },
-      { name: "c", defaultBranch: "dev" }, // forks/archived públicos se conservan
     ])
   })
 })
@@ -54,7 +58,14 @@ describe("createOwnerRepoCatalog.listPublic", () => {
     stubFetch([{ name: "vaio", private: false, default_branch: "main" }], state)
     const cat = createOwnerRepoCatalog({ user: "kev", ttlMs: 60_000 })
     expect(await cat.listPublic()).toEqual([
-      { name: "vaio", defaultBranch: "main" },
+      {
+        name: "vaio",
+        defaultBranch: "main",
+        language: null,
+        topics: [],
+        description: null,
+        stars: 0,
+      },
     ])
     await cat.listPublic()
     expect(state.calls).toBe(1) // 2ª cae en cache

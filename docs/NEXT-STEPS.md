@@ -85,6 +85,18 @@
   integración completa en el portafolio**. Hasta entonces, no tocar Railway/secrets. Cuando llegue: `TRENDS_ENABLED=1`
   + `WAKATIME_API_KEY`/`STEAM_API_KEY`/`STEAM_ID` en secrets; `pnpm ingest` acumula la 1ª captura; las tendencias
   reales emergen con la 2ª corrida. (Mismo gate para los 3 conectores nuevos: WakaTime/Steam/GitHub-stats en prod.)
+- [?] **Detectores a+b (repo-awareness) + c (findRepos) + filosofía de tools (Invariante #10) — IMPLEMENTADO (pend.
+  verif. conversacional de Kevin por Telegram).** (a+b) `UnindexedRepoDetector` enriquecido: detecta repos del owner
+  no indexados por DOS señales — nombre en la query (**multi-palabra** vía `reposNamedInQuery`, segmento distintivo) +
+  mención en una descripción del conector github recuperada; una nota por repo (dedup en el registry por `hint.repo`).
+  (c) tool **`findRepos`** (extensible, todos los canales): filtra los repos PÚBLICOS por `language`/`topic` contra el
+  catálogo enriquecido, fallo VISIBLE (#8); "proyectos en Java?" → lista real. **Filosofía de tools = Invariante #10**
+  (pocas tools-intención extensibles, anti-tool-bloat; findRepos crece por params, no tools nuevas) en `CLAUDE.md` +
+  memoria `few-extensible-intent-tools`. Infra: `DetectContext.retrieved` (chunks) + `DetectionHint.repo`; catálogo
+  enriquecido (language/topics/desc/stars). **383 tests** (+19); typecheck/biome limpios. **e2e ✅:** "qué proyectos
+  en Java?" → findRepos lista repos Java reales; "hablame del Tastrack" → la nota del detector menciona
+  `Tastrack_Challenge` (multi-palabra). Specs `2026-06-15-repo-awareness-findrepos-{design,plan}.md`. **Falta:** e2e
+  conversacional de Kevin por Telegram.
 > **✅ Cerrado 2026-06-15 (PROBADO Y APROBADO por Kevin en Telegram) → Historial "CAPA DE DETECTORES (fundación +
 > detector ACME)":** la fundación de la capa de complemento + el `UnindexedRepoDetector` (caso ACME). El modelo,
 > ante un repo no indexado, leyó la nota y trajo el repo solo (la proactividad de learnRepo que faltaba).
@@ -723,15 +735,18 @@ conector github sin avisar que existía el repo `KevinJGV/ACME` sin indexar. Spe
 [`…-knowledge-detectors-design.md`](superpowers/specs/2026-06-15-knowledge-detectors-design.md) ·
 [`…-plan.md`](superpowers/specs/2026-06-15-knowledge-detectors-plan.md). **Cada incremento = su propio design+plan al
 priorizar.** ✅ **1er incremento HECHO + APROBADO por Telegram (2026-06-15):** fundación (puerto+registry+extraer el
-gate a `FreshnessDetector`) + `UnindexedRepoDetector` (caso ACME) → ver Historial. **Próximos candidatos:** afinar el
-match del UnindexedRepoDetector (repos multi-palabra, hoy solo catchea un nombre exacto) · ThinContent · LiveMetadata
-(atado a "queries vivas a GitHub" ↓).
+gate a `FreshnessDetector`) + `UnindexedRepoDetector` (caso ACME) → ver Historial. ✅ **2º incremento HECHO
+(2026-06-15):** match multi-palabra (a) + señal-contenido/ThinContent (b) fundidos en el detector enriquecido +
+`findRepos` (c) + Invariante #10 → ver WIP `[?]` arriba. **Próximos candidatos:** sumar otros estados al detector
+(p.ej. "trabajás con este repo → ¿lo sincronizo?") · queries de ESTADO vivo como params de findRepos (CI/PRs/deploy).
 
-### 🔵 Pendiente FUTURO — Queries VIVAS a GitHub (metadata + estado: lenguajes/topics/commits, CI/PRs/deploys)
-> **Es una FUENTE/detector futura de la capa de detectores de arriba** (un `LiveMetadataDetector` + su tool de pull).
+### 🔵 Pendiente FUTURO — Queries VIVAS a GitHub: ✅ METADATA cerrada (findRepos) · ESTADO vivo diferido
+> ✅ **Parte METADATA HECHA (2026-06-15):** la tool **`findRepos`** (extensible) responde "proyectos en Java?", "topic
+> X?" filtrando el catálogo enriquecido (lenguaje/topics) — ver Historial/WIP. **Parte ESTADO (CI/PRs/deploys/commits)
+> DIFERIDA**, con su **home definido**: entran como **PARAMS de `findRepos`** (filosofía Invariante #10: no tools
+> nuevas), salvo el deploy que vive en **Railway** (≠ GitHub → su propio adapter/diseño). Detalle de la parte de estado:
 **Planteado por Kevin (2026-06-15).** El RAG tiene el **contenido** de los repos; `recentActivity` el **feed** de
-actividad; `github-stats` totales agregados. Pero **nada cubre preguntas de METADATA/ESTADO VIVO** que no se pueden
-responder con lo ingestado y que las tools actuales no alcanzan. Ejemplos de Kevin:
+actividad; `github-stats` totales agregados. La parte de **ESTADO VIVO** aún no cubierta (futuros params de findRepos):
 - "¿Qué proyectos tienen Java?" → repos por **lenguaje** (GitHub Search `language:java user:…` o `/repos`+`/languages`).
 - "¿Hay algún trabajo con más de X commits?" → **commit counts** por repo (GraphQL `history.totalCount`).
 - "¿Hay algún repo con el topic '[topicX]'?" → **topics** (REST/GraphQL `repositoryTopics`).
