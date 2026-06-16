@@ -4,6 +4,7 @@
 // handler del webhook ya respondió 200, no queremos que Telegram reintente.
 
 import type { Logger } from "../../ports/logger.js"
+import { sanitizeTelegramHtml, stripTelegramHtml } from "./html.js"
 
 const API = "https://api.telegram.org"
 const MAX_LEN = 4096
@@ -111,8 +112,10 @@ export function createTelegramClient(
         opts?.messageThreadId !== undefined
           ? { message_thread_id: opts.messageThreadId }
           : {}
-      for (const part of splitForTelegram(text)) {
-        // Intento con HTML; si Telegram rechaza (p.ej. entities inválidas), reenvío en texto plano.
+      // El modelo a veces emite tags que Telegram no soporta (p.ej. `<span>` pelado) → 400. Saneamos a HTML
+      // válido de Telegram ANTES de enviar (deja solo los tags soportados); si igual rechaza, el fallback va en
+      // texto plano SIN tags (limpio). Ver adapters/telegram/html.ts.
+      for (const part of splitForTelegram(sanitizeTelegramHtml(text))) {
         const okHtml = await call("sendMessage", {
           chat_id: chatId,
           text: part,
@@ -124,7 +127,11 @@ export function createTelegramClient(
             { chatId },
             "telegram HTML rechazado → fallback texto plano"
           )
-          await call("sendMessage", { chat_id: chatId, text: part, ...thread })
+          await call("sendMessage", {
+            chat_id: chatId,
+            text: stripTelegramHtml(part),
+            ...thread,
+          })
         }
       }
     },

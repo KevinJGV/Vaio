@@ -230,8 +230,9 @@ describe("createTelegramClient.sendMessage", () => {
     await createTelegramClient("T", noopLogger).sendMessage(123, "<b>hola")
     expect(calls).toHaveLength(2)
     expect(calls[0]?.parse_mode).toBe("HTML")
+    expect(calls[0]?.text).toBe("<b>hola") // `<b>` es soportado → se conserva en el intento HTML
     expect(calls[1]?.parse_mode).toBeUndefined()
-    expect(calls[1]?.text).toBe("<b>hola")
+    expect(calls[1]?.text).toBe("hola") // fallback texto plano: SIN tags (no se ven crudos)
   })
 
   it("incluye message_thread_id cuando se pasa (responde en el topic)", async () => {
