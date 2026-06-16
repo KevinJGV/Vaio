@@ -78,6 +78,28 @@ describe("learnRepo", () => {
     expect(out.toLowerCase()).toMatch(/trayendo|moment|de nuevo/)
   })
 
+  it("con resume (Telegram) → registra la tarea en el seam proactivo + promete RETOMAR", async () => {
+    const repoSync = fakeRepoSync({ tracked: false })
+    const calls: { label?: string }[] = []
+    const resume = {
+      resume: (_task: Promise<unknown>, opts?: { label?: string }) => {
+        calls.push({ label: opts?.label })
+      },
+    }
+    const t = learnRepo.build(
+      ctx({ ownerRepos: catalog(["clon-ai"]), repoSync, resume })
+    )
+    const out = String(
+      await t.execute?.({ repo: "clon-ai" }, { toolCallId: "c", messages: [] })
+    )
+    await new Promise((r) => setTimeout(r, 0))
+    expect(calls).toEqual([{ label: "learnRepo" }]) // tarea registrada en el resume
+    expect(repoSync.synced).toEqual([{ owner: "KevinJGV", repo: "clon-ai" }]) // el sync igual arrancó
+    expect(out.toLowerCase()).toMatch(
+      /te retomo|retomo acá|cuando termine|en cuanto termine/
+    )
+  })
+
   it("match + YA trackeado → NO re-ingiere, dice que ya lo tiene", async () => {
     const repoSync = fakeRepoSync({ tracked: true })
     const t = learnRepo.build(ctx({ ownerRepos: catalog(["vaio"]), repoSync }))

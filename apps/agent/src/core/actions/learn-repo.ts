@@ -81,9 +81,18 @@ export const learnRepo: ActionDescriptor = {
             `Ese ya lo tengo indexado (${res.repo.name}); preguntame directo sobre él.`
           )
         }
-        // Fire-and-forget: full ingest en background, no bloquea el turno (Invariante #1). El sync es
-        // best-effort; el .catch traga un fallo de ingesta sin romper el turno (ya respondimos).
-        void ctx.repoSync.sync(spec).catch(() => {})
+        // Ingest full en background, no bloquea el turno (Invariante #1). Turnos proactivos (Nivel C): si el
+        // canal soporta push (Telegram), registramos la tarea para que Vaio RETOME solo al terminar y responda la
+        // duda original (1er trigger user-waiting del seam `resume`). Sin push (web) → fire-and-forget como antes.
+        const task = ctx.repoSync.sync(spec)
+        if (ctx.resume) {
+          ctx.resume.resume(task, { label: "learnRepo" })
+          return done(
+            true,
+            `Dale, estoy trayendo ${res.repo.name} a mi memoria ahora (toma un momentito). En cuanto termine te retomo acá mismo con su contenido.`
+          )
+        }
+        void task.catch(() => {}) // best-effort: el .catch traga un fallo de ingesta (ya respondimos).
         return done(
           true,
           `Dale, estoy trayendo ${res.repo.name} a mi memoria ahora (toma un momentito); preguntame de nuevo en un rato y ya lo tengo fresco.`
