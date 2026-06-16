@@ -493,3 +493,16 @@ El código typecheckeó sin cambios de API salvo **dos rupturas reales**:
   #9** (`CLAUDE.md` + memoria `tools-self-contained-minimize-chaining`): minimizar el encadenamiento de acciones del
   modelo; tools versátiles/auto-contenidas que engloben la tarea (acción automática del sistema + feedback), no
   atómicas que el modelo deba orquestar — sobre todo si exponen estados async no sincronizados.
+- **⚠️ El cap `maxChunksPerRepo` es POR-CORRIDA, no por-repo-total → incompleto se appendea con `ignoreFresh`,
+  NUNCA con `forceFull`** (2026-06-15, lo destapó el e2e por Telegram del detector `repo-awareness`). En `syncRepo`
+  el `chunkCount` que corta el cap **resetea cada sync** → un repo más grande que el cap **converge en varias
+  pasadas** (cada incremental appendea hasta `maxChunksPerRepo` chunks nuevos). Consecuencia: un repo **incompleto**
+  (le faltan archivos por el cap) es **SHA-fresh** (`lastCommitSha == HEAD`). Dos trampas al querer completarlo:
+  (1) **`forceFull`** hace `clearSource` + re-index por orden de prioridad → re-haría el **MISMO prefijo** de
+  archivos y **nunca progresa** (y borra todo un instante); (2) un **incremental común** ve el SHA fresh → el gate
+  de frescura de `syncRepo` hace `skipped-fresh` → **0 embeddings**. **Fix:** opt **`ignoreFresh`** en
+  `syncRepo`/`guardedSync` que saltea el gate de frescura pero corre el diff **incremental** (isFull=false) →
+  appendea **solo los faltantes** sin borrar → progresa. `coverageGap` (puro) mide los faltantes exactos
+  (`kept − indexados − tombstones`). Lo usa la rama `incomplete` de `ensureRepoReady` (detector `repo-awareness`).
+  **Regla:** completar un índice parcial = **append (`ignoreFresh`)**, no rebuild (`forceFull`); `forceFull` es solo
+  para policy-bump/corrupción. Specs `2026-06-15-repo-awareness-states-design.md`.

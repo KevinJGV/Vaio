@@ -88,14 +88,20 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [?] **Estados al detector `repo-awareness` (stale + incompleto) — EN `main` (local), pend. e2e Telegram de Kevin**
+- [?] **Estados al detector `repo-awareness` (stale + incompleto) — EN `main` (local), e2e Telegram PARCIAL**
   (2026-06-15). Rename `unindexed-repo`→`repo-awareness`; clasifica el repo NOMBRADO en unindexed | stale | incompleto
   vía el nuevo `RepoSyncPort.ensureRepoReady` (cobertura precisa `coverageGap`, sin migración) y dispara la acción del
-  sistema sola (Inv #9): incompleto → `forceFull` bg, stale → incremental bg. `FreshnessDetector` intacto (eje
-  recuperado; sin solape, repo-awareness solo actúa sobre `notRetrieved`). **416 tests** (+13: coverageGap 5,
-  ensureRepoReady 6, detector reescrito); typecheck/biome/build limpios; boot OK (`/health` 200, detectores cableados).
-  Specs `2026-06-15-repo-awareness-states-{design,plan}.md`. **Falta:** verificación conversacional por Telegram
-  (repo cap-bajo des-completado → nota "incompleto"; repo nombrado+stale+no-recuperado → nota "atrás").
+  sistema sola (Inv #9): **incompleto → incremental `ignoreFresh` bg** (NO forceFull — ver abajo), stale → incremental
+  bg. `FreshnessDetector` intacto (eje recuperado; sin solape, repo-awareness solo actúa sobre `notRetrieved`).
+  **397 tests**; typecheck/biome/build limpios; boot OK. Specs `2026-06-15-repo-awareness-states-{design,plan}.md`.
+  **e2e Telegram (con seed sintético en ACME):** ✅ Caso B (incompleto): nota "parcial" emitida + auto-completado en bg;
+  ✅ Caso C (stale): staleness detectada + auto-cura (cayó en `FreshnessDetector` porque ACME siempre se recupera →
+  `notRetrieved` falso, es lo esperado); ✅ untracked confirmado incidentalmente (nota learnRepo para otro repo no
+  indexado). **Fix que destapó el e2e:** la rama incompleto disparaba `forceFull` (clearSource → se quedaba pegado en
+  el prefijo, nunca progresa, porque el cap es POR-CORRIDA y el repo es SHA-fresh) → cambiado a **incremental
+  `ignoreFresh`** (appendea los faltantes sin borrar). **Falta (no-bloqueante):** el sub-camino repo-awareness `stale`
+  (nombrado + no-recuperado) y el append-`ignoreFresh` no se pueden forzar en vivo por el guard `notRetrieved` → quedan
+  cubiertos por unit tests. Kevin: re-confirmar Caso B con el código nuevo si querés (idéntico en el caso all-deleted).
 - [x] ✅ **Limpieza del seed SINTÉTICO de trends (GROUNDING) — HECHO** (2026-06-15). Se borraron de la DB real los
   **8** snapshots backdateados (-21d) de `connector_snapshots` (`lastfm`/`steam`/`wakatime`/`github-stats`) + los
   **4** chunks `trend:*` derivados (en transacción; verificado 0 filas). La violación de grounding (historia
