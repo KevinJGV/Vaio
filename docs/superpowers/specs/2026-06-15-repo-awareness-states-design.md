@@ -47,7 +47,7 @@ export interface RepoReadiness { state: "fresh" | "stale" | "incomplete" | "untr
 export interface RepoSyncPort {
   // … existentes …
   /** Para un repo NOMBRADO por el usuario: clasifica su estado y DISPARA la acción (Inv #9):
-   *  incompleto → forceFull bg; stale → incremental bg; fresh/untracked → no-op. TTL-gated (comparte el
+   *  incompleto → incremental `ignoreFresh` bg; stale → incremental bg; fresh/untracked → no-op. TTL-gated (comparte el
    *  lastChecked de ensureFresh). best-effort: nunca tira (error → "fresh", sin acción). */
   ensureRepoReady(spec: RepoSyncSpec): Promise<RepoReadiness>
 }
@@ -69,7 +69,7 @@ ensureRepoReady(spec):
     if !tree.truncated:
       gap = coverageGap(tree.tree→TreeEntry[], await memory.listIndexedFiles(source), tracked.skipped ?? [], policy)
       if gap.length > 0:
-        void guardedSync(spec, { forceFull: true }).catch(()=>{})
+        void guardedSync(spec, { ignoreFresh: true }).catch(()=>{})   # NO forceFull (ver nota)
         return { state: "incomplete" }
     head = await remoteHead(slug, branch)                       // freshness por SHA
     if compareFreshness(head, tracked.lastCommitSha).state === "stale":
@@ -79,6 +79,16 @@ ensureRepoReady(spec):
   catch: return { state: "fresh" }                               // degrada silencioso (Inv #1)
 ```
 Reusa: `guardedSync`, `parseRepoSource`, `remoteHead`, `compareFreshness`, `lastChecked`, `inFlight`, `policy`.
+
+> **`ignoreFresh` vs `forceFull` (APRENDIDO del e2e por Telegram, 2026-06-15 — corrige el diseño original):**
+> un repo INCOMPLETO es **SHA-fresh** (`lastCommitSha == HEAD`) pero le faltan archivos (el cap
+> `maxChunksPerRepo` es POR-CORRIDA → un repo grande converge en varias pasadas). Por eso:
+> - `forceFull` ❌ — `clearSource` + re-index por orden de prioridad re-haría el MISMO prefijo de archivos y
+>   **nunca progresaría** (y borra todo un instante).
+> - incremental común ❌ — el gate de frescura de `syncRepo` haría `skipped-fresh` (SHA fresh) → 0 embeddings.
+> - **`ignoreFresh` ✅** — saltea el gate de frescura pero corre el diff INCREMENTAL (isFull=false): appendea
+>   SOLO los faltantes sin borrar lo indexado → **progresa** cada pasada hasta completar.
+> El flag se suma a `syncRepo`/`guardedSync` opts; `stale` (SHA cambiado, no es fresh) usa el incremental normal.
 
 ### 4. Detector — `core/detectors/repo-awareness.ts` (rename de `unindexed-repo.ts`)
 - Factory `createRepoAwarenessDetector({ ownerRepos, ownerUser, repoSync })`; `name: "repo-awareness"`.

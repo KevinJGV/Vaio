@@ -116,7 +116,10 @@ export async function repoFreshness(
 export async function syncRepo(
   spec: RawRepoSpec,
   deps: SyncRepoDeps,
-  opts?: { inlineMaxFiles?: number; forceFull?: boolean }
+  // `forceFull` → clearSource + re-index desde cero (policy/corrupción). `ignoreFresh` → corre el diff
+  // INCREMENTAL aunque el SHA esté fresh (caso "índice incompleto/cap-bajo": SHA fresh pero faltan archivos
+  // → appendea lo faltante sin borrar). No confundir: forceFull reinicia; ignoreFresh appendea.
+  opts?: { inlineMaxFiles?: number; forceFull?: boolean; ignoreFresh?: boolean }
 ): Promise<SyncReport> {
   const { memory, tracker, token, logger } = deps
   const policy = deps.policy ?? DEFAULT_REPO_POLICY
@@ -136,7 +139,7 @@ export async function syncRepo(
       compareFreshness(head, tracked?.lastCommitSha).state === "fresh"
     const samePolicy =
       (tracked?.policyVersion ?? POLICY_VERSION) === POLICY_VERSION
-    if (fresh && samePolicy && !opts?.forceFull) {
+    if (fresh && samePolicy && !opts?.forceFull && !opts?.ignoreFresh) {
       return {
         source,
         mode: "skipped-fresh",
@@ -318,7 +321,11 @@ export function createRepoSync(deps: SyncRepoDeps): RepoSyncPort {
   const inFlight = new Set<string>()
   const guardedSync = async (
     spec: RawRepoSpec,
-    opts?: { inlineMaxFiles?: number; forceFull?: boolean }
+    opts?: {
+      inlineMaxFiles?: number
+      forceFull?: boolean
+      ignoreFresh?: boolean
+    }
   ): Promise<SyncReport> => {
     const source = `repo:${spec.owner}/${spec.repo}`
     if (inFlight.has(source)) {
@@ -377,7 +384,9 @@ export function createRepoSync(deps: SyncRepoDeps): RepoSyncPort {
         const slug = `${spec.owner}/${spec.repo}`
         const policy = deps.policy ?? DEFAULT_REPO_POLICY
 
-        // COBERTURA primero: un repo cap-bajo es SHA-fresh pero le faltan archivos → re-index FULL en bg.
+        // COBERTURA primero: un repo es SHA-fresh pero le faltan archivos (cap por-corrida → converge en
+        // varias pasadas). Disparamos un sync INCREMENTAL: appendea los faltantes sin borrar lo que ya hay.
+        // (NO forceFull: clearSource + re-index por prioridad re-haría el MISMO prefijo y nunca progresaría.)
         const tree = await githubApi<TreeResponse>(
           `/repos/${slug}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
           deps.token
@@ -395,8 +404,10 @@ export function createRepoSync(deps: SyncRepoDeps): RepoSyncPort {
             policy
           )
           if (gap.length > 0) {
-            void guardedSync(spec, { forceFull: true }).catch(() => {})
-            return { state: "incomplete" } // el full lo trae fresh + completo (subsume stale)
+            // ignoreFresh: el repo es SHA-fresh (un incremental común haría skipped-fresh y no embebería
+            // nada) pero le faltan archivos → corre el diff igual y appendea los faltantes (sin clearSource).
+            void guardedSync(spec, { ignoreFresh: true }).catch(() => {})
+            return { state: "incomplete" } // appendea los faltantes (subsume stale)
           }
         }
 

@@ -104,6 +104,41 @@ describe("syncRepo", () => {
     })()
   })
 
+  it("ignoreFresh: SHA fresh pero faltan archivos → NO skipped-fresh; appendea lo faltante (sin clearSource)", async () => {
+    mockGithub((url) => {
+      if (url.includes("/commits/")) return { json: { sha: "c1" } } // == lastCommitSha → fresh
+      if (url.includes("/git/trees/"))
+        return {
+          json: tree([
+            { path: "README.md", sha: "a" }, // ya indexado → unchanged
+            { path: "src/x.ts", sha: "b" }, // falta (cap por-corrida) → se appendea
+          ]),
+        }
+      if (url.includes("/contents/src/x.ts")) return { text: "const x = 1" }
+      return { text: "" }
+    })
+    const { mem, calls } = fakeMemory({
+      "repo:kev/vaio": [{ path: "README.md", blobSha: "a" }],
+    })
+    const { tracker } = fakeTracker({
+      source: "repo:kev/vaio",
+      owner: "kev",
+      repo: "vaio",
+      branch: "main",
+      lastCommitSha: "c1",
+      lastTreeSha: "t",
+      policyVersion: 1,
+    })
+    const r = await syncRepo(
+      { owner: "kev", repo: "vaio", branch: "main" },
+      { memory: mem, tracker, policy: DEFAULT_REPO_POLICY },
+      { ignoreFresh: true }
+    )
+    expect(r.mode).toBe("incremental") // no skipped-fresh pese al SHA fresh
+    expect(calls.replaceFile).toEqual(["src/x.ts"]) // solo el faltante
+    expect(calls.clearSource).toEqual([]) // appendea, no reinicia
+  })
+
   it("stale incremental → re-embebe SOLO el archivo cambiado", async () => {
     mockGithub((url) => {
       if (url.includes("/commits/")) return { json: { sha: "c2" } }
@@ -438,21 +473,21 @@ describe("createRepoSync.ensureRepoReady (repo nombrado)", () => {
     expect(fetches).toBe(0)
   })
 
-  it("cap-bajo (faltan archivos) → 'incomplete' + dispara FULL en background (clearSource)", async () => {
+  it("índice parcial (faltan archivos) → 'incomplete' + dispara INCREMENTAL que APPENDEA lo faltante (sin clearSource)", async () => {
     mockGithub((url) => {
       if (url.includes("/commits/")) return { json: { sha: "c1" } }
       if (url.includes("/git/trees/"))
         return {
           json: tree([
-            { path: "README.md", sha: "a" },
-            { path: "src/x.ts", sha: "b" }, // NO indexado → faltante
+            { path: "README.md", sha: "a" }, // ya indexado (mismo sha) → unchanged
+            { path: "src/x.ts", sha: "b" }, // NO indexado → faltante → se appendea
           ]),
         }
       if (url.includes("/contents/")) return { text: "const x = 1" }
       return {}
     })
     const { mem, calls } = fakeMemory({
-      "repo:kev/vaio": [{ path: "README.md", blobSha: "a" }], // src/x.ts falta
+      "repo:kev/vaio": [{ path: "README.md", blobSha: "a" }], // src/x.ts falta (cap por-corrida)
     })
     const { tracker } = fakeTracker(trackedFresh())
     const rs = createRepoSync({
@@ -461,11 +496,9 @@ describe("createRepoSync.ensureRepoReady (repo nombrado)", () => {
       policy: DEFAULT_REPO_POLICY,
     })
     expect((await rs.ensureRepoReady(spec)).state).toBe("incomplete")
-    // El FULL en bg re-indexa todo (clearSource) y completa los faltantes.
-    await vi.waitFor(() => expect(calls.clearSource).toEqual(["repo:kev/vaio"]))
-    await vi.waitFor(() =>
-      expect(calls.replaceFile.sort()).toEqual(["README.md", "src/x.ts"])
-    )
+    // Incremental: appendea SOLO el faltante; NO borra lo ya indexado (forceFull se quedaría pegado en el prefijo).
+    await vi.waitFor(() => expect(calls.replaceFile).toEqual(["src/x.ts"]))
+    expect(calls.clearSource).toEqual([]) // sin clearSource → README intacto, progresa
   })
 
   it("completo pero SHA atrás → 'stale' + dispara INCREMENTAL en background (sin clearSource)", async () => {
