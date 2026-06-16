@@ -85,18 +85,9 @@
   integración completa en el portafolio**. Hasta entonces, no tocar Railway/secrets. Cuando llegue: `TRENDS_ENABLED=1`
   + `WAKATIME_API_KEY`/`STEAM_API_KEY`/`STEAM_ID` en secrets; `pnpm ingest` acumula la 1ª captura; las tendencias
   reales emergen con la 2ª corrida. (Mismo gate para los 3 conectores nuevos: WakaTime/Steam/GitHub-stats en prod.)
-- [?] **Detectores a+b (repo-awareness) + c (findRepos) + filosofía de tools (Invariante #10) — IMPLEMENTADO (pend.
-  verif. conversacional de Kevin por Telegram).** (a+b) `UnindexedRepoDetector` enriquecido: detecta repos del owner
-  no indexados por DOS señales — nombre en la query (**multi-palabra** vía `reposNamedInQuery`, segmento distintivo) +
-  mención en una descripción del conector github recuperada; una nota por repo (dedup en el registry por `hint.repo`).
-  (c) tool **`findRepos`** (extensible, todos los canales): filtra los repos PÚBLICOS por `language`/`topic` contra el
-  catálogo enriquecido, fallo VISIBLE (#8); "proyectos en Java?" → lista real. **Filosofía de tools = Invariante #10**
-  (pocas tools-intención extensibles, anti-tool-bloat; findRepos crece por params, no tools nuevas) en `CLAUDE.md` +
-  memoria `few-extensible-intent-tools`. Infra: `DetectContext.retrieved` (chunks) + `DetectionHint.repo`; catálogo
-  enriquecido (language/topics/desc/stars). **383 tests** (+19); typecheck/biome limpios. **e2e ✅:** "qué proyectos
-  en Java?" → findRepos lista repos Java reales; "hablame del Tastrack" → la nota del detector menciona
-  `Tastrack_Challenge` (multi-palabra). Specs `2026-06-15-repo-awareness-findrepos-{design,plan}.md`. **Falta:** e2e
-  conversacional de Kevin por Telegram.
+> **✅ Cerrado 2026-06-15 (CORRECTO Y VERIFICADO por Kevin en Telegram) → Historial "DETECTORES a+b + findRepos +
+> Invariante #10":** UnindexedRepoDetector enriquecido (match multi-palabra + señal-contenido), tool `findRepos`
+> (queries de metadata por lenguaje/topic, extensible), y la filosofía de tools (Invariante #10, anti-tool-bloat).
 > **✅ Cerrado 2026-06-15 (PROBADO Y APROBADO por Kevin en Telegram) → Historial "CAPA DE DETECTORES (fundación +
 > detector ACME)":** la fundación de la capa de complemento + el `UnindexedRepoDetector` (caso ACME). El modelo,
 > ante un repo no indexado, leyó la nota y trajo el repo solo (la proactividad de learnRepo que faltaba).
@@ -134,6 +125,23 @@
 ---
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
+
+**🟢 DETECTORES a+b (repo-awareness enriquecido) + findRepos (c) + INVARIANTE #10 (anti-tool-bloat) — EN `main` +
+CORRECTO Y VERIFICADO por Kevin en Telegram** (2026-06-15). 2º incremento de la capa de detectores. **(a+b)
+`UnindexedRepoDetector` enriquecido:** detecta repos PÚBLICOS del owner no indexados por DOS señales — (1) la query
+NOMBRA el repo, ahora **multi-palabra** (`reposNamedInQuery`: nombre exacto o SEGMENTO distintivo "Tastrack"→
+"Tastrack_Challenge", sin falsos positivos de segmentos comunes) + (2) una descripción del conector github recuperada
+lo menciona ("es solo la descripción, no el código"). Una nota por repo (dedup en el registry por `hint.repo`);
+`DetectContext` pasa `retrieved` (chunks). **(c) tool `findRepos`** (extensible, todos los canales): filtra los repos
+públicos por `language`/`topic` contra el catálogo enriquecido (language/topics/desc/stars), **fallo VISIBLE** si el
+filtro no matchea valores reales (#8). Cierra la parte **METADATA** del pendiente "queries vivas a GitHub"; el estado
+(CI/PRs/deploy) = params futuros de findRepos. **INVARIANTE #10 (la batuta de Kevin, anti-tool-bloat):** pocas
+tools-intención EXTENSIBLES (crecen por params) > micro-tools > god-tool → `CLAUDE.md` + memoria
+`few-extensible-intent-tools`. **383 tests** (+19); typecheck/biome limpios. **e2e ✅:** "qué proyectos en Java?" →
+findRepos lista repos Java reales; "hablame del Tastrack" → la nota del detector menciona `Tastrack_Challenge`
+(multi-palabra) **+ Kevin lo verificó por Telegram**. Specs
+[`…-repo-awareness-findrepos-design.md`](superpowers/specs/2026-06-15-repo-awareness-findrepos-design.md) ·
+[`…-plan.md`](superpowers/specs/2026-06-15-repo-awareness-findrepos-plan.md).
 
 **🟢 CAPA DE DETECTORES DE CONOCIMIENTO — FUNDACIÓN + detector ACME — EN `main` + PROBADO Y APROBADO por Kevin en
 Telegram** (2026-06-15). 1er incremento de la visión "IA omnisciente" (capa de COMPLEMENTO de la memoria: searchMemory
