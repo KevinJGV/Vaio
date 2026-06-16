@@ -16,6 +16,7 @@ import {
 } from "../../core/repo-ingest.js"
 import {
   compareFreshness,
+  coverageGap,
   diffRepoTree,
   type FreshnessResult,
   isInlineSync,
@@ -359,6 +360,60 @@ export function createRepoSync(deps: SyncRepoDeps): RepoSyncPort {
       return (
         (await deps.tracker.get(`repo:${spec.owner}/${spec.repo}`)) !== null
       )
+    },
+    async ensureRepoReady(spec) {
+      const source = `repo:${spec.owner}/${spec.repo}`
+      // Ya hay un sync en vuelo (de un turno anterior, aún sin terminar) → sigue atrás; no dispares otro.
+      if (inFlight.has(source)) return { state: "stale" }
+      try {
+        const tracked = await deps.tracker.get(source)
+        if (!tracked?.lastCommitSha) return { state: "untracked" } // 0 requests GitHub
+        // TTL compartido con ensureFresh: si lo sondeamos hace poco, confiamos (evita doble request).
+        const seen = lastChecked.get(source)
+        if (seen != null && Date.now() - seen < ttlMs) return { state: "fresh" }
+        lastChecked.set(source, Date.now())
+
+        const branch = spec.branch ?? tracked.branch
+        const slug = `${spec.owner}/${spec.repo}`
+        const policy = deps.policy ?? DEFAULT_REPO_POLICY
+
+        // COBERTURA primero: un repo cap-bajo es SHA-fresh pero le faltan archivos → re-index FULL en bg.
+        const tree = await githubApi<TreeResponse>(
+          `/repos/${slug}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
+          deps.token
+        )
+        if (!tree.truncated) {
+          const gap = coverageGap(
+            tree.tree.map((e) => ({
+              path: e.path,
+              type: e.type as "blob" | "tree" | "commit",
+              ...(e.size != null ? { size: e.size } : {}),
+              sha: e.sha,
+            })),
+            await deps.memory.listIndexedFiles(source),
+            tracked.skipped ?? [],
+            policy
+          )
+          if (gap.length > 0) {
+            void guardedSync(spec, { forceFull: true }).catch(() => {})
+            return { state: "incomplete" } // el full lo trae fresh + completo (subsume stale)
+          }
+        }
+
+        // Completo → FRESCURA por SHA. Stale → sync incremental en bg.
+        const head = await remoteHead(slug, branch, deps.token)
+        if (compareFreshness(head, tracked.lastCommitSha).state === "stale") {
+          void guardedSync(spec).catch(() => {})
+          return { state: "stale" }
+        }
+        return { state: "fresh" }
+      } catch (err) {
+        deps.logger?.warn(
+          { source, err: err instanceof Error ? err.message : "?" },
+          "ensureRepoReady: probe falló (se ignora)"
+        )
+        return { state: "fresh" } // degrada silencioso (Inv #1): sin acción, sin nota
+      }
     },
     async ensureFresh(sources) {
       const now = Date.now()

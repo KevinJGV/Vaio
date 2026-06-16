@@ -47,7 +47,7 @@ import {
 import { type Agent, createAgent } from "./core/agent.js"
 import { createFreshnessDetector } from "./core/detectors/freshness.js"
 import { createDetectorRegistry } from "./core/detectors/registry.js"
-import { createUnindexedRepoDetector } from "./core/detectors/unindexed-repo.js"
+import { createRepoAwarenessDetector } from "./core/detectors/repo-awareness.js"
 import { DEFAULT_REPO_POLICY } from "./core/repo-ingest.js"
 import type { Connector } from "./ports/connector.js"
 import type { ConversationStore } from "./ports/conversation.js"
@@ -140,10 +140,11 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
         logger,
       })
       // Capa de COMPLEMENTO de la memoria: detectores de conocimiento disponible (searchMemory los corre y
-      // antepone sus notas). FreshnessDetector (repo:* atrás) + UnindexedRepoDetector (repo del owner sin indexar).
+      // antepone sus notas). FreshnessDetector (repo:* recuperado y atrás) + RepoAwarenessDetector (repo del
+      // owner nombrado sin indexar / incompleto / atrás → el sistema dispara la acción y avisa).
       detectors = createDetectorRegistry([
         createFreshnessDetector(repoSync),
-        createUnindexedRepoDetector({
+        createRepoAwarenessDetector({
           ownerRepos,
           ownerUser: env.GITHUB_USER,
           repoSync,

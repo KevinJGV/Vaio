@@ -393,10 +393,167 @@ describe("createRepoSync.ensureFresh (freshness gate)", () => {
       if (url.includes("/commits/")) return { json: { sha: "c1" } } // == lastCommitSha → fresh
       return {}
     })
-    const { mem } = fakeMemory({ "repo:kev/vaio": [{ path: "a", blobSha: "x" }] })
+    const { mem } = fakeMemory({
+      "repo:kev/vaio": [{ path: "a", blobSha: "x" }],
+    })
     const { tracker } = fakeTracker(trackedFresh())
-    const rs = createRepoSync({ memory: mem, tracker, policy: DEFAULT_REPO_POLICY })
+    const rs = createRepoSync({
+      memory: mem,
+      tracker,
+      policy: DEFAULT_REPO_POLICY,
+    })
     const r = await rs.ensureFresh(["repo:kev/vaio"])
     expect(r.behind).toBe(false)
+  })
+})
+
+describe("createRepoSync.ensureRepoReady (repo nombrado)", () => {
+  function trackedFresh(): TrackedRepo {
+    return {
+      source: "repo:kev/vaio",
+      owner: "kev",
+      repo: "vaio",
+      branch: "main",
+      lastCommitSha: "c1",
+      lastTreeSha: "t",
+      policyVersion: 1,
+    }
+  }
+  const spec = { owner: "kev", repo: "vaio", branch: "main" }
+
+  it("sin lastCommitSha (untracked) → 'untracked', 0 requests GitHub", async () => {
+    let fetches = 0
+    mockGithub(() => {
+      fetches++
+      return {}
+    })
+    const { mem } = fakeMemory()
+    const { tracker } = fakeTracker(null)
+    const rs = createRepoSync({
+      memory: mem,
+      tracker,
+      policy: DEFAULT_REPO_POLICY,
+    })
+    expect((await rs.ensureRepoReady(spec)).state).toBe("untracked")
+    expect(fetches).toBe(0)
+  })
+
+  it("cap-bajo (faltan archivos) → 'incomplete' + dispara FULL en background (clearSource)", async () => {
+    mockGithub((url) => {
+      if (url.includes("/commits/")) return { json: { sha: "c1" } }
+      if (url.includes("/git/trees/"))
+        return {
+          json: tree([
+            { path: "README.md", sha: "a" },
+            { path: "src/x.ts", sha: "b" }, // NO indexado → faltante
+          ]),
+        }
+      if (url.includes("/contents/")) return { text: "const x = 1" }
+      return {}
+    })
+    const { mem, calls } = fakeMemory({
+      "repo:kev/vaio": [{ path: "README.md", blobSha: "a" }], // src/x.ts falta
+    })
+    const { tracker } = fakeTracker(trackedFresh())
+    const rs = createRepoSync({
+      memory: mem,
+      tracker,
+      policy: DEFAULT_REPO_POLICY,
+    })
+    expect((await rs.ensureRepoReady(spec)).state).toBe("incomplete")
+    // El FULL en bg re-indexa todo (clearSource) y completa los faltantes.
+    await vi.waitFor(() => expect(calls.clearSource).toEqual(["repo:kev/vaio"]))
+    await vi.waitFor(() =>
+      expect(calls.replaceFile.sort()).toEqual(["README.md", "src/x.ts"])
+    )
+  })
+
+  it("completo pero SHA atrás → 'stale' + dispara INCREMENTAL en background (sin clearSource)", async () => {
+    mockGithub((url) => {
+      if (url.includes("/commits/")) return { json: { sha: "c2" } } // != c1 → stale
+      if (url.includes("/git/trees/"))
+        return { json: tree([{ path: "README.md", sha: "a2" }]) } // mismo path → cobertura completa
+      if (url.includes("/contents/")) return { text: "# nuevo" }
+      return {}
+    })
+    const { mem, calls } = fakeMemory({
+      "repo:kev/vaio": [{ path: "README.md", blobSha: "a" }],
+    })
+    const { tracker } = fakeTracker(trackedFresh())
+    const rs = createRepoSync({
+      memory: mem,
+      tracker,
+      policy: DEFAULT_REPO_POLICY,
+    })
+    expect((await rs.ensureRepoReady(spec)).state).toBe("stale")
+    await vi.waitFor(() => expect(calls.replaceFile).toEqual(["README.md"]))
+    expect(calls.clearSource).toEqual([]) // incremental, no full
+  })
+
+  it("completo y al día → 'fresh', sin sync", async () => {
+    mockGithub((url) => {
+      if (url.includes("/commits/")) return { json: { sha: "c1" } } // == c1 → fresh
+      if (url.includes("/git/trees/"))
+        return { json: tree([{ path: "README.md", sha: "a" }]) }
+      return {}
+    })
+    const { mem, calls } = fakeMemory({
+      "repo:kev/vaio": [{ path: "README.md", blobSha: "a" }],
+    })
+    const { tracker } = fakeTracker(trackedFresh())
+    const rs = createRepoSync({
+      memory: mem,
+      tracker,
+      policy: DEFAULT_REPO_POLICY,
+    })
+    expect((await rs.ensureRepoReady(spec)).state).toBe("fresh")
+    expect(calls.replaceFile).toEqual([])
+  })
+
+  it("árbol truncado → ignora cobertura, decide por SHA (fresh)", async () => {
+    mockGithub((url) => {
+      if (url.includes("/commits/")) return { json: { sha: "c1" } }
+      if (url.includes("/git/trees/"))
+        return {
+          json: { sha: "tr", truncated: true, tree: [] }, // truncado → no confiar en faltantes
+        }
+      return {}
+    })
+    const { mem, calls } = fakeMemory({
+      "repo:kev/vaio": [{ path: "README.md", blobSha: "a" }],
+    })
+    const { tracker } = fakeTracker(trackedFresh())
+    const rs = createRepoSync({
+      memory: mem,
+      tracker,
+      policy: DEFAULT_REPO_POLICY,
+    })
+    expect((await rs.ensureRepoReady(spec)).state).toBe("fresh")
+    expect(calls.clearSource).toEqual([]) // no dispara full por un árbol truncado
+  })
+
+  it("TTL: 2º chequeo dentro del TTL → 'fresh' sin re-bajar el árbol", async () => {
+    let treeFetches = 0
+    mockGithub((url) => {
+      if (url.includes("/commits/")) return { json: { sha: "c1" } }
+      if (url.includes("/git/trees/")) {
+        treeFetches++
+        return { json: tree([{ path: "README.md", sha: "a" }]) }
+      }
+      return {}
+    })
+    const { mem } = fakeMemory({
+      "repo:kev/vaio": [{ path: "README.md", blobSha: "a" }],
+    })
+    const { tracker } = fakeTracker(trackedFresh())
+    const rs = createRepoSync({
+      memory: mem,
+      tracker,
+      policy: DEFAULT_REPO_POLICY,
+      freshnessTtlMs: 60_000,
+    })
+    await rs.ensureRepoReady(spec)
+    expect((await rs.ensureRepoReady(spec)).state).toBe("fresh")
+    expect(treeFetches).toBe(1) // 2ª cae en el TTL
   })
 })

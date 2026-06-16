@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { createMemoryStore } from "../src/adapters/neon-memory.js"
 import type { Database } from "../src/adapters/db/client.js"
+import { createMemoryStore } from "../src/adapters/neon-memory.js"
 import type { DocChunk, Embedder } from "../src/ports/memory.js"
 
 /** Fake mínimo de `db` que registra el ORDEN de las operaciones que hace `replaceFile`

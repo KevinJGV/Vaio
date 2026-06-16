@@ -86,3 +86,25 @@ export function compareFreshness(
 export function isInlineSync(diff: RepoDiff, maxFiles: number): boolean {
   return diff.toEmbed.length <= maxFiles
 }
+
+/**
+ * Cobertura: paths que DEBERÍAN estar indexados pero NO lo están (kept − indexados − tombstones). Mide la
+ * verdad de terreno de "¿el índice de este repo está completo?", independiente de la frescura por SHA: un repo
+ * cap-bajo (lo cortó `maxChunksPerRepo`) tiene el commit-SHA correcto pero archivos enteros sin un solo chunk.
+ * Medida EXACTA, sin umbral: todo archivo `kept` no-tombstoned debería tener ≥1 chunk; si falta del manifest,
+ * lo dropeó el cap. PURO (sin red/DB). El caller decide qué hacer con árbol truncado (ausencia ≠ falta → no
+ * llamar / ignorar). Reusa `filterTree` (la verdad de "qué DEBE estar indexado ahora").
+ */
+export function coverageGap(
+  currentTree: TreeEntry[],
+  indexed: IndexedFile[],
+  skipped: { path: string }[],
+  policy: RepoIngestPolicy
+): string[] {
+  const { kept } = filterTree(currentTree, policy)
+  const have = new Set(indexed.map((f) => f.path))
+  const tomb = new Set(skipped.map((s) => s.path))
+  return kept
+    .map((e) => e.path)
+    .filter((path) => !have.has(path) && !tomb.has(path))
+}

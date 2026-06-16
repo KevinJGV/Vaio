@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { DEFAULT_REPO_POLICY, type TreeEntry } from "../src/core/repo-ingest.js"
 import {
   compareFreshness,
+  coverageGap,
   diffRepoTree,
   type IndexedFile,
   isInlineSync,
@@ -88,6 +89,59 @@ describe("compareFreshness", () => {
   it("SHA igual → fresh; distinto → stale", () => {
     expect(compareFreshness("abc", "abc").state).toBe("fresh")
     expect(compareFreshness("abc", "def").state).toBe("stale")
+  })
+})
+
+describe("coverageGap", () => {
+  it("índice completo → sin faltantes", () => {
+    const tree = [blob("README.md", "a"), blob("src/x.ts", "b")]
+    const indexed: IndexedFile[] = [
+      { path: "README.md", blobSha: "a" },
+      { path: "src/x.ts", blobSha: "b" },
+    ]
+    expect(coverageGap(tree, indexed, [], DEFAULT_REPO_POLICY)).toEqual([])
+  })
+
+  it("cap-bajo: archivos kept sin chunk en el manifest → faltantes", () => {
+    const tree = [
+      blob("README.md", "a"),
+      blob("src/x.ts", "b"),
+      blob("src/y.ts", "c"),
+    ]
+    const indexed: IndexedFile[] = [{ path: "README.md", blobSha: "a" }]
+    expect(coverageGap(tree, indexed, [], DEFAULT_REPO_POLICY).sort()).toEqual([
+      "src/x.ts",
+      "src/y.ts",
+    ])
+  })
+
+  it("tombstones NO cuentan como faltantes (descartados a propósito)", () => {
+    const tree = [blob("README.md", "a"), blob("src/leaky.ts", "s1")]
+    const indexed: IndexedFile[] = [{ path: "README.md", blobSha: "a" }]
+    // src/leaky.ts no está indexado PERO es tombstone → no es un faltante real.
+    expect(
+      coverageGap(
+        tree,
+        indexed,
+        [{ path: "src/leaky.ts" }],
+        DEFAULT_REPO_POLICY
+      )
+    ).toEqual([])
+  })
+
+  it("archivos filtrados (node_modules) no son kept → no cuentan", () => {
+    const tree = [blob("README.md", "a"), blob("node_modules/d/x.js", "z")]
+    const indexed: IndexedFile[] = [{ path: "README.md", blobSha: "a" }]
+    // node_modules nunca es kept → aunque no esté indexado, no es un faltante.
+    expect(coverageGap(tree, indexed, [], DEFAULT_REPO_POLICY)).toEqual([])
+  })
+
+  it("manifest vacío (nada indexado) → todo lo kept es faltante", () => {
+    const tree = [blob("README.md", "a"), blob("src/x.ts", "b")]
+    expect(coverageGap(tree, [], [], DEFAULT_REPO_POLICY).sort()).toEqual([
+      "README.md",
+      "src/x.ts",
+    ])
   })
 })
 

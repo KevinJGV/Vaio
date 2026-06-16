@@ -110,11 +110,11 @@ export function createCapabilityResolver(): CapabilityResolver {
       return {
         channel: "web",
         allowedTools: [
-      "searchMemory",
-      "checkRepoFreshness",
-      "findRepos",
-      "recentActivity",
-    ],
+          "searchMemory",
+          "checkRepoFreshness",
+          "findRepos",
+          "recentActivity",
+        ],
         memoryScope: { sources: PUBLIC_SOURCES, maxK: 6 },
         policyText: WEB_POLICY,
       }

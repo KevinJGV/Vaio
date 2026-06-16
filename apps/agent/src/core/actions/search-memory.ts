@@ -94,7 +94,8 @@ export const searchMemory: ActionDescriptor = {
                   )
                   .join("\n\n")
           // CAPA DE COMPLEMENTO: searchMemory trae el CONTENIDO; los DETECTORES emiten SEÑALES de disponibilidad
-          // (repo:* atrás → FreshnessDetector; repo del owner sin indexar → UnindexedRepoDetector) como notas del
+          // (repo:* atrás → FreshnessDetector; repo del owner nombrado sin indexar/incompleto/atrás →
+          // RepoAwarenessDetector) como notas del
           // sistema que se anteponen. El sistema detecta+informa; el modelo lee y acciona (Invariante #9).
           // Best-effort: un fallo de detección nunca rompe la respuesta. Ver knowledge-detectors-design.md.
           let notes: string[] = []

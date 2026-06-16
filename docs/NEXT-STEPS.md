@@ -66,9 +66,13 @@
 > fuera de la tx, concurrencia de embeddings (~10×) y frescura silenciosa. Detalle → Historial.
 > **Paso 3 parte 2 — `learnRepo` (on-demand de repo público) — MERGEADO en `main`** (2026-06-15): falta solo el e2e
 > conversacional de Kevin por Telegram. Detalle → WIP + Historial.
-> **🔜 PRÓXIMA SESIÓN — candidatos DIRECTOS de este trabajo (capa de detectores + findRepos), elegí uno:**
-> 1. **Sumar estados al `UnindexedRepoDetector`** (ya es "conciencia de repos"): p.ej. "trabajás/mencionás un repo
->    indexado pero STALE → ¿lo sincronizo?" u otras señales relevantes. Reusa el patrón de señal + dedup por `hint.repo`.
+> **Estados al detector (`repo-awareness`) — EN `main` (local)** (2026-06-15): el `UnindexedRepoDetector` pasó a
+> `RepoAwarenessDetector` (rename) y ahora clasifica el repo NOMBRADO en 3 estados — unindexed | **stale** |
+> **incompleto/cap-bajo** — disparando la acción del sistema sola (learnRepo / incremental bg / forceFull bg; Inv #9).
+> Cobertura precisa (`coverageGap`, sin migración) + nuevo método de puerto `ensureRepoReady`. **416 tests**. Falta
+> solo el e2e conversacional de Kevin por Telegram. Detalle → WIP + Historial.
+> **🔜 PRÓXIMA SESIÓN — candidatos DIRECTOS (capa de detectores + findRepos), elegí uno:**
+> 1. ✅ **Estados al `UnindexedRepoDetector`** — HECHO 2026-06-15 (`repo-awareness`: stale + incompleto; ver arriba).
 > 2. **Estado vivo de GitHub como PARAMS de `findRepos`** (Invariante #10, NO tools nuevas): "¿PR sin mergear?",
 >    "¿CI que no pasó?" → filtros nuevos (Pulls/Actions API por-repo). El **deploy vive en Railway** (≠ GitHub → su
 >    propio adapter/diseño, aparte). Ver §"Queries vivas a GitHub" (parte ESTADO diferida).
@@ -79,11 +83,19 @@
 > learnRepo/sync largo/escalate), **`escalate`** (Fase 2), **extracción automática de facts**, **paso 5**
 > (grafos/Graphiti, Fase 3), **streaming en topics** (diferido). El **portafolio** va DESPUÉS.
 > *(Rerank ✅; facts ✅; repos uuid-free ✅; streaming Telegram ✅; trends #3 ✅; freshness/RAG hardening ✅; learnRepo ✅;
-> capa de detectores + findRepos + Invariante #10 ✅ — 2026-06-15.)*
+> capa de detectores + findRepos + Invariante #10 ✅; estados repo-awareness ✅ — 2026-06-15.)*
 
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
+- [?] **Estados al detector `repo-awareness` (stale + incompleto) — EN `main` (local), pend. e2e Telegram de Kevin**
+  (2026-06-15). Rename `unindexed-repo`→`repo-awareness`; clasifica el repo NOMBRADO en unindexed | stale | incompleto
+  vía el nuevo `RepoSyncPort.ensureRepoReady` (cobertura precisa `coverageGap`, sin migración) y dispara la acción del
+  sistema sola (Inv #9): incompleto → `forceFull` bg, stale → incremental bg. `FreshnessDetector` intacto (eje
+  recuperado; sin solape, repo-awareness solo actúa sobre `notRetrieved`). **416 tests** (+13: coverageGap 5,
+  ensureRepoReady 6, detector reescrito); typecheck/biome/build limpios; boot OK (`/health` 200, detectores cableados).
+  Specs `2026-06-15-repo-awareness-states-{design,plan}.md`. **Falta:** verificación conversacional por Telegram
+  (repo cap-bajo des-completado → nota "incompleto"; repo nombrado+stale+no-recuperado → nota "atrás").
 - [x] ✅ **Limpieza del seed SINTÉTICO de trends (GROUNDING) — HECHO** (2026-06-15). Se borraron de la DB real los
   **8** snapshots backdateados (-21d) de `connector_snapshots` (`lastfm`/`steam`/`wakatime`/`github-stats`) + los
   **4** chunks `trend:*` derivados (en transacción; verificado 0 filas). La violación de grounding (historia

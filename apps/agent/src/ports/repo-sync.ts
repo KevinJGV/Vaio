@@ -12,6 +12,12 @@ export interface RepoFreshness {
   state: "fresh" | "stale" | "untracked"
 }
 
+/** Estado de "disponibilidad" de un repo NOMBRADO por el usuario (no solo frescura: también COBERTURA).
+ *  `incomplete` = trackeado y SHA-fresh pero le faltan archivos (cap-bajo); el sistema lo completa solo. */
+export interface RepoReadiness {
+  state: "fresh" | "stale" | "incomplete" | "untracked"
+}
+
 export interface RepoSyncResult {
   mode:
     | "full"
@@ -43,4 +49,10 @@ export interface RepoSyncPort {
   ensureFresh(
     sources: string[]
   ): Promise<{ refreshed: boolean; behind?: boolean }>
+  /** Para un repo NOMBRADO por el usuario: clasifica su estado y DISPARA la acción derivada (Inv #9) —
+   *  `incomplete` → re-index FULL en background; `stale` → sync incremental en background; `fresh`/`untracked`
+   *  → no-op. Chequea COBERTURA (árbol vs indexado) además de frescura (SHA), porque un repo cap-bajo es
+   *  SHA-fresh pero le faltan archivos y nunca se completaría por `ensureFresh`. TTL-gated (comparte el gate
+   *  de `ensureFresh`: un repo recién sondeado no se rechequea). best-effort: nunca tira (error → `fresh`). */
+  ensureRepoReady(spec: RepoSyncSpec): Promise<RepoReadiness>
 }
