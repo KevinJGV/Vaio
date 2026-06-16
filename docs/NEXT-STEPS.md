@@ -91,17 +91,11 @@
 > **✅ Cerrado 2026-06-15 (verificado por el Telegram de Kevin, 16:57) → nota en el Historial del cluster:**
 > "frescura silenciosa — el SISTEMA informa la staleness" (`ensureFresh.behind` → nota en searchMemory → Vaio flaggea
 > honesto). Fue el followup que corrigió el over-cierre de la silenciosa.
-- [?] **Paso 3 parte 2 — `learnRepo` (ingesta on-demand de repo público de Kevin) — IMPLEMENTADO (pend.
-  verificación conversacional de Kevin por Telegram).** Acción `learnRepo` (owner-only, telegram trusted): el modelo
-  pasa un NOMBRE, el sistema lo valida contra los repos PÚBLICOS reales de Kevin (excepción #8: fallo visible, sin
-  doble confirmación si es inequívoco), y dispara `syncRepo` (full, background) reusando toda la maquinaria — v1 sin
-  notify (turnos proactivos = futuro). Arquitectura: matcher PURO `core/repo-resolve.ts` + puerto/adapter
-  `OwnerRepoCatalog` (listado público cacheado, filtro `private`) + acción auto-contenida. **347 tests** (+19);
-  typecheck/biome limpios. **e2e parcial ✅:** GitHub real (39 repos públicos, shape OK); ingest real de un repo
-  untracked (`Ej_montecarlo`) → `mode:full, embedded:2` en `documents`+`tracked_repos` (limpiado tras la prueba).
-  **Falta:** e2e conversacional por Telegram owner ("hablame de mi repo X" → learnRepo → bg ingest → re-preguntar).
-  Specs [`…-learn-repo-design.md`](superpowers/specs/2026-06-15-learn-repo-design.md) ·
-  [`…-plan.md`](superpowers/specs/2026-06-15-learn-repo-plan.md). Cierra el paso 3 parte 2 de "Vaio se nutre solo".
+> **✅ Cerrado 2026-06-15 (verificado por el Telegram de Kevin) → Historial "PASO 3 PARTE 2 — learnRepo":**
+> e2e conversacional confirmado: "usa learnrepo con Acme" → `learnRepo("Acme")` resolvió **Acme→ACME**, ingest
+> `mode:full embedded:53`, y al re-preguntar `searchMemory` recuperó el repo → Vaio respondió completo (Java/JavaFX/
+> MVC/SOLID). **Followup que abrió:** Vaio NO usó learnRepo proactivamente (se conformó con la descripción del
+> conector github) → el **detector ACME** (capa de detectores de conocimiento, abajo §Pendiente FUTURO).
 > **Mejora futura diferida (Kevin "dejémoslo así por ahora", 2026-06-15) — streaming en TOPICS de Telegram:**
 > hoy el streaming en vivo solo va en chats privados (límite de `sendMessageDraft`); en topics aparece de golpe
 > (typing fallback). Para streamear en topics → `editMessageText` (universal, pero "parpadea" al editar y hay que
@@ -125,6 +119,18 @@
 ---
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
+
+**🟢 PASO 3 PARTE 2 — `learnRepo` (ingesta on-demand de repo público) — EN `main` + VERIFICADO por Telegram de Kevin**
+(2026-06-15). Cierra el paso 3 parte 2 de "Vaio se nutre solo": Kevin pregunta por un repo SUYO no indexado → Vaio lo
+ingiere en background para responder. Acción `learnRepo` (owner-only): el modelo pasa un NOMBRE, el sistema lo valida
+contra los repos PÚBLICOS reales (excepción #8: fallo visible, sin doble confirmación si es inequívoco) y dispara
+`syncRepo` full en background (reusa toda la maquinaria). Arquitectura: matcher PURO `core/repo-resolve.ts` +
+puerto/adapter `OwnerRepoCatalog` (listado público cacheado, filtro `private`) + acción auto-contenida (Inv #9).
+**347 tests** (+19); typecheck/biome limpios. **e2e conversacional ✅:** "usa learnrepo con Acme" → resolvió
+**Acme→ACME** → ingest `mode:full embedded:53` → re-pregunta → `searchMemory` recupera el repo → respuesta completa
+(Java/JavaFX/MVC/SOLID). Specs `2026-06-15-learn-repo-{design,plan}.md`. **Followup:** Vaio no usó learnRepo
+**proactivamente** (se conformó con la descripción del conector github) → motivó la **capa de detectores de
+conocimiento** (`2026-06-15-knowledge-detectors-design.md`), 1er incremento = detector ACME.
 
 **🟢 CLUSTER FRESHNESS/RAG HARDENING — EN `main` + VERIFICADO por Telegram real de Kevin** (2026-06-15; cerrado
 2026-06-15 con su log "hablame de tu sistema" → solo searchMemory, chunk VERBATIM, sin bloqueo). Seis fixes
