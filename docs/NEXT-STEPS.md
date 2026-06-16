@@ -79,9 +79,9 @@
 > **🔜 PRÓXIMA SESIÓN — candidatos DIRECTOS (capa de detectores + findRepos), elegí uno:**
 > 1. ✅ **Estados al `UnindexedRepoDetector`** — HECHO 2026-06-15 (`repo-awareness`: stale + incompleto; ver arriba).
 > 2. **Estado vivo de GitHub como PARAMS de `findRepos`** (Invariante #10, NO tools nuevas): ✅ **PRs sin mergear
->    (`hasOpenPRs`) HECHO 2026-06-15**; **CI que no pasó = sub-item PENDIENTE** (Actions API **por-repo** → acotar
->    a un set chico/repo nombrado para no gastar N llamadas; su propio incremento). El **deploy vive en Railway**
->    (≠ GitHub → su propio adapter/diseño, aparte). Ver §"Queries vivas a GitHub" (parte ESTADO diferida).
+>    (`hasOpenPRs`) HECHO 2026-06-15**; **CI que no pasó = DESCARTADO por ahora** (decisión de Kevin 2026-06-16; se
+>    retomará si hace falta — Actions API por-repo, acotar el costo). El **deploy vive en Railway** (≠ GitHub → su
+>    propio adapter/diseño, aparte). Ver §"Queries vivas a GitHub" (parte ESTADO diferida).
 > 3. **Más detectores de la capa de complemento** (otras fuentes que el sistema detecte y surfacee como notas).
 > Cada uno = su propio `brainstorming`→design+plan si es no trivial; reusan toda la infra ya en `main`
 > (`KnowledgeDetector`/registry, `OwnerRepoCatalog` enriquecido, `[nota del sistema: …]`, patrón findRepos).
@@ -173,8 +173,8 @@ para degradar honesto); puro `core/repo-activity.ts` (`parseRepoFromUrl`/`groupP
 **e2e ✅:** query real trajo 3 PRs reales (Dependabot KevinJGV + Technical-test_ACME); **+ Kevin lo verificó por
 Telegram** ("¿qué repos tengo con PRs sin mergear?" → lista enriquecida). Specs
 [`…-findrepos-open-prs-{design,plan}.md`](superpowers/specs/2026-06-15-findrepos-open-prs-design.md). **CI que no pasó
-= sub-item PENDIENTE** (Actions API por-repo → acotar; su propio incremento). **Followup (watch):** 400 intermitente
-de Telegram en `sendMessage` (ver WIP) → instrumentación del body agregada.
+= DESCARTADO por ahora** (decisión de Kevin 2026-06-16; se retoma si hace falta). **Followup (watch):** 400
+intermitente de Telegram en `sendMessage` (ver WIP) → instrumentación del body agregada.
 
 **🟢 ESTADOS AL DETECTOR `repo-awareness` (stale + incompleto) — EN `main` (local) + VERIFICADO por Kevin en Telegram**
 (2026-06-15). 3er incremento de la capa de detectores. El `UnindexedRepoDetector` pasó a **`RepoAwarenessDetector`**
