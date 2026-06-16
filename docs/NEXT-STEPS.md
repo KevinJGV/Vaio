@@ -66,10 +66,20 @@
 > fuera de la tx, concurrencia de embeddings (~10×) y frescura silenciosa. Detalle → Historial.
 > **Paso 3 parte 2 — `learnRepo` (on-demand de repo público) — MERGEADO en `main`** (2026-06-15): falta solo el e2e
 > conversacional de Kevin por Telegram. Detalle → WIP + Historial.
-> **Próximos candidatos (orden de Kevin):** **Nivel C** (turnos proactivos), **`escalate`** (Fase 2), **extracción
-> automática de facts**, **paso 5** (grafos/Graphiti, Fase 3), o el **streaming en topics** (diferido). El
-> **portafolio** va DESPUÉS.
-> *(Rerank ✅; facts ✅; repos uuid-free ✅; streaming Telegram ✅; trends #3 ✅; freshness/RAG hardening ✅; learnRepo ✅ — 2026-06-15.)*
+> **🔜 PRÓXIMA SESIÓN — candidatos DIRECTOS de este trabajo (capa de detectores + findRepos), elegí uno:**
+> 1. **Sumar estados al `UnindexedRepoDetector`** (ya es "conciencia de repos"): p.ej. "trabajás/mencionás un repo
+>    indexado pero STALE → ¿lo sincronizo?" u otras señales relevantes. Reusa el patrón de señal + dedup por `hint.repo`.
+> 2. **Estado vivo de GitHub como PARAMS de `findRepos`** (Invariante #10, NO tools nuevas): "¿PR sin mergear?",
+>    "¿CI que no pasó?" → filtros nuevos (Pulls/Actions API por-repo). El **deploy vive en Railway** (≠ GitHub → su
+>    propio adapter/diseño, aparte). Ver §"Queries vivas a GitHub" (parte ESTADO diferida).
+> 3. **Más detectores de la capa de complemento** (otras fuentes que el sistema detecte y surfacee como notas).
+> Cada uno = su propio `brainstorming`→design+plan si es no trivial; reusan toda la infra ya en `main`
+> (`KnowledgeDetector`/registry, `OwnerRepoCatalog` enriquecido, `[nota del sistema: …]`, patrón findRepos).
+> **Roadmap mayor (después, orden de Kevin):** **Nivel C** (turnos proactivos — habilita notify/retoma de
+> learnRepo/sync largo/escalate), **`escalate`** (Fase 2), **extracción automática de facts**, **paso 5**
+> (grafos/Graphiti, Fase 3), **streaming en topics** (diferido). El **portafolio** va DESPUÉS.
+> *(Rerank ✅; facts ✅; repos uuid-free ✅; streaming Telegram ✅; trends #3 ✅; freshness/RAG hardening ✅; learnRepo ✅;
+> capa de detectores + findRepos + Invariante #10 ✅ — 2026-06-15.)*
 
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
