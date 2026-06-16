@@ -103,10 +103,13 @@
   (2026-06-16). Puerto `ProactiveResume` + threading `TurnContext→ActionContext` + adapter Telegram
   `createTelegramResume` (re-entrada con turno sintético `resume:null` anti-loop → `sendMessage` prefijo+respuesta;
   best-effort, web→null). In-process (sin DB/worker). **437 tests** (+5: resuelta/anti-loop/thread/locale/rechazada);
-  typecheck/biome/build limpios; boot OK. Specs `2026-06-16-proactive-turns-{design,plan}.md`. **Sin trigger aún** →
-  no hay e2e en vivo en v1. **Próximo (refinamiento de Kevin):** **barrido AGÉNTICO** de todos los sitios donde un
-  action conversacional difiere la respuesta a una tarea de fondo (user-waiting, p.ej. `learnRepo`; NO los bg
-  silenciosos como el freshness gate) → cablear cada uno (`ctx.resume?.resume(task)` + aviso "ya voy, te retomo").
+  typecheck/biome/build limpios; boot OK. Specs `2026-06-16-proactive-turns-{design,plan}.md`.
+  **Barrido AGÉNTICO hecho** (Explore): `learnRepo` es el ÚNICO sitio user-waiting hoy (el resto son silenciosos:
+  detectores/freshness gates, el user ya tuvo respuesta; o no-conversacionales: persist/webhook). **`learnRepo`
+  CABLEADO** (`ctx.resume?.resume(sync, {label})` + promete la retoma; web → fire-and-forget). **Ahora SÍ hay e2e
+  en vivo:** owner pregunta por un repo no indexado → "ya voy, te retomo" → al terminar la ingesta, Vaio responde
+  solo la duda original por Telegram. **Pend.: e2e en vivo de Kevin.** Followups: persistencia (tabla+worker),
+  framing del sintético, web (canal push SSE/WS).
 > **✅ Cerrado 2026-06-16 (VERIFICADO por Kevin en Telegram) → Historial "`hasOpenPRs` en findRepos":** "¿qué repos
 > tengo con PRs sin mergear?" → `findRepos({hasOpenPRs:true})` → output enriquecido con los 3 PRs reales (Dependabot
 > en KevinJGV #9/#10 + Technical-test_ACME #1). Feature OK end-to-end.
