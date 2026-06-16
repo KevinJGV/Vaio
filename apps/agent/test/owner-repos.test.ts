@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import {
+  createOwnerRepoActivity,
   createOwnerRepoCatalog,
   publicReposOnly,
+  searchItemsToOpenPRs,
 } from "../src/adapters/sources/owner-repos.js"
 
 afterEach(() => vi.unstubAllGlobals())
@@ -82,5 +84,97 @@ describe("createOwnerRepoCatalog.listPublic", () => {
     )
     const cat = createOwnerRepoCatalog({ user: "kev" })
     expect(await cat.listPublic()).toEqual([])
+  })
+})
+
+describe("searchItemsToOpenPRs (puro)", () => {
+  it("mapea items → OpenPR y descarta los sin repo parseable", () => {
+    expect(
+      searchItemsToOpenPRs([
+        {
+          repository_url: "https://api.github.com/repos/kev/Vaio",
+          number: 12,
+          title: "fix sync",
+          html_url: "https://github.com/kev/Vaio/pull/12",
+        },
+        {
+          repository_url: "url-rara",
+          number: 99,
+          title: "x",
+          html_url: "y",
+        },
+      ])
+    ).toEqual([
+      {
+        repo: "Vaio",
+        number: 12,
+        title: "fix sync",
+        url: "https://github.com/kev/Vaio/pull/12",
+      },
+    ])
+  })
+})
+
+describe("createOwnerRepoActivity.openPullRequests", () => {
+  function stubSearch(
+    items: unknown[],
+    state: { calls: number; url?: string }
+  ) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL) => {
+        state.calls++
+        state.url = String(input)
+        return { ok: true, status: 200, json: async () => ({ items }) }
+      })
+    )
+  }
+
+  it("trae PRs abiertos (query is:pull-request+is:public) y CACHEA", async () => {
+    const state = { calls: 0 }
+    stubSearch(
+      [
+        {
+          repository_url: "https://api.github.com/repos/kev/Vaio",
+          number: 7,
+          title: "rerank",
+          html_url: "https://github.com/kev/Vaio/pull/7",
+        },
+      ],
+      state
+    )
+    const act = createOwnerRepoActivity({ user: "kev", ttlMs: 60_000 })
+    expect(await act.openPullRequests()).toEqual([
+      {
+        repo: "Vaio",
+        number: 7,
+        title: "rerank",
+        url: "https://github.com/kev/Vaio/pull/7",
+      },
+    ])
+    expect(state.url).toContain("/search/issues")
+    expect(decodeURIComponent(state.url ?? "")).toContain("is:pull-request")
+    expect(decodeURIComponent(state.url ?? "")).toContain("is:public")
+    await act.openPullRequests()
+    expect(state.calls).toBe(1) // 2ª cae en cache
+  })
+
+  it("sin PRs → [] (no es lo mismo que fallo)", async () => {
+    stubSearch([], { calls: 0 })
+    const act = createOwnerRepoActivity({ user: "kev" })
+    expect(await act.openPullRequests()).toEqual([])
+  })
+
+  it("ante error de Search (rate-limit) degrada a null (Invariante #1)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: false,
+        status: 403,
+        text: async () => "rate limited",
+      }))
+    )
+    const act = createOwnerRepoActivity({ user: "kev" })
+    expect(await act.openPullRequests()).toBeNull()
   })
 })

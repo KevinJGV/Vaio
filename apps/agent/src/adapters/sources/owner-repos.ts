@@ -3,9 +3,13 @@
 // modela `private`). Filtra `private===true` — un repo privado en el RAG sería recuperable por el chat
 // público anónimo (fuga). Degrada a [] ante cualquier error (Invariante #1).
 
+import { type OpenPR, parseRepoFromUrl } from "../../core/repo-activity.js"
 import type { OwnerRepo } from "../../core/repo-resolve.js"
 import type { Logger } from "../../ports/logger.js"
-import type { OwnerRepoCatalog } from "../../ports/owner-repos.js"
+import type {
+  OwnerRepoActivity,
+  OwnerRepoCatalog,
+} from "../../ports/owner-repos.js"
 import { githubApi } from "./github-api.js"
 
 /** Forma (parcial) de un repo en `GET /users/{user}/repos`. Tipo propio: incluye `private` (clave para el filtro)
@@ -82,6 +86,64 @@ export function createOwnerRepoCatalog(deps: {
           "owner-repos: listado falló (degrada a [])"
         )
         return []
+      }
+    },
+  }
+}
+
+/** Forma (parcial) de un item de `GET /search/issues` (PRs abiertos). */
+interface GhSearchPrItem {
+  repository_url: string
+  number: number
+  title: string
+  html_url: string
+}
+interface GhSearchResponse {
+  items?: GhSearchPrItem[]
+}
+
+/** PURO: mapea los items de la Search API → OpenPR[], descartando los que no parsean su repo. */
+export function searchItemsToOpenPRs(items: GhSearchPrItem[]): OpenPR[] {
+  const out: OpenPR[] = []
+  for (const it of items) {
+    const repo = parseRepoFromUrl(it.repository_url)
+    if (!repo) continue
+    out.push({ repo, number: it.number, title: it.title, url: it.html_url })
+  }
+  return out
+}
+
+/** Estado VIVO de los repos del owner (hoy: PRs abiertos vía Search API). Cacheado con TTL; degrada a `null`. */
+export function createOwnerRepoActivity(deps: {
+  user: string
+  token?: string
+  logger?: Logger
+  /** TTL del cache (ms). Default 5 min. */
+  ttlMs?: number
+}): OwnerRepoActivity {
+  const ttlMs = deps.ttlMs ?? 5 * 60 * 1000
+  let cache: { at: number; prs: OpenPR[] } | null = null
+
+  return {
+    async openPullRequests(): Promise<OpenPR[] | null> {
+      const now = Date.now()
+      if (cache && now - cache.at < ttlMs) return cache.prs
+      // is:pull-request (sin él GitHub da 422) · is:open = sin mergear · is:public = solo públicos (guard #5).
+      const q = `is:pull-request is:open user:${deps.user} is:public`
+      try {
+        const res = await githubApi<GhSearchResponse>(
+          `/search/issues?q=${encodeURIComponent(q)}&per_page=100`,
+          deps.token
+        )
+        const prs = searchItemsToOpenPRs(res.items ?? [])
+        cache = { at: now, prs }
+        return prs
+      } catch (err) {
+        deps.logger?.warn(
+          { user: deps.user, err: err instanceof Error ? err.message : "?" },
+          "owner-repos: search de PRs falló (degrada a null)"
+        )
+        return null
       }
     },
   }

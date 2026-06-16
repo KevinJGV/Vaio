@@ -2,8 +2,12 @@ import { describe, expect, it } from "vitest"
 import { findRepos } from "../src/core/actions/find-repos.js"
 import type { ActionContext, TraceIds } from "../src/core/actions/types.js"
 import type { CapabilityProfile, Principal } from "../src/core/capabilities.js"
+import type { OpenPR } from "../src/core/repo-activity.js"
 import type { LogFields, Logger } from "../src/ports/logger.js"
-import type { OwnerRepoCatalog } from "../src/ports/owner-repos.js"
+import type {
+  OwnerRepoActivity,
+  OwnerRepoCatalog,
+} from "../src/ports/owner-repos.js"
 
 function noopLogger(): Logger {
   const noop = (_a: LogFields | string, _b?: string): void => {}
@@ -59,8 +63,14 @@ function ctx(partial: Partial<ActionContext>): ActionContext {
   }
 }
 
-const run = (input: { language?: string; topic?: string }, c = ctx({})) =>
-  findRepos.build(c).execute?.(input, { toolCallId: "c", messages: [] })
+const activity = (prs: OpenPR[] | null): OwnerRepoActivity => ({
+  openPullRequests: async () => prs,
+})
+
+const run = (
+  input: { language?: string; topic?: string; hasOpenPRs?: boolean },
+  c = ctx({})
+) => findRepos.build(c).execute?.(input, { toolCallId: "c", messages: [] })
 
 describe("findRepos", () => {
   it("por lenguaje (case-insensitive) → lista los repos reales", async () => {
@@ -94,5 +104,82 @@ describe("findRepos", () => {
       await run({ language: "java" }, ctx({ ownerRepos: null }))
     )
     expect(out.toLowerCase()).toContain("no puedo")
+  })
+
+  const pr = (repo: string, number: number, title: string): OpenPR => ({
+    repo,
+    number,
+    title,
+    url: `https://github.com/KevinJGV/${repo}/pull/${number}`,
+  })
+
+  it("hasOpenPRs → lista solo repos con PRs, enriquecido (número + título)", async () => {
+    const out = String(
+      await run(
+        { hasOpenPRs: true },
+        ctx({
+          repoActivity: activity([
+            pr("Vaio", 12, "fix sync"),
+            pr("Vaio", 15, "rerank"),
+          ]),
+        })
+      )
+    )
+    expect(out).toContain("Vaio")
+    expect(out).toContain("2 PR(s) sin mergear")
+    expect(out).toContain('#12 "fix sync"')
+    expect(out).toContain('#15 "rerank"')
+    expect(out).not.toContain("ACME") // ACME no tiene PRs → fuera
+  })
+
+  it("hasOpenPRs intersecta con el catálogo público (PR de repo ajeno NO aparece — guard de privacidad)", async () => {
+    const out = String(
+      await run(
+        { hasOpenPRs: true },
+        ctx({
+          repoActivity: activity([
+            pr("ACME", 3, "real"),
+            pr("PrivadoXYZ", 99, "no debe salir"), // no está en el catálogo
+          ]),
+        })
+      )
+    )
+    expect(out).toContain("ACME")
+    expect(out).not.toContain("PrivadoXYZ")
+    expect(out).not.toContain("no debe salir")
+  })
+
+  it("hasOpenPRs + language → intersección (TS con PRs)", async () => {
+    const out = String(
+      await run(
+        { language: "TypeScript", hasOpenPRs: true },
+        ctx({
+          repoActivity: activity([pr("ACME", 1, "x"), pr("Vaio", 2, "y")]),
+        })
+      )
+    )
+    expect(out).toContain("Vaio")
+    expect(out).not.toContain("ACME") // ACME es Java → excluido por el filtro de lenguaje
+  })
+
+  it("hasOpenPRs con [] (genuinamente ninguno) → 'no tenés PRs'", async () => {
+    const out = String(
+      await run({ hasOpenPRs: true }, ctx({ repoActivity: activity([]) }))
+    )
+    expect(out.toLowerCase()).toContain("no tenés prs sin mergear")
+  })
+
+  it("hasOpenPRs con null (query falló) → 'no pude consultar' (≠ no hay PRs)", async () => {
+    const out = String(
+      await run({ hasOpenPRs: true }, ctx({ repoActivity: activity(null) }))
+    )
+    expect(out.toLowerCase()).toContain("no pude consultar")
+  })
+
+  it("hasOpenPRs sin repoActivity en el ctx → degrada honesto", async () => {
+    const out = String(
+      await run({ hasOpenPRs: true }, ctx({ repoActivity: null }))
+    )
+    expect(out.toLowerCase()).toContain("no pude consultar")
   })
 })

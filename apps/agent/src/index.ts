@@ -21,7 +21,10 @@ import { createMemoryStore } from "./adapters/neon-memory.js"
 import { createRepoTracker } from "./adapters/neon-tracker.js"
 import { createModel } from "./adapters/openrouter.js"
 import { createReranker } from "./adapters/rerank-openrouter.js"
-import { createOwnerRepoCatalog } from "./adapters/sources/owner-repos.js"
+import {
+  createOwnerRepoActivity,
+  createOwnerRepoCatalog,
+} from "./adapters/sources/owner-repos.js"
 import { createRepoSync } from "./adapters/sources/repo-sync.js"
 import { createSpeechSynthesizer } from "./adapters/speech-openrouter.js"
 import { createSummarizer } from "./adapters/summarizer.js"
@@ -55,7 +58,10 @@ import type { FactStore } from "./ports/facts.js"
 import type { DetectorRegistry } from "./ports/knowledge-detector.js"
 import type { MediaUnderstanding, Transcriber } from "./ports/media.js"
 import type { MemoryStore } from "./ports/memory.js"
-import type { OwnerRepoCatalog } from "./ports/owner-repos.js"
+import type {
+  OwnerRepoActivity,
+  OwnerRepoCatalog,
+} from "./ports/owner-repos.js"
 import type { RepoSyncPort } from "./ports/repo-sync.js"
 import type { Reranker } from "./ports/rerank.js"
 import type { SpeechSynthesizer } from "./ports/speech.js"
@@ -97,6 +103,7 @@ let speech: SpeechSynthesizer | null = null
 let reranker: Reranker | null = null
 let repoSync: RepoSyncPort | null = null
 let ownerRepos: OwnerRepoCatalog | null = null
+let repoActivity: OwnerRepoActivity | null = null
 let detectors: DetectorRegistry | null = null
 let connectors: Connector[] = []
 if (env.OPENROUTER_API_KEY && models.length > 0) {
@@ -135,6 +142,12 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
       })
       // Catálogo de repos públicos del owner (para learnRepo: resolver un nombre → repo real).
       ownerRepos = createOwnerRepoCatalog({
+        user: env.GITHUB_USER,
+        token: env.GITHUB_TOKEN,
+        logger,
+      })
+      // Estado VIVO de repos (PRs abiertos) para los params vivos de findRepos (Search API, cacheado).
+      repoActivity = createOwnerRepoActivity({
         user: env.GITHUB_USER,
         token: env.GITHUB_TOKEN,
         logger,
@@ -238,6 +251,7 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
     repoSync,
     knownRepos: rawSourceRepos(env),
     ownerRepos,
+    repoActivity,
     ownerUser: env.GITHUB_USER,
     detectors,
     connectors,

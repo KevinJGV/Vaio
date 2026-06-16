@@ -71,11 +71,16 @@
 > **incompleto/cap-bajo** — disparando la acción del sistema sola (learnRepo / incremental bg / forceFull bg; Inv #9).
 > Cobertura precisa (`coverageGap`, sin migración) + nuevo método de puerto `ensureRepoReady`. **416 tests**. Falta
 > solo el e2e conversacional de Kevin por Telegram. Detalle → WIP + Historial.
+> **`hasOpenPRs` en `findRepos` (PRs sin mergear) — EN `main` (local)** (2026-06-15): 1ª señal VIVA de GitHub como
+> **param** de findRepos (Inv #10, no tool nueva). Search API (1 call cross-repo, `is:public` + intersección con el
+> catálogo = guard de privacidad) + enriquecido (PRs por repo) + degrada honesto (`null`≠`[]`). **432 tests**;
+> e2e real ✅ (3 PRs reales de Kevin). Falta el e2e conversacional por Telegram. Detalle → WIP + Historial.
 > **🔜 PRÓXIMA SESIÓN — candidatos DIRECTOS (capa de detectores + findRepos), elegí uno:**
 > 1. ✅ **Estados al `UnindexedRepoDetector`** — HECHO 2026-06-15 (`repo-awareness`: stale + incompleto; ver arriba).
-> 2. **Estado vivo de GitHub como PARAMS de `findRepos`** (Invariante #10, NO tools nuevas): "¿PR sin mergear?",
->    "¿CI que no pasó?" → filtros nuevos (Pulls/Actions API por-repo). El **deploy vive en Railway** (≠ GitHub → su
->    propio adapter/diseño, aparte). Ver §"Queries vivas a GitHub" (parte ESTADO diferida).
+> 2. **Estado vivo de GitHub como PARAMS de `findRepos`** (Invariante #10, NO tools nuevas): ✅ **PRs sin mergear
+>    (`hasOpenPRs`) HECHO 2026-06-15**; **CI que no pasó = sub-item PENDIENTE** (Actions API **por-repo** → acotar
+>    a un set chico/repo nombrado para no gastar N llamadas; su propio incremento). El **deploy vive en Railway**
+>    (≠ GitHub → su propio adapter/diseño, aparte). Ver §"Queries vivas a GitHub" (parte ESTADO diferida).
 > 3. **Más detectores de la capa de complemento** (otras fuentes que el sistema detecte y surfacee como notas).
 > Cada uno = su propio `brainstorming`→design+plan si es no trivial; reusan toda la infra ya en `main`
 > (`KnowledgeDetector`/registry, `OwnerRepoCatalog` enriquecido, `[nota del sistema: …]`, patrón findRepos).
@@ -88,6 +93,15 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
+- [?] **`hasOpenPRs` en `findRepos` (PRs sin mergear) — EN `main` (local), pend. e2e Telegram de Kevin**
+  (2026-06-15). 1ª señal VIVA de GitHub como **param** de findRepos (Inv #10, no tool nueva; CI será otro param a
+  futuro). Puerto `OwnerRepoActivity` + adapter `createOwnerRepoActivity` (Search API `is:pull-request is:open
+  user:X is:public`, 1 call cross-repo, TTL 5min, `null`≠`[]`); puro `repo-activity.ts` (`parseRepoFromUrl`/
+  `groupPRsByRepo`); `findRepos({hasOpenPRs})` intersecta con el catálogo público (guard de privacidad #5) y
+  **enriquece** (≤5 PRs/repo: número+título); degrada honesto. **432 tests** (+20); typecheck/biome/build limpios;
+  boot OK. **e2e real ✅:** la query trajo 3 PRs reales de Kevin (Dependabot en KevinJGV + Technical-test_ACME).
+  Specs `2026-06-15-findrepos-open-prs-{design,plan}.md`. **Falta:** e2e conversacional por Telegram ("¿qué repos
+  tengo con PRs sin mergear?").
 > **✅ Cerrado 2026-06-15 (VERIFICADO por Kevin en Telegram con seed sintético en ACME) → Historial "ESTADOS AL
 > DETECTOR repo-awareness":** Caso B (incompleto → nota "parcial" + auto-completado), Caso C ×2 (stale → staleness
 > detectada + auto-cura), untracked (incidental). El fix `ignoreFresh` (incompleto appendea, no forceFull) salió del

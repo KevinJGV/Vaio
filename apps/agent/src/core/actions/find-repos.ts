@@ -8,10 +8,32 @@
 
 import { tool } from "ai"
 import { z } from "zod"
+import { groupPRsByRepo, type OpenPR } from "../repo-activity.js"
 import { filterRepos } from "../repo-filter.js"
+import type { OwnerRepo } from "../repo-resolve.js"
 import type { ActionContext, ActionDescriptor } from "./types.js"
 
 const MAX_LIST = 30
+/** Máximo de PRs a listar por repo en el enriquecido (no inundar el contexto). */
+const MAX_PRS_PER_REPO = 5
+
+/** Línea de un repo en el output: `• name [lang] — desc`. */
+function repoLine(r: OwnerRepo, owner: string): string {
+  return `• ${r.name}${r.language ? ` [${r.language}]` : ""}${r.description ? ` — ${r.description}` : ""} (https://github.com/${owner}/${r.name})`
+}
+
+/** Línea enriquecida con los PRs abiertos del repo: `• name [lang] — N PR(s) sin mergear: #12 "t", …`. */
+function repoLineWithPRs(r: OwnerRepo, owner: string, prs: OpenPR[]): string {
+  const shown = prs
+    .slice(0, MAX_PRS_PER_REPO)
+    .map((p) => `#${p.number} "${p.title}"`)
+    .join(", ")
+  const more =
+    prs.length > MAX_PRS_PER_REPO
+      ? ` (+${prs.length - MAX_PRS_PER_REPO} más)`
+      : ""
+  return `• ${r.name}${r.language ? ` [${r.language}]` : ""} — ${prs.length} PR(s) sin mergear: ${shown}${more} (https://github.com/${owner}/${r.name})`
+}
 
 export const findRepos: ActionDescriptor = {
   name: "findRepos",
@@ -20,15 +42,21 @@ export const findRepos: ActionDescriptor = {
   build(ctx: ActionContext) {
     return tool({
       description:
-        "Listá los repos PÚBLICOS de Kevin filtrando por lenguaje y/o topic (p.ej. '¿qué proyectos tiene en Java?', 'repos con topic X'). Sin filtros, lista todos. Devuelve nombre + descripción + lenguaje + URL.",
+        "Listá los repos PÚBLICOS de Kevin filtrando por lenguaje, topic y/o por PRs sin mergear (p.ej. '¿qué proyectos tiene en Java?', 'repos con topic X', '¿qué repos tienen PRs sin mergear?'). Sin filtros, lista todos. Devuelve nombre + descripción + lenguaje + URL (+ los PRs abiertos si filtrás por hasOpenPRs).",
       inputSchema: z.object({
         language: z
           .string()
           .optional()
           .describe("Lenguaje de programación (p.ej. 'Java', 'TypeScript')."),
         topic: z.string().optional().describe("Topic/tema del repo."),
+        hasOpenPRs: z
+          .boolean()
+          .optional()
+          .describe(
+            "Filtrar a los repos con PRs sin mergear (abiertos); enriquece cada uno con sus PRs."
+          ),
       }),
-      execute: async ({ language, topic }, { toolCallId }) => {
+      execute: async ({ language, topic, hasOpenPRs }, { toolCallId }) => {
         const t0 = Date.now()
         const done = (ok: boolean, output: string) => {
           ctx.emit({
@@ -68,19 +96,42 @@ export const findRepos: ActionDescriptor = {
           return done(true, "No encontré repos con esos filtros.")
         }
         const owner = ctx.ownerUser ?? ""
-        const list = res.matched
-          .slice(0, MAX_LIST)
-          .map(
-            (r) =>
-              `• ${r.name}${r.language ? ` [${r.language}]` : ""}${r.description ? ` — ${r.description}` : ""} (https://github.com/${owner}/${r.name})`
-          )
-          .join("\n")
         const filt = [
           language ? `en ${language}` : "",
           topic ? `con topic ${topic}` : "",
         ]
           .filter(Boolean)
           .join(" ")
+
+        // Filtro VIVO: PRs sin mergear. Camino que suma 1 llamada (Search API) SOLO cuando se pide.
+        if (hasOpenPRs) {
+          const prs = await ctx.repoActivity?.openPullRequests()
+          if (prs == null) {
+            return done(true, "No pude consultar el estado de PRs ahora.")
+          }
+          const byRepo = groupPRsByRepo(prs)
+          // Intersección con el catálogo público (res.matched) = guard de privacidad: un repo privado no está acá.
+          const withPRs = res.matched.filter((r) => byRepo.has(r.name))
+          if (withPRs.length === 0) {
+            return done(
+              true,
+              `No tenés PRs sin mergear${filt ? ` (${filt})` : ""}.`
+            )
+          }
+          const list = withPRs
+            .slice(0, MAX_LIST)
+            .map((r) => repoLineWithPRs(r, owner, byRepo.get(r.name) ?? []))
+            .join("\n")
+          return done(
+            true,
+            `Repos de Kevin con PRs sin mergear${filt ? ` ${filt}` : ""}:\n${list}`
+          )
+        }
+
+        const list = res.matched
+          .slice(0, MAX_LIST)
+          .map((r) => repoLine(r, owner))
+          .join("\n")
         return done(
           true,
           `Repos públicos de Kevin${filt ? ` ${filt}` : ""}:\n${list}`

@@ -31,7 +31,10 @@ import type {
   Transcriber,
 } from "../ports/media.js"
 import type { MemoryStore } from "../ports/memory.js"
-import type { OwnerRepoCatalog } from "../ports/owner-repos.js"
+import type {
+  OwnerRepoActivity,
+  OwnerRepoCatalog,
+} from "../ports/owner-repos.js"
 import type { RepoSyncPort, RepoSyncSpec } from "../ports/repo-sync.js"
 import type { Reranker } from "../ports/rerank.js"
 import type { Summarizer } from "../ports/summary.js"
@@ -91,6 +94,8 @@ export interface AgentDeps {
   connectors?: Connector[]
   /** Catálogo de repos públicos del owner (para learnRepo). null = sin token/DB. */
   ownerRepos?: OwnerRepoCatalog | null
+  /** Estado VIVO de repos del owner (PRs abiertos, …) para los params vivos de findRepos. null = sin token. */
+  repoActivity?: OwnerRepoActivity | null
   /** Owner de los repos (GITHUB_USER): el sistema arma el spec con esto, nunca el modelo. */
   ownerUser?: string
   /** Capa de complemento: detectores de conocimiento disponible (señales para searchMemory). */
@@ -164,6 +169,7 @@ export function createAgent(deps: AgentDeps) {
     repoSync = null,
     knownRepos = [],
     ownerRepos = null,
+    repoActivity = null,
     ownerUser,
     detectors = null,
     connectors = [],
@@ -315,6 +321,7 @@ export function createAgent(deps: AgentDeps) {
           repoSync,
           knownRepos,
           ownerRepos,
+          repoActivity,
           ownerUser,
           detectors,
           connectors,
