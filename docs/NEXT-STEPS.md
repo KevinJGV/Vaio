@@ -88,20 +88,11 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [?] **Estados al detector `repo-awareness` (stale + incompleto) — EN `main` (local), e2e Telegram PARCIAL**
-  (2026-06-15). Rename `unindexed-repo`→`repo-awareness`; clasifica el repo NOMBRADO en unindexed | stale | incompleto
-  vía el nuevo `RepoSyncPort.ensureRepoReady` (cobertura precisa `coverageGap`, sin migración) y dispara la acción del
-  sistema sola (Inv #9): **incompleto → incremental `ignoreFresh` bg** (NO forceFull — ver abajo), stale → incremental
-  bg. `FreshnessDetector` intacto (eje recuperado; sin solape, repo-awareness solo actúa sobre `notRetrieved`).
-  **397 tests**; typecheck/biome/build limpios; boot OK. Specs `2026-06-15-repo-awareness-states-{design,plan}.md`.
-  **e2e Telegram (con seed sintético en ACME):** ✅ Caso B (incompleto): nota "parcial" emitida + auto-completado en bg;
-  ✅ Caso C (stale): staleness detectada + auto-cura (cayó en `FreshnessDetector` porque ACME siempre se recupera →
-  `notRetrieved` falso, es lo esperado); ✅ untracked confirmado incidentalmente (nota learnRepo para otro repo no
-  indexado). **Fix que destapó el e2e:** la rama incompleto disparaba `forceFull` (clearSource → se quedaba pegado en
-  el prefijo, nunca progresa, porque el cap es POR-CORRIDA y el repo es SHA-fresh) → cambiado a **incremental
-  `ignoreFresh`** (appendea los faltantes sin borrar). **Falta (no-bloqueante):** el sub-camino repo-awareness `stale`
-  (nombrado + no-recuperado) y el append-`ignoreFresh` no se pueden forzar en vivo por el guard `notRetrieved` → quedan
-  cubiertos por unit tests. Kevin: re-confirmar Caso B con el código nuevo si querés (idéntico en el caso all-deleted).
+> **✅ Cerrado 2026-06-15 (VERIFICADO por Kevin en Telegram con seed sintético en ACME) → Historial "ESTADOS AL
+> DETECTOR repo-awareness":** Caso B (incompleto → nota "parcial" + auto-completado), Caso C ×2 (stale → staleness
+> detectada + auto-cura), untracked (incidental). El fix `ignoreFresh` (incompleto appendea, no forceFull) salió del
+> propio e2e. El sub-camino repo-awareness `stale` y el append-`ignoreFresh` no se fuerzan en vivo por el guard
+> `notRetrieved` (ACME siempre se recupera) → cubiertos por unit tests; la conducta observable quedó toda verificada.
 - [x] ✅ **Limpieza del seed SINTÉTICO de trends (GROUNDING) — HECHO** (2026-06-15). Se borraron de la DB real los
   **8** snapshots backdateados (-21d) de `connector_snapshots` (`lastfm`/`steam`/`wakatime`/`github-stats`) + los
   **4** chunks `trend:*` derivados (en transacción; verificado 0 filas). La violación de grounding (historia
@@ -153,6 +144,25 @@
 ---
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
+
+**🟢 ESTADOS AL DETECTOR `repo-awareness` (stale + incompleto) — EN `main` (local) + VERIFICADO por Kevin en Telegram**
+(2026-06-15). 3er incremento de la capa de detectores. El `UnindexedRepoDetector` pasó a **`RepoAwarenessDetector`**
+(rename, `git mv`): para cada repo del owner **nombrado/mencionado** y **no recuperado** este turno, el SISTEMA
+clasifica su estado vía el nuevo **`RepoSyncPort.ensureRepoReady(spec)`** y dispara la acción sola (Inv #9): **untracked**
+→ nota learnRepo · **incompleto** → incremental `ignoreFresh` bg (appendea faltantes) → nota "parcial" · **stale** →
+incremental bg → nota "atrás" · **fresh** → sin nota. Llena 2 puntos ciegos: stale nombrado-pero-no-recuperado, e
+**incompleto/cap-bajo** (la frescura es por SHA → un repo cap-bajo es "fresh" pero le faltan archivos y `ensureFresh`
+nunca lo completa). Detección de incompleto = **cobertura precisa** (`coverageGap` puro = `kept − indexados −
+tombstones`, sin migración). `FreshnessDetector` intacto (eje *recuperado*; sin solape — repo-awareness solo sobre
+`notRetrieved` + dedup por repo). **Fix del e2e (clave):** el cap `maxChunksPerRepo` es **POR-CORRIDA** → un repo
+incompleto es SHA-fresh → `forceFull` se quedaría pegado re-indexando el prefijo y un incremental común haría
+`skipped-fresh` → nuevo opt **`ignoreFresh`** (saltea el gate de frescura, corre el diff incremental, appendea). **397
+tests** (coverageGap 5, ensureRepoReady 6, detector reescrito, ignoreFresh 1); typecheck/biome/build limpios; boot OK.
+**e2e Telegram (seed sintético en ACME):** Caso B (incompleto → nota "parcial" + auto-completado), Caso C ×2 (stale →
+staleness + auto-cura, convergiendo 53→154→+34 archivos), untracked (incidental). El sub-camino repo-awareness `stale`
+y el append-`ignoreFresh` no se fuerzan en vivo por el guard `notRetrieved` (ACME siempre se recupera) → unit tests.
+Specs [`…-repo-awareness-states-{design,plan}.md`](superpowers/specs/2026-06-15-repo-awareness-states-design.md);
+lección del cap por-corrida en `LEARNINGS.md`; memoria `vaio-chain-to-resolve-in-turn-ideal` (insight de Kevin del e2e).
 
 **🟢 DETECTORES a+b (repo-awareness enriquecido) + findRepos (c) + INVARIANTE #10 (anti-tool-bloat) — EN `main` +
 CORRECTO Y VERIFICADO por Kevin en Telegram** (2026-06-15). 2º incremento de la capa de detectores. **(a+b)
