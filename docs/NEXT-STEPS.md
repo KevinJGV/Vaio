@@ -85,16 +85,9 @@
   integración completa en el portafolio**. Hasta entonces, no tocar Railway/secrets. Cuando llegue: `TRENDS_ENABLED=1`
   + `WAKATIME_API_KEY`/`STEAM_API_KEY`/`STEAM_ID` en secrets; `pnpm ingest` acumula la 1ª captura; las tendencias
   reales emergen con la 2ª corrida. (Mismo gate para los 3 conectores nuevos: WakaTime/Steam/GitHub-stats en prod.)
-- [?] **Capa de detectores de conocimiento — FUNDACIÓN + detector ACME — IMPLEMENTADO (pend. verif. conversacional
-  de Kevin por Telegram).** 1er incremento de la visión "IA omnisciente" (§Pendiente FUTURO). Puerto
-  `KnowledgeDetector` + `DetectorRegistry` (corre detectores en paralelo, best-effort, cap de notas) → `searchMemory`
-  **delega** (su único fin sigue siendo CONTENIDO; el freshness gate se **EXTRAJO** a un `FreshnessDetector` → quedó
-  más limpio). **`UnindexedRepoDetector` (caso ACME):** la query matchea un repo público del owner NO indexado
-  (match exacto de token normalizado, conservador) → nota del sistema "tenés X sin indexar → learnRepo". **364
-  tests** (+17: registry 4, freshness-detector 4, unindexed 7, searchMemory ajustado); typecheck/biome limpios.
-  **e2e ✅:** des-indexé ACME → `/chat` "hablame de ACME" → el output de searchMemory trae la nota del detector
-  (verificado en `trace_events`); ACME restaurado (800 chunks). **Falta:** e2e Telegram owner (la nota → el modelo
-  dispara learnRepo solo, sin pedírselo). Specs `2026-06-15-knowledge-detectors-{design,plan}.md`.
+> **✅ Cerrado 2026-06-15 (PROBADO Y APROBADO por Kevin en Telegram) → Historial "CAPA DE DETECTORES (fundación +
+> detector ACME)":** la fundación de la capa de complemento + el `UnindexedRepoDetector` (caso ACME). El modelo,
+> ante un repo no indexado, leyó la nota y trajo el repo solo (la proactividad de learnRepo que faltaba).
 > **✅ Cerrados 2026-06-15 (→ Historial "CLUSTER FRESHNESS/RAG HARDENING"), verificados por el Telegram de Kevin:**
 > Followup ① (RAG verbatim) · Followup ② (gate siempre background + embed fuera de tx) · tools de freshness
 > rediseñadas (eliminado `syncRepo`, Invariante #9) · refinamientos (concurrencia de embeddings + frescura silenciosa).
@@ -129,6 +122,23 @@
 ---
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
+
+**🟢 CAPA DE DETECTORES DE CONOCIMIENTO — FUNDACIÓN + detector ACME — EN `main` + PROBADO Y APROBADO por Kevin en
+Telegram** (2026-06-15). 1er incremento de la visión "IA omnisciente" (capa de COMPLEMENTO de la memoria: searchMemory
+trae CONTENIDO, los detectores emiten SEÑALES de disponibilidad como notas del sistema; separación estricta, no
+amalgama). **Fundación:** puerto `KnowledgeDetector` + `DetectorRegistry` (paralelo, best-effort, cap de notas);
+`searchMemory` **delega** (su único fin sigue siendo contenido) y el freshness gate (`behindNote`) se **EXTRAJO** a un
+`FreshnessDetector` → searchMemory quedó más limpio; `ActionContext` gana UN dep (`detectors`) en vez de N puertos
+sueltos. **`UnindexedRepoDetector` (caso ACME):** la query matchea un repo público del owner NO indexado (match exacto
+de token normalizado, conservador) y no trackeado/recuperado → nota "tenés X sin indexar → learnRepo (nombre X)"; el
+owner lo pone el sistema (env), no el modelo (Inv #8). **364 tests** (+17); typecheck/biome limpios. **e2e ✅:**
+des-indexé ACME → `/chat` "hablame de ACME" → la nota del detector en el output (trace_events); **+ Kevin lo probó por
+Telegram: el modelo leyó la nota y trajo el repo SOLO** (la proactividad de learnRepo que faltaba, gap original del
+caso ACME). Specs [`…-knowledge-detectors-design.md`](superpowers/specs/2026-06-15-knowledge-detectors-design.md) ·
+[`…-plan.md`](superpowers/specs/2026-06-15-knowledge-detectors-plan.md) + memoria `knowledge-detectors-vision`.
+**Gotcha (deferido, próximo incremento candidato):** el match exacto de token catchea repos de UN nombre ("ACME") pero
+no multi-palabra ("Tastrack" → "Tastrack_Challenge"); afinar el heurístico. Otros detectores futuros: ThinContent ·
+LiveMetadata (queries vivas de GitHub).
 
 **🟢 PASO 3 PARTE 2 — `learnRepo` (ingesta on-demand de repo público) — EN `main` + VERIFICADO por Telegram de Kevin**
 (2026-06-15). Cierra el paso 3 parte 2 de "Vaio se nutre solo": Kevin pregunta por un repo SUYO no indexado → Vaio lo
@@ -712,7 +722,10 @@ LiveMetadata (atado a "queries vivas a GitHub" ↓). Lo destapó **ACME**: Vaio 
 conector github sin avisar que existía el repo `KevinJGV/ACME` sin indexar. Specs
 [`…-knowledge-detectors-design.md`](superpowers/specs/2026-06-15-knowledge-detectors-design.md) ·
 [`…-plan.md`](superpowers/specs/2026-06-15-knowledge-detectors-plan.md). **Cada incremento = su propio design+plan al
-priorizar.** El **1er incremento candidato** = fundación (puerto+registry+extraer el gate) → luego el detector ACME.
+priorizar.** ✅ **1er incremento HECHO + APROBADO por Telegram (2026-06-15):** fundación (puerto+registry+extraer el
+gate a `FreshnessDetector`) + `UnindexedRepoDetector` (caso ACME) → ver Historial. **Próximos candidatos:** afinar el
+match del UnindexedRepoDetector (repos multi-palabra, hoy solo catchea un nombre exacto) · ThinContent · LiveMetadata
+(atado a "queries vivas a GitHub" ↓).
 
 ### 🔵 Pendiente FUTURO — Queries VIVAS a GitHub (metadata + estado: lenguajes/topics/commits, CI/PRs/deploys)
 > **Es una FUENTE/detector futura de la capa de detectores de arriba** (un `LiveMetadataDetector` + su tool de pull).
