@@ -81,7 +81,20 @@ export function createTelegramClient(
         body: JSON.stringify(body),
       })
       if (!res.ok) {
-        logger.warn({ method, status: res.status }, "telegram api no-2xx")
+        // Capturamos el body (description) de Telegram: dice la causa EXACTA (entities/length/thread/…).
+        // Antes se descartaba → fallos "a ciegas". Diagnóstico de cuál parámetro/contenido lo rompe.
+        const errBody = await res.text().catch(() => "")
+        const b = body as { parse_mode?: string; text?: string }
+        logger.warn(
+          {
+            method,
+            status: res.status,
+            body: errBody.slice(0, 300),
+            parseMode: b.parse_mode ?? "(plano)",
+            textLen: typeof b.text === "string" ? b.text.length : undefined,
+          },
+          "telegram api no-2xx"
+        )
       }
       return res.ok
     } catch (err) {
