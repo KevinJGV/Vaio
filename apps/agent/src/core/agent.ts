@@ -22,6 +22,7 @@ import type {
   ConversationStore,
   StoredAttachment,
 } from "../ports/conversation.js"
+import type { EscalationStore } from "../ports/escalation.js"
 import type { FactStore, PendingFact } from "../ports/facts.js"
 import type { DetectorRegistry } from "../ports/knowledge-detector.js"
 import type { Logger } from "../ports/logger.js"
@@ -31,6 +32,7 @@ import type {
   Transcriber,
 } from "../ports/media.js"
 import type { MemoryStore } from "../ports/memory.js"
+import type { OwnerNotifier } from "../ports/owner-notifier.js"
 import type {
   OwnerRepoActivity,
   OwnerRepoCatalog,
@@ -46,6 +48,7 @@ import {
   type CapabilityResolver,
   createCapabilityResolver,
   type Principal,
+  type ToolName,
 } from "./capabilities.js"
 import { buildUserContent } from "./modality.js"
 import { reportDegraded } from "./observability.js"
@@ -101,6 +104,10 @@ export interface AgentDeps {
   ownerUser?: string
   /** Capa de complemento: detectores de conocimiento disponible (señales para searchMemory). */
   detectors?: DetectorRegistry | null
+  /** Notificación proactiva al owner (outbound genérico): la usa escalate para avisar a Kevin. null = sin canal owner. */
+  ownerNotifier?: OwnerNotifier | null
+  /** Cola persistida de escalaciones (Fase 2). null = sin DB → escalate degrada honesto. */
+  escalations?: EscalationStore | null
   /** Zona horaria de Kevin para el "sentido del ahora" (default America/Bogota). */
   ownerTimezone?: string
 }
@@ -113,6 +120,9 @@ export interface TurnContext {
   /** Turnos proactivos (Nivel C): el canal inyecta el seam que deja a un action registrar una tarea en background
    *  y RETOMAR solo al completar. null/ausente = canal sin push (web) → los actions degradan (no-op). */
   resume?: ProactiveResume | null
+  /** Tools a deshabilitar SOLO en este turno (se restan de caps.allowedTools en buildTools). Lo usa el retomo
+   *  cross-conversation de escalate: el turno sintético corre con `escalate` denegada → anti-loop (no re-escala). */
+  toolDenylist?: ToolName[]
 }
 
 /** Resultado de un turno: `stream` (passthrough HTTP) + `text` (drenaje no-streaming, p.ej. Telegram).
@@ -177,6 +187,8 @@ export function createAgent(deps: AgentDeps) {
     ownerUser,
     detectors = null,
     connectors = [],
+    ownerNotifier = null,
+    escalations = null,
     ownerTimezone = "America/Bogota",
   } = deps
 
@@ -199,7 +211,17 @@ export function createAgent(deps: AgentDeps) {
         id: req.principalId,
         trusted: req.trusted,
       }
-      const caps = capabilities.resolve(req.channel, principal)
+      const resolvedCaps = capabilities.resolve(req.channel, principal)
+      // toolDenylist: deshabilita tools SOLO en este turno (retomo sintético de escalate → `escalate` denegada,
+      // anti-loop). Se resta de allowedTools antes de gatear el ToolSet; el resto del perfil queda intacto.
+      const caps: typeof resolvedCaps = ctx.toolDenylist?.length
+        ? {
+            ...resolvedCaps,
+            allowedTools: resolvedCaps.allowedTools.filter(
+              (t) => !ctx.toolDenylist?.includes(t)
+            ),
+          }
+        : resolvedCaps
       // Con quién habla Vaio: en Telegram, trusted = el owner (Kevin); si no, visitante. Web = público.
       const audience: Audience =
         req.channel === "telegram"
@@ -330,6 +352,10 @@ export function createAgent(deps: AgentDeps) {
           detectors,
           connectors,
           resume: ctx.resume ?? null,
+          escalations,
+          notifier: ownerNotifier,
+          conversationKey: req.conversationKey,
+          locale,
         }),
         onChunk({ chunk }) {
           if (chunk.type === "tool-call") {

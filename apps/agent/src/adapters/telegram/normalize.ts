@@ -30,6 +30,8 @@ export interface TelegramUpdate {
     document?: TgFile & { file_name?: string }
     /** id del topic/hilo (forum topics; en chats privados de bots con topic-mode). Opcional. */
     message_thread_id?: number
+    /** Mensaje CITADO (reply). Lo usamos para correlacionar la respuesta del owner a una escalada (por message_id). */
+    reply_to_message?: { message_id: number }
     chat: { id: number; type?: string } // "private" | "group" | "supergroup" | "channel"
     from?: { id: number; language_code?: string }
   }
@@ -53,6 +55,8 @@ export type NormalizeResult =
       locale: Locale
       /** Presente sólo si el mensaje vino en un topic/hilo de Telegram. */
       threadId?: number
+      /** message_id del mensaje CITADO (si es un reply). Correlaciona la respuesta del owner a una escalada. */
+      replyToMessageId?: number
       /** Chat privado 1:1 (no grupo/supergrupo/canal) → habilita el streaming por `sendMessageDraft`. */
       isPrivate: boolean
     }
@@ -171,6 +175,10 @@ export function normalizeUpdate(
     typeof msg.message_thread_id === "number"
       ? { threadId: msg.message_thread_id }
       : {}
+  const replyTo =
+    typeof msg.reply_to_message?.message_id === "number"
+      ? { replyToMessageId: msg.reply_to_message.message_id }
+      : {}
   const text = (msg.text ?? msg.caption ?? "").trim()
   const media = extractAttachments(msg)
   if ("unsupported" in media) {
@@ -196,6 +204,7 @@ export function normalizeUpdate(
     attachments: media.attachments,
     locale,
     ...threadId,
+    ...replyTo,
     isPrivate: msg.chat.type === "private",
   }
 }

@@ -6,10 +6,12 @@
 import type { TraceEvent } from "@vaio/contracts"
 import type { Tool } from "ai"
 import type { Connector } from "../../ports/connector.js"
+import type { EscalationStore } from "../../ports/escalation.js"
 import type { FactStore } from "../../ports/facts.js"
 import type { DetectorRegistry } from "../../ports/knowledge-detector.js"
 import type { Logger } from "../../ports/logger.js"
 import type { MemoryStore } from "../../ports/memory.js"
+import type { OwnerNotifier } from "../../ports/owner-notifier.js"
 import type {
   OwnerRepoActivity,
   OwnerRepoCatalog,
@@ -68,6 +70,14 @@ export interface ActionContext {
   /** Turnos proactivos (Nivel C): un action puede registrar una tarea en background y RETOMAR solo al completar.
    *  null = canal sin push (web) → degrada (no-op). El canal (Telegram) inyecta la implementación. */
   resume?: ProactiveResume | null
+  /** Escalación humana (Fase 2): cola persistida de dudas que Vaio escaló a Kevin. null = sin DB → escalate degrada. */
+  escalations?: EscalationStore | null
+  /** Notificación proactiva al owner (outbound genérico). null = sin canal owner → escalate degrada honesto. */
+  notifier?: OwnerNotifier | null
+  /** conversationKey crudo del turno (para que escalate persista el threadKey del origen y poder retomar). */
+  conversationKey?: string
+  /** locale del turno (para componer el DM al owner y el retomo en el idioma del visitante). */
+  locale?: string
 }
 
 /** Descriptor de una acción: metadata de gating + cómo construir su tool del AI SDK.

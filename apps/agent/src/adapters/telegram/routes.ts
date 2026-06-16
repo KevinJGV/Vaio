@@ -8,12 +8,14 @@ import type { InputAttachment, TurnRequest } from "@vaio/contracts"
 import type { Hono } from "hono"
 import { type Agent, courtesy } from "../../core/agent.js"
 import { shouldSpeak, stripForSpeech } from "../../core/speech-policy.js"
+import type { EscalationStore } from "../../ports/escalation.js"
 import type { Logger } from "../../ports/logger.js"
 import type { ResolvedMedia } from "../../ports/media.js"
 import type { SpeechSynthesizer } from "../../ports/speech.js"
 import type { TraceSink } from "../../ports/trace.js"
 import type { Variables } from "../http/types.js"
 import type { TelegramClient } from "./client.js"
+import { tryHandleEscalationReply } from "./escalation-inbound.js"
 import type { TelegramMedia } from "./media.js"
 import {
   conversationKeyFor,
@@ -22,6 +24,7 @@ import {
   normalizeUpdate,
 } from "./normalize.js"
 import { createTelegramResume } from "./proactive.js"
+import { createTelegramConversationResumer } from "./resume.js"
 import { pumpStream } from "./stream-draft.js"
 
 /** Cap del texto del draft (preview en vivo). El mensaje final persiste completo (troceado a 4096). */
@@ -35,6 +38,9 @@ export interface TelegramDeps {
   webhookSecret: string
   /** Id de Telegram de Kevin (owner). Solo ese id resuelve a `trusted` (perfil pleno). */
   ownerId?: number
+  /** Cola de escalaciones (Fase 2). Presente → habilita el INBOUND: el reply del owner a una escalada se
+   *  correlaciona y cierra el bucle (retomo al visitante + invitación a curar). null/ausente = escalate off. */
+  escalations?: EscalationStore
   sink: TraceSink
   /** Descarga de media (audio/voz + imágenes). undefined = sin multimodal → se ignoran adjuntos. */
   media?: TelegramMedia
@@ -260,6 +266,33 @@ export function mountTelegram(
       // Media no soportado (doc/PDF/video): respondemos cortés, no ignoramos en silencio.
       void replyUnsupported(norm)
       return c.json({ ok: true })
+    }
+    // INBOUND de escalaciones: ¿es la RESPUESTA del owner a una escalada (reply citando el DM del aviso)? Si sí, la
+    // consumimos acá (correlación por message_id, Inv #8) y cerramos el bucle — NO es un turno conversacional nuevo.
+    if (
+      deps.escalations &&
+      deps.agent &&
+      isOwnerId(deps.ownerId, norm.fromId) &&
+      norm.replyToMessageId !== undefined
+    ) {
+      const log = c.get("log")
+      const resumer = createTelegramConversationResumer({
+        agent: deps.agent,
+        client: deps.client,
+        logger: log,
+        sink: deps.sink,
+        newRequestId: randomUUID,
+      })
+      const consumed = await tryHandleEscalationReply(
+        {
+          escalations: deps.escalations,
+          resumer,
+          client: deps.client,
+          logger: log,
+        },
+        norm
+      )
+      if (consumed) return c.json({ ok: true })
     }
     // ACK rápido + trabajo en background (Telegram reintenta si tardamos).
     void handleTurn(norm, c.get("requestId") ?? randomUUID(), c.get("log"))

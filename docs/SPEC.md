@@ -197,7 +197,15 @@ Diseño/plan → [`superpowers/specs/2026-06-12-cavemem-compression-{design,plan
 - Tabla `facts` + extracción de hechos post-conversación (LLM) + dedup. **Diseñar bi-temporal**
   (`valid_at`/`invalid_at` + `created_at`/`expired_at`; invalidar al INGERIR, no borrar — ver
   `NEXT-STEPS.md` "Grafos"). La compresión de facts es seam futuro (el `Compressor` Tier 1 ya existe).
-- Tool `escalate(question)` con umbral de confianza → cola `unknown_questions`.
+- **Tool `escalate(question)` + infra de notificación proactiva al owner — IMPLEMENTADO** (2026-06-16, ver
+  [`superpowers/specs/2026-06-16-escalate-owner-notifier-design.md`](superpowers/specs/2026-06-16-escalate-owner-notifier-design.md)).
+  Un visitante (web/telegram-no-owner) pregunta algo que Vaio no sabe → `escalate` lo PERSISTE (tabla `escalations`)
+  y lo NOTIFICA a Kevin por su canal de owner vía el puerto **`OwnerNotifier`** (outbound genérico/maleable, base
+  reusable para rutinas/cron/webhooks futuros; Telegram DM hoy, WhatsApp/correo = adapters nuevos). Kevin responde
+  **citando** el DM → el inbound de `/tg` correlaciona por `message_id` (determinístico, Inv #8), marca `answered`,
+  **retoma al visitante** donde haya push (Telegram, vía `ConversationResumer`) y lo **invita a curar** un fact. Web
+  cierra vía fact. **Curación 100% gated por Kevin** (flujo `rememberFact`/`resolveFact`); Vaio NUNCA aprende facts
+  por su cuenta de los visitantes. Anti-spam (rate-limit/dedup) + saneo de la pregunta + degradación (Inv #1).
 
 ### Norte: "Vaio se nutre solo" — memoria viva auto-curada + self-awareness (visión, 2026-06-13)
 Materializa el **Invariante #3** (crecimiento orgánico > prompt estático) y el norte "Vaio como harness

@@ -7,6 +7,7 @@
 import { type Tool, type ToolSet, tool } from "ai"
 import { z } from "zod"
 import { checkRepoFreshness } from "./check-repo-freshness.js"
+import { escalate } from "./escalate.js"
 import { findRepos } from "./find-repos.js"
 import { learnRepo } from "./learn-repo.js"
 import { recentActivity } from "./recent-activity.js"
@@ -24,6 +25,7 @@ export const ACTIONS: ActionDescriptor[] = [
   learnRepo,
   findRepos,
   recentActivity,
+  escalate,
 ]
 
 /** ¿El principal cumple el clearance de la acción? */

@@ -196,3 +196,43 @@ export const facts = pgTable(
     index("facts_pending_idx").on(t.principalId, t.status),
   ]
 )
+
+/** ESCALACIONES: dudas de un visitante que Vaio NO supo y escaló a Kevin (owner) por su canal de notificación.
+ *  Persiste para sobrevivir restarts (la espera humana tarda horas/días) y para correlacionar la respuesta de
+ *  Kevin de forma DETERMINÍSTICA: él responde CITANDO el DM y el sistema casa por `notify_message_id` (Inv #8,
+ *  el modelo nunca toca ids). Al responder: se entrega al visitante (si su canal tiene push) + Kevin decide curar
+ *  un fact (gated, por el flujo conversacional; NUNCA auto). Máquina de estados:
+ *  pending → notified → answered | dismissed | failed. */
+export const escalations = pgTable(
+  "escalations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    // ORIGEN (para retomar + adjudicar el cierre)
+    originChannel: text("origin_channel").notNull(), // 'web' | 'telegram'
+    originConversationId: uuid("origin_conversation_id"), // conversations.id (nullable: stateless)
+    originThreadKey: text("origin_thread_key"), // conversationKeyFor del visitante → reconstruye chatId/threadId
+    askerPrincipalId: text("asker_principal_id").notNull(), // telegram user id | "web"
+    locale: text("locale").notNull().default("es"),
+    // CONTENIDO
+    question: text("question").notNull(), // la duda en NL (saneada al ir al DM)
+    answer: text("answer"), // reply de Kevin (nullable hasta 'answered')
+    // CORRELACIÓN (Inv #8): message_id del DM al owner → Kevin responde citándolo. text para no atarlo al
+    // rango de int de Telegram y servir a otros canales (WhatsApp wamid, correo Message-ID). Ambos nullable: se
+    // setean al NOTIFICAR (markNotified); en 'pending' aún no se sabe por qué canal/mensaje se avisó.
+    notifyChannel: text("notify_channel"), // 'telegram' hoy (null hasta notified)
+    notifyMessageId: text("notify_message_id"),
+    // ESTADO
+    status: text("status").notNull().default("pending"), // pending|notified|answered|dismissed|failed
+    factId: uuid("fact_id"), // linaje si Kevin curó un fact desde esta escalada (auditoría)
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    notifiedAt: timestamp("notified_at", { withTimezone: true }),
+    answeredAt: timestamp("answered_at", { withTimezone: true }),
+  },
+  (t) => [
+    // Correlación O(1) cuando llega el reply de Kevin.
+    index("escalations_notify_msg_idx").on(t.notifyChannel, t.notifyMessageId),
+    // Listado de abiertas por principal/estado (anti-spam: rate-limit + dedup; huérfanas a futuro).
+    index("escalations_status_idx").on(t.status, t.createdAt),
+    index("escalations_principal_idx").on(t.askerPrincipalId, t.status),
+  ]
+)

@@ -64,6 +64,13 @@
       "when": 1781507817433,
       "tag": "0008_smiling_puff_adder",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1781635340568,
+      "tag": "0009_long_blade",
+      "breakpoints": true
     }
   ]
 }

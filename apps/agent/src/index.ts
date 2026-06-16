@@ -16,6 +16,7 @@ import {
   createTranscriber,
 } from "./adapters/media-openrouter.js"
 import { createConversationStore } from "./adapters/neon-conversation.js"
+import { createEscalationStore } from "./adapters/neon-escalation.js"
 import { createFactStore } from "./adapters/neon-facts.js"
 import { createMemoryStore } from "./adapters/neon-memory.js"
 import { createRepoTracker } from "./adapters/neon-tracker.js"
@@ -30,6 +31,7 @@ import { createSpeechSynthesizer } from "./adapters/speech-openrouter.js"
 import { createSummarizer } from "./adapters/summarizer.js"
 import { createTelegramClient } from "./adapters/telegram/client.js"
 import { createTelegramMedia } from "./adapters/telegram/media.js"
+import { createTelegramOwnerNotifier } from "./adapters/telegram/owner-notifier.js"
 import type { TelegramDeps } from "./adapters/telegram/routes.js"
 import { createCompositeTraceSink } from "./adapters/trace-composite.js"
 import { createLoggerTraceSink } from "./adapters/trace-logger.js"
@@ -54,10 +56,12 @@ import { createRepoAwarenessDetector } from "./core/detectors/repo-awareness.js"
 import { DEFAULT_REPO_POLICY } from "./core/repo-ingest.js"
 import type { Connector } from "./ports/connector.js"
 import type { ConversationStore } from "./ports/conversation.js"
+import type { EscalationStore } from "./ports/escalation.js"
 import type { FactStore } from "./ports/facts.js"
 import type { DetectorRegistry } from "./ports/knowledge-detector.js"
 import type { MediaUnderstanding, Transcriber } from "./ports/media.js"
 import type { MemoryStore } from "./ports/memory.js"
+import type { OwnerNotifier } from "./ports/owner-notifier.js"
 import type {
   OwnerRepoActivity,
   OwnerRepoCatalog,
@@ -92,9 +96,25 @@ const models = modelChain(env)
 // Compresor de contexto (Tier 1, determinístico). Independiente de OpenRouter/DB.
 const compressor = env.COMPRESS_ENABLED ? createCompressor() : null
 
+// Cliente de Telegram (singleton): lo reusan el canal /tg y el OwnerNotifier de escalate (un solo client).
+const telegramClient = env.TELEGRAM_BOT_TOKEN
+  ? createTelegramClient(env.TELEGRAM_BOT_TOKEN, logger)
+  : null
+// Notificación proactiva al owner (outbound genérico): Telegram DM de Kevin. Independiente de DB/OpenRouter →
+// la base maleable que reusarán rutinas/webhooks futuros. Sin client/owner → null (escalate degrada honesto).
+const ownerNotifier: OwnerNotifier | null =
+  telegramClient && env.OWNER_TELEGRAM_ID !== undefined
+    ? createTelegramOwnerNotifier({
+        client: telegramClient,
+        ownerChatId: env.OWNER_TELEGRAM_ID,
+        logger,
+      })
+    : null
+
 let agent: Agent | null = null
 let ragEnabled = false
 let conversations: ConversationStore | null = null
+let escalations: EscalationStore | null = null
 let factStore: FactStore | null = null
 let summarizer: Summarizer | null = null
 let transcriber: Transcriber | null = null
@@ -114,6 +134,8 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
   if (dbHandle) {
     const { db } = dbHandle
     conversations = createConversationStore(db)
+    // Cola de escalaciones (Fase 2): solo necesita DB (no embeddings). Persiste las dudas que Vaio escala a Kevin.
+    escalations = createEscalationStore(db)
     if (embeddingsKey) {
       const embedder = createEmbedder({
         apiKey: embeddingsKey,
@@ -255,6 +277,8 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
     ownerUser: env.GITHUB_USER,
     detectors,
     connectors,
+    ownerNotifier,
+    escalations,
     ownerTimezone: env.OWNER_TIMEZONE,
   })
   // Salida de voz (TTS) — cadena de fallback (model|voice|format). Vacía → Vaio solo habla por texto.
@@ -289,10 +313,13 @@ if (
   }
   telegram = {
     agent,
-    client: createTelegramClient(env.TELEGRAM_BOT_TOKEN, logger),
+    // Reusa el client singleton (mismo que el OwnerNotifier de escalate); fallback defensivo por si fuese null.
+    client: telegramClient ?? createTelegramClient(env.TELEGRAM_BOT_TOKEN, logger),
     allowedIds: telegramAllowedIds(env),
     webhookSecret: env.TELEGRAM_WEBHOOK_SECRET,
     ownerId: env.OWNER_TELEGRAM_ID,
+    // Inbound de escalaciones: el reply del owner a una escalada se correlaciona y cierra el bucle.
+    ...(escalations ? { escalations } : {}),
     draftStreaming: env.TELEGRAM_DRAFT_STREAMING,
     sink,
     // Descarga de media de Telegram (audio/voz + imágenes). El core decide transcribir/describir.
@@ -334,6 +361,7 @@ logger.info(
     connectors: connectors.length,
     nativeImages: env.MULTIMODAL_NATIVE_IMAGES,
     telegram: telegram !== undefined,
+    escalate: escalations !== null && ownerNotifier !== null,
     models,
     logLevel: env.LOG_LEVEL,
     logFormat: env.LOG_FORMAT,

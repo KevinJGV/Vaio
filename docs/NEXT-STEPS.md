@@ -99,6 +99,20 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
+- [?] **`escalate` + infra de notificación proactiva genérica (Fase 2) — IMPLEMENTADO en `main` (local), pend.
+  e2e EN VIVO de Kevin** (2026-06-16). Paso mayor del roadmap, aprobado en plan mode tras brainstorming + 3 Plan
+  agents (arquitectura + adversarial + infra). **F0-F6 ✅** (specs durables · puertos `OwnerNotifier`/`EscalationStore`
+  + tabla `escalations` migración `0009` · adapters · acción `escalate` (web+visitante, anti-spam/dedup/saneo) ·
+  retomo cross-conversation `ConversationResumer` + `toolDenylist` anti-loop · inbound reply-to determinístico ·
+  wiring index.ts). **450 tests** (+11), typecheck/build/biome limpios, `/health` 200, boot `escalate: true`.
+  Decisiones de Kevin: `OwnerNotifier` genérico (maleable, base para rutinas/webhooks/WhatsApp), persistir, correlación
+  reply-to, retomo donde haya push (web vía fact), **curación 100% gated** (el adversarial atrapó que auto-curar el
+  reply = corrupción/fuga). **Invariante del feature:** Vaio NUNCA aprende facts por su cuenta de los visitantes.
+  Specs [`…-escalate-owner-notifier-{design,plan}.md`](superpowers/specs/2026-06-16-escalate-owner-notifier-design.md).
+  **Falta solo el e2e en vivo de Kevin** (ngrok + 2º Telegram + aplicar `0009` a la DB dev: `db:push` a branch Neon,
+  NO prod). **Followups:** push al visitante web (pedir contacto → política de datos), recordatorio/expiración de
+  huérfanas (cron), persistir el dedupe `seen`, que Vaio PROPONGA el statement del fact, 2º consumidor del notifier
+  (rutina/webhook), adapters WhatsApp/correo.
 > **✅ Cerrado 2026-06-16 (VERIFICADO EN VIVO por Telegram de Kevin) → Historial "TURNOS PROACTIVOS (Nivel C) seam
 > v1 + learnRepo":** "hablame de greenforge frontend" → learnRepo ("ya voy, te retomo") → ingest full (42 chunks) →
 > `tg: turno proactivo (resume)` → Vaio re-entró y mandó SOLO el 2º mensaje con el contenido real del repo. La

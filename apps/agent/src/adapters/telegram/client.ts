@@ -21,7 +21,14 @@ export interface SendAudioOpts extends SendOpts {
 }
 
 export interface TelegramClient {
-  sendMessage(chatId: number, text: string, opts?: SendOpts): Promise<void>
+  /** Envía un texto (troceado, HTML con fallback a plano). Devuelve el `message_id` del PRIMER mensaje enviado
+   *  (el ancla del reply-to, p.ej. para correlacionar la respuesta del owner a una escalada), o undefined si nada
+   *  salió. Los callers que no lo necesitan simplemente ignoran el retorno. */
+  sendMessage(
+    chatId: number,
+    text: string,
+    opts?: SendOpts
+  ): Promise<number | undefined>
   /** Envía un audio (multipart). Devuelve `ok` para que el caller pueda caer a texto si falla. */
   sendAudio(
     chatId: number,
@@ -73,8 +80,12 @@ export function createTelegramClient(
   logger: Logger
 ): TelegramClient {
   const base = `${API}/bot${botToken}`
-  // Devuelve `ok` (2xx) para poder decidir fallbacks; no lanza (el webhook ya respondió 200).
-  const call = async (method: string, body: unknown): Promise<boolean> => {
+  // Request crudo: devuelve `ok` (2xx) + el JSON parseado de Telegram (para leer result.message_id). No lanza
+  // (el webhook ya respondió 200). `call` es el wrapper booleano para los métodos que solo deciden fallbacks.
+  const request = async (
+    method: string,
+    body: unknown
+  ): Promise<{ ok: boolean; messageId?: number }> => {
     try {
       const res = await fetch(`${base}/${method}`, {
         method: "POST",
@@ -96,16 +107,25 @@ export function createTelegramClient(
           },
           "telegram api no-2xx"
         )
+        return { ok: false }
       }
-      return res.ok
+      const json = (await res.json().catch(() => null)) as {
+        result?: { message_id?: number }
+      } | null
+      const messageId = json?.result?.message_id
+      return typeof messageId === "number"
+        ? { ok: true, messageId }
+        : { ok: true }
     } catch (err) {
       logger.warn(
         { method, err: err instanceof Error ? err.message : String(err) },
         "telegram api falló"
       )
-      return false
+      return { ok: false }
     }
   }
+  const call = async (method: string, body: unknown): Promise<boolean> =>
+    (await request(method, body)).ok
   return {
     async sendMessage(chatId, text, opts) {
       const thread =
@@ -115,25 +135,30 @@ export function createTelegramClient(
       // El modelo a veces emite tags que Telegram no soporta (p.ej. `<span>` pelado) → 400. Saneamos a HTML
       // válido de Telegram ANTES de enviar (deja solo los tags soportados); si igual rechaza, el fallback va en
       // texto plano SIN tags (limpio). Ver adapters/telegram/html.ts.
+      let firstId: number | undefined
       for (const part of splitForTelegram(sanitizeTelegramHtml(text))) {
-        const okHtml = await call("sendMessage", {
+        let sent = await request("sendMessage", {
           chat_id: chatId,
           text: part,
           parse_mode: "HTML",
           ...thread,
         })
-        if (!okHtml) {
+        if (!sent.ok) {
           logger.warn(
             { chatId },
             "telegram HTML rechazado → fallback texto plano"
           )
-          await call("sendMessage", {
+          sent = await request("sendMessage", {
             chat_id: chatId,
             text: stripTelegramHtml(part),
             ...thread,
           })
         }
+        if (firstId === undefined && sent.messageId !== undefined) {
+          firstId = sent.messageId
+        }
       }
+      return firstId
     },
     async sendAudio(chatId, audio, opts) {
       // Multipart: el `call` genérico es JSON-only. fetch arma el boundary solo (sin content-type manual).
