@@ -61,6 +61,11 @@
 > `trend:<source>` por clave exacta → "📈 Cómo viene"; mató la competencia con `searchMemory`). Flag `TRENDS_ENABLED`
 > OFF por defecto. **Probado vía Telegram con data sintética sembrada** (4 trends grounded). **328 tests.**
 > Precursor graph-ready (Fase 3). Detalle → Historial. ⚠️ Ver followups + limpieza de seed abajo.
+> **Turnos proactivos (Nivel C) — SEAM v1 EN `main` (local)** (2026-06-16): infra para que Vaio RETOME solo tras una
+> tarea en background (puerto `ProactiveResume` + threading + adapter Telegram `createTelegramResume`: al completar,
+> re-entra `agent.respond` con la duda original —turno sintético `resume:null` anti-loop— y manda la respuesta).
+> In-process; seam genérico **sin trigger aún**. **437 tests.** **Refinamiento de Kevin:** todo bg conversacional se
+> PESCA al terminar + SIEMPRE avisar; próximo = **barrido agéntico de los sitios + cablear triggers**. Detalle → WIP + Historial.
 > **Cluster freshness/RAG hardening — EN `main` + VERIFICADO por el Telegram de Kevin** (2026-06-15): RAG verbatim
 > (no comprimir RAG), gate siempre background (no más 183s), eliminado el tool `syncRepo` (**Invariante #9**), embed
 > fuera de la tx, concurrencia de embeddings (~10×) y frescura silenciosa. Detalle → Historial.
@@ -94,6 +99,14 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
+- [?] **Turnos proactivos (Nivel C) — SEAM v1, EN `main` (local), pend. e2e en vivo (llega al cablear un trigger)**
+  (2026-06-16). Puerto `ProactiveResume` + threading `TurnContext→ActionContext` + adapter Telegram
+  `createTelegramResume` (re-entrada con turno sintético `resume:null` anti-loop → `sendMessage` prefijo+respuesta;
+  best-effort, web→null). In-process (sin DB/worker). **437 tests** (+5: resuelta/anti-loop/thread/locale/rechazada);
+  typecheck/biome/build limpios; boot OK. Specs `2026-06-16-proactive-turns-{design,plan}.md`. **Sin trigger aún** →
+  no hay e2e en vivo en v1. **Próximo (refinamiento de Kevin):** **barrido AGÉNTICO** de todos los sitios donde un
+  action conversacional difiere la respuesta a una tarea de fondo (user-waiting, p.ej. `learnRepo`; NO los bg
+  silenciosos como el freshness gate) → cablear cada uno (`ctx.resume?.resume(task)` + aviso "ya voy, te retomo").
 > **✅ Cerrado 2026-06-16 (VERIFICADO por Kevin en Telegram) → Historial "`hasOpenPRs` en findRepos":** "¿qué repos
 > tengo con PRs sin mergear?" → `findRepos({hasOpenPRs:true})` → output enriquecido con los 3 PRs reales (Dependabot
 > en KevinJGV #9/#10 + Technical-test_ACME #1). Feature OK end-to-end.

@@ -90,4 +90,13 @@ export function createTelegramResume(deps: {
 
 ## No-trigger en v1
 Ningún action invoca `resume` aún → **no hay e2e en vivo**; verificación = tests + no-regresión (boot + `/chat` normal).
-Cablear `learnRepo` (1er consumidor, 1 línea) = followup inmediato para el demo real.
+
+## Followup (refinamiento de Kevin 2026-06-16) — el PRINCIPIO que corona el fundamento
+**TODO proceso que conversacionalmente conlleve a una tarea de fondo se debe PESCAR al finalizar para que Vaio
+continúe el tema — SIEMPRE avisando** (al dispararlo) "en cuanto termine, retomo". Próxima fase = **barrido AGÉNTICO**
+de todos los sitios detectables donde un action **difiere la respuesta real** a una tarea de fondo, y cablear cada uno:
+`ctx.resume?.resume(task, {label})` + que el action **devuelva el aviso** ("ya voy, te retomo al terminar").
+**Distinción clave:** bg **user-waiting** (difiere la respuesta → necesita resume; p.ej. `learnRepo`) vs bg
+**silencioso** (freshness gate / `ensureRepoReady` / `ensureFresh` — el user ya tuvo respuesta con caveat → NO resume).
+Otros followups: persistencia (tabla+worker, sobrevive restart), framing del turno sintético, cortesía en onErr, web
+(canal push SSE/WS).
