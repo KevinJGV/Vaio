@@ -35,6 +35,7 @@ import type {
   OwnerRepoActivity,
   OwnerRepoCatalog,
 } from "../ports/owner-repos.js"
+import type { ProactiveResume } from "../ports/proactive.js"
 import type { RepoSyncPort, RepoSyncSpec } from "../ports/repo-sync.js"
 import type { Reranker } from "../ports/rerank.js"
 import type { Summarizer } from "../ports/summary.js"
@@ -109,6 +110,9 @@ export interface TurnContext {
   logger: Logger
   sink: TraceSink
   requestId: string
+  /** Turnos proactivos (Nivel C): el canal inyecta el seam que deja a un action registrar una tarea en background
+   *  y RETOMAR solo al completar. null/ausente = canal sin push (web) → los actions degradan (no-op). */
+  resume?: ProactiveResume | null
 }
 
 /** Resultado de un turno: `stream` (passthrough HTTP) + `text` (drenaje no-streaming, p.ej. Telegram).
@@ -325,6 +329,7 @@ export function createAgent(deps: AgentDeps) {
           ownerUser,
           detectors,
           connectors,
+          resume: ctx.resume ?? null,
         }),
         onChunk({ chunk }) {
           if (chunk.type === "tool-call") {

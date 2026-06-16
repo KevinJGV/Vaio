@@ -21,6 +21,7 @@ import {
   type NormalizeResult,
   normalizeUpdate,
 } from "./normalize.js"
+import { createTelegramResume } from "./proactive.js"
 import { pumpStream } from "./stream-draft.js"
 
 /** Cap del texto del draft (preview en vivo). El mensaje final persiste completo (troceado a 4096). */
@@ -123,9 +124,22 @@ export function mountTelegram(
         // Sólo el owner (Kevin) es de confianza → perfil pleno; el resto = visitante capado.
         trusted: isOwnerId(deps.ownerId, norm.fromId),
       }
+      // Turnos proactivos (Nivel C): seam bindeado a ESTE turno (req + chat). Un action que dispare una tarea en
+      // background puede `ctx.resume?.resume(task)` para que Vaio RETOME solo al completar y responda la duda
+      // original por Telegram. El turno sintético del resume lleva resume:null (anti-loop).
+      const resume = createTelegramResume({
+        agent: deps.agent,
+        client: deps.client,
+        logger: log,
+        sink: deps.sink,
+        req,
+        chatId: norm.chatId,
+        ...(norm.threadId !== undefined ? { threadId: norm.threadId } : {}),
+        newRequestId: randomUUID,
+      })
       const { stream, text } = await deps.agent.respond(
         req,
-        { logger: log, sink: deps.sink, requestId },
+        { logger: log, sink: deps.sink, requestId, resume },
         resolved
       )
       // Salida de voz (TTS): default texto; voz si entró voz (espejo) o el usuario la pidió. Decidible por la

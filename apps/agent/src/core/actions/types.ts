@@ -14,6 +14,7 @@ import type {
   OwnerRepoActivity,
   OwnerRepoCatalog,
 } from "../../ports/owner-repos.js"
+import type { ProactiveResume } from "../../ports/proactive.js"
 import type { RepoSyncPort, RepoSyncSpec } from "../../ports/repo-sync.js"
 import type { Reranker } from "../../ports/rerank.js"
 import type { CapabilityProfile, Principal, ToolName } from "../capabilities.js"
@@ -64,6 +65,9 @@ export interface ActionContext {
   /** Capa de COMPLEMENTO de la memoria: detectores que emiten señales de disponibilidad (notas del sistema)
    *  que searchMemory antepone a su output. null = sin detectores → solo contenido. */
   detectors?: DetectorRegistry | null
+  /** Turnos proactivos (Nivel C): un action puede registrar una tarea en background y RETOMAR solo al completar.
+   *  null = canal sin push (web) → degrada (no-op). El canal (Telegram) inyecta la implementación. */
+  resume?: ProactiveResume | null
 }
 
 /** Descriptor de una acción: metadata de gating + cómo construir su tool del AI SDK.
