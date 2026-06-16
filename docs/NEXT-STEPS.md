@@ -71,10 +71,11 @@
 > **incompleto/cap-bajo** — disparando la acción del sistema sola (learnRepo / incremental bg / forceFull bg; Inv #9).
 > Cobertura precisa (`coverageGap`, sin migración) + nuevo método de puerto `ensureRepoReady`. **416 tests**. Falta
 > solo el e2e conversacional de Kevin por Telegram. Detalle → WIP + Historial.
-> **`hasOpenPRs` en `findRepos` (PRs sin mergear) — EN `main` (local)** (2026-06-15): 1ª señal VIVA de GitHub como
-> **param** de findRepos (Inv #10, no tool nueva). Search API (1 call cross-repo, `is:public` + intersección con el
-> catálogo = guard de privacidad) + enriquecido (PRs por repo) + degrada honesto (`null`≠`[]`). **432 tests**;
-> e2e real ✅ (3 PRs reales de Kevin). Falta el e2e conversacional por Telegram. Detalle → WIP + Historial.
+> **`hasOpenPRs` en `findRepos` (PRs sin mergear) — EN `main` (local) + VERIFICADO por Telegram** (2026-06-15/16):
+> 1ª señal VIVA de GitHub como **param** de findRepos (Inv #10, no tool nueva). Search API (1 call cross-repo,
+> `is:public` + intersección con el catálogo = guard de privacidad) + enriquecido (PRs por repo) + degrada honesto
+> (`null`≠`[]`). **432 tests**; e2e real + Telegram ✅ (3 PRs reales de Kevin). Detalle → Historial. **Watch:** 400
+> intermitente de Telegram (instrumentación del body agregada) → WIP.
 > **🔜 PRÓXIMA SESIÓN — candidatos DIRECTOS (capa de detectores + findRepos), elegí uno:**
 > 1. ✅ **Estados al `UnindexedRepoDetector`** — HECHO 2026-06-15 (`repo-awareness`: stale + incompleto; ver arriba).
 > 2. **Estado vivo de GitHub como PARAMS de `findRepos`** (Invariante #10, NO tools nuevas): ✅ **PRs sin mergear
@@ -93,15 +94,16 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [?] **`hasOpenPRs` en `findRepos` (PRs sin mergear) — EN `main` (local), pend. e2e Telegram de Kevin**
-  (2026-06-15). 1ª señal VIVA de GitHub como **param** de findRepos (Inv #10, no tool nueva; CI será otro param a
-  futuro). Puerto `OwnerRepoActivity` + adapter `createOwnerRepoActivity` (Search API `is:pull-request is:open
-  user:X is:public`, 1 call cross-repo, TTL 5min, `null`≠`[]`); puro `repo-activity.ts` (`parseRepoFromUrl`/
-  `groupPRsByRepo`); `findRepos({hasOpenPRs})` intersecta con el catálogo público (guard de privacidad #5) y
-  **enriquece** (≤5 PRs/repo: número+título); degrada honesto. **432 tests** (+20); typecheck/biome/build limpios;
-  boot OK. **e2e real ✅:** la query trajo 3 PRs reales de Kevin (Dependabot en KevinJGV + Technical-test_ACME).
-  Specs `2026-06-15-findrepos-open-prs-{design,plan}.md`. **Falta:** e2e conversacional por Telegram ("¿qué repos
-  tengo con PRs sin mergear?").
+> **✅ Cerrado 2026-06-16 (VERIFICADO por Kevin en Telegram) → Historial "`hasOpenPRs` en findRepos":** "¿qué repos
+> tengo con PRs sin mergear?" → `findRepos({hasOpenPRs:true})` → output enriquecido con los 3 PRs reales (Dependabot
+> en KevinJGV #9/#10 + Technical-test_ACME #1). Feature OK end-to-end.
+- [ ] **⚠️ WATCH (no bloqueante) — 400 INTERMITENTE de Telegram en `sendMessage`** (2026-06-15→16). Al responder un
+  mensaje con `<a href>` links, `sendMessage` HTML **y** el fallback a texto plano dieron **400** una vez → el
+  mensaje no se entregó (peor en privado: el draft es efímero, se pierde). **NO reproducible** al re-correr (output
+  del modelo varía → causa raíz NO confirmada; no se inventa fix sin evidencia). **Instrumentación agregada**
+  (`telegram/client.ts`: `call()` ahora loguea el `body`/`description` de Telegram + `parseMode` + `textLen`) → la
+  próxima vez que ocurra, el log dirá la causa exacta (entities/length/thread/empty). Cerrar cuando recurra con
+  evidencia o se descarte. Sospecha principal: HTML del modelo con tag no soportado/sin escapar (`&`/`<`).
 > **✅ Cerrado 2026-06-15 (VERIFICADO por Kevin en Telegram con seed sintético en ACME) → Historial "ESTADOS AL
 > DETECTOR repo-awareness":** Caso B (incompleto → nota "parcial" + auto-completado), Caso C ×2 (stale → staleness
 > detectada + auto-cura), untracked (incidental). El fix `ignoreFresh` (incompleto appendea, no forceFull) salió del
@@ -158,6 +160,21 @@
 ---
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
+
+**🟢 `hasOpenPRs` EN `findRepos` (PRs sin mergear) — EN `main` (local) + VERIFICADO por Kevin en Telegram**
+(2026-06-15/16). Candidato #2 del roadmap "queries vivas a GitHub", parte **PRs**. 1ª señal VIVA de GitHub como
+**param** de `findRepos` (Invariante #10: la única tool de consultar repos crece por params, no tools nuevas; CI será
+otro param a futuro). **Insight de costo:** los PRs se traen cross-repo en **1 llamada** (Search API
+`is:pull-request is:open user:X is:public`, verificado en context7); el camino metadata sigue cacheado, el vivo suma
+1 call SOLO cuando se pide. **Privacidad (#5, doble guard):** `is:public` + intersección con el catálogo público.
+Puerto `OwnerRepoActivity` (hermano de `OwnerRepoCatalog`) + adapter `createOwnerRepoActivity` (TTL 5min, `null`≠`[]`
+para degradar honesto); puro `core/repo-activity.ts` (`parseRepoFromUrl`/`groupPRsByRepo`); `findRepos({hasOpenPRs})`
+(Inv #8: booleano) **enriquece** ≤5 PRs/repo (número+título). **432 tests** (+20); typecheck/biome/build limpios.
+**e2e ✅:** query real trajo 3 PRs reales (Dependabot KevinJGV + Technical-test_ACME); **+ Kevin lo verificó por
+Telegram** ("¿qué repos tengo con PRs sin mergear?" → lista enriquecida). Specs
+[`…-findrepos-open-prs-{design,plan}.md`](superpowers/specs/2026-06-15-findrepos-open-prs-design.md). **CI que no pasó
+= sub-item PENDIENTE** (Actions API por-repo → acotar; su propio incremento). **Followup (watch):** 400 intermitente
+de Telegram en `sendMessage` (ver WIP) → instrumentación del body agregada.
 
 **🟢 ESTADOS AL DETECTOR `repo-awareness` (stale + incompleto) — EN `main` (local) + VERIFICADO por Kevin en Telegram**
 (2026-06-15). 3er incremento de la capa de detectores. El `UnindexedRepoDetector` pasó a **`RepoAwarenessDetector`**
