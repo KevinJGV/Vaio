@@ -99,27 +99,17 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [?] **Turnos proactivos (Nivel C) — SEAM v1, EN `main` (local), pend. e2e en vivo (llega al cablear un trigger)**
-  (2026-06-16). Puerto `ProactiveResume` + threading `TurnContext→ActionContext` + adapter Telegram
-  `createTelegramResume` (re-entrada con turno sintético `resume:null` anti-loop → `sendMessage` prefijo+respuesta;
-  best-effort, web→null). In-process (sin DB/worker). **437 tests** (+5: resuelta/anti-loop/thread/locale/rechazada);
-  typecheck/biome/build limpios; boot OK. Specs `2026-06-16-proactive-turns-{design,plan}.md`.
-  **Barrido AGÉNTICO hecho** (Explore): `learnRepo` es el ÚNICO sitio user-waiting hoy (el resto son silenciosos:
-  detectores/freshness gates, el user ya tuvo respuesta; o no-conversacionales: persist/webhook). **`learnRepo`
-  CABLEADO** (`ctx.resume?.resume(sync, {label})` + promete la retoma; web → fire-and-forget). **Ahora SÍ hay e2e
-  en vivo:** owner pregunta por un repo no indexado → "ya voy, te retomo" → al terminar la ingesta, Vaio responde
-  solo la duda original por Telegram. **Pend.: e2e en vivo de Kevin.** Followups: persistencia (tabla+worker),
-  framing del sintético, web (canal push SSE/WS).
+> **✅ Cerrado 2026-06-16 (VERIFICADO EN VIVO por Telegram de Kevin) → Historial "TURNOS PROACTIVOS (Nivel C) seam
+> v1 + learnRepo":** "hablame de greenforge frontend" → learnRepo ("ya voy, te retomo") → ingest full (42 chunks) →
+> `tg: turno proactivo (resume)` → Vaio re-entró y mandó SOLO el 2º mensaje con el contenido real del repo. La
+> visión funcionando. Followups (no bloqueantes): persistencia (tabla+worker), framing del sintético, web (push).
+> **✅ Cerrado 2026-06-16 (CAUSA RAÍZ + FIX, gracias a la instrumentación) → Historial "Fix 400 Telegram":** el
+> watch-item del 400 intermitente quedó RESUELTO: el body capturado mostró `Tag "span" must have class "tg-spoiler"`
+> (el modelo emitió `4<span>0</span>4`). Fix = `sanitizeTelegramHtml` (solo tags soportados) + fallback que limpia
+> tags. La instrumentación del body fue la que lo cazó (justificó su valor).
 > **✅ Cerrado 2026-06-16 (VERIFICADO por Kevin en Telegram) → Historial "`hasOpenPRs` en findRepos":** "¿qué repos
 > tengo con PRs sin mergear?" → `findRepos({hasOpenPRs:true})` → output enriquecido con los 3 PRs reales (Dependabot
 > en KevinJGV #9/#10 + Technical-test_ACME #1). Feature OK end-to-end.
-- [ ] **⚠️ WATCH (no bloqueante) — 400 INTERMITENTE de Telegram en `sendMessage`** (2026-06-15→16). Al responder un
-  mensaje con `<a href>` links, `sendMessage` HTML **y** el fallback a texto plano dieron **400** una vez → el
-  mensaje no se entregó (peor en privado: el draft es efímero, se pierde). **NO reproducible** al re-correr (output
-  del modelo varía → causa raíz NO confirmada; no se inventa fix sin evidencia). **Instrumentación agregada**
-  (`telegram/client.ts`: `call()` ahora loguea el `body`/`description` de Telegram + `parseMode` + `textLen`) → la
-  próxima vez que ocurra, el log dirá la causa exacta (entities/length/thread/empty). Cerrar cuando recurra con
-  evidencia o se descarte. Sospecha principal: HTML del modelo con tag no soportado/sin escapar (`&`/`<`).
 > **✅ Cerrado 2026-06-15 (VERIFICADO por Kevin en Telegram con seed sintético en ACME) → Historial "ESTADOS AL
 > DETECTOR repo-awareness":** Caso B (incompleto → nota "parcial" + auto-completado), Caso C ×2 (stale → staleness
 > detectada + auto-cura), untracked (incidental). El fix `ignoreFresh` (incompleto appendea, no forceFull) salió del
@@ -176,6 +166,32 @@
 ---
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
+
+**🟢 TURNOS PROACTIVOS (Nivel C) — SEAM v1 + learnRepo cableado — EN `main` (local) + VERIFICADO EN VIVO por Telegram**
+(2026-06-16). Vaio RETOMA solo tras una tarea en background: dispara algo largo, sigue, y al COMPLETAR re-entra el
+loop con la duda original y manda un mensaje **iniciado por el agente**. **Seam (Inv #4):** puerto `ProactiveResume`
+(`ports/proactive.ts`) + threading `TurnContext→ActionContext` (puro pasamanos) + adapter `adapters/telegram/
+proactive.ts` (`createTelegramResume`: turno SINTÉTICO con la duda original → `agent.respond(..., resume:null)`
+[ANTI-LOOP] → `sendMessage(prefijo+respuesta)`; best-effort, no bloquea, web→null=no-op). In-process (sin DB/worker;
+restart pierde la continuación → persistencia=followup). **Barrido AGÉNTICO** (Explore) de TODOS los sitios
+fire-and-forget: `learnRepo` es el ÚNICO **user-waiting** (el resto son silenciosos —detectores/freshness gates— o
+no-conversacionales —persist/webhook—). **`learnRepo` cableado** (`ctx.resume?.resume(sync,{label})` + promete la
+retoma). Decisiones de Kevin: seam genérico · in-process · re-responder · **principio: todo bg conversacional se
+PESCA al terminar + SIEMPRE avisar**. **418 tests** (+5 proactive +1 learnRepo); typecheck/biome/build limpios.
+**e2e EN VIVO ✅:** "hablame de greenforge frontend" → learnRepo ("en cuanto termine te retomo") → `repo sync full 42
+chunks` → `tg: turno proactivo (resume)` → re-entró y mandó SOLO el 2º mensaje con stack/rutas/UI reales. Specs
+[`…-proactive-turns-{design,plan}.md`](superpowers/specs/2026-06-16-proactive-turns-design.md) + memoria
+`proactive-turns-vision`. Followups: persistencia (tabla+worker), framing del sintético, más triggers (escalate), web (push).
+
+**🟢 FIX 400 DE TELEGRAM — `sanitizeTelegramHtml` (causa raíz vía instrumentación) — EN `main` (local)** (2026-06-16).
+El watch-item del 400 intermitente de `sendMessage` quedó RESUELTO con `systematic-debugging`: la instrumentación del
+body (que se había agregado al no poder reproducirlo) capturó en vivo `Bad Request: can't parse entities: Tag "span"
+must have class "tg-spoiler"` — el modelo emitió `4<span>0</span>4` (span pelado, inválido en Telegram HTML). Tags
+válidos verificados en context7. **Fix:** `adapters/telegram/html.ts` (puro) — `sanitizeTelegramHtml` deja solo los
+tags soportados (b/i/u/s/a/code/pre/blockquote/tg-spoiler/tg-emoji…), descarta el resto manteniendo el texto, `<br>`→\n;
+`stripTelegramHtml` quita todos los tags para el fallback (antes mandaba el markup crudo a la vista). `client.ts`
+sanea antes del HTML + fallback limpio. **424 tests** (+6 html). Lección: la instrumentación del body (cuando no se
+puede reproducir, NO inventar fix → instrumentar y esperar evidencia) fue exactamente lo que cazó la causa raíz.
 
 **🟢 `hasOpenPRs` EN `findRepos` (PRs sin mergear) — EN `main` (local) + VERIFICADO por Kevin en Telegram**
 (2026-06-15/16). Candidato #2 del roadmap "queries vivas a GitHub", parte **PRs**. 1ª señal VIVA de GitHub como
