@@ -682,7 +682,24 @@ Surgidos al diseñar el freshness gate; cada uno su propio par design+plan cuand
   `i18n/{es,en}.ts` + `cv.ts`, no en el markup). Queda como principio general: si a futuro un repo trocea pobre
   (Astro/MDX/JSON ruidoso) → mejor extracción/chunking consciente de estructura.
 
+### 🔵 Pendiente FUTURO (NORTE de arquitectura) — Capa de "detectores de conocimiento disponible" (complemento de la memoria)
+**Visión de Kevin (2026-06-15) — DISEÑO APROBADO.** Que Vaio obtenga feedback de **múltiples frentes** → sensación
+de "IA omnisciente a la que no se le escapa nada", **complementando** la memoria de la DB con data que el **sistema
+detecta solo** como de otras fuentes, **sin amalgamar** `searchMemory`/`learnRepo` (separación estricta). **Insight:**
+hay 2 tipos de conocimiento — **CONTENIDO** (lo que searchMemory ya trae) y **SEÑALES DE DISPONIBILIDAD** (lo que
+existe pero no está cargado/está atrás/es solo metadata/es consultable en vivo). Hoy solo existe el precedente
+`behindNote`. **Diseño:** un puerto `KnowledgeDetector` + `DetectorRegistry` que corre detectores baratos cada turno
+y emite **notas del sistema** que el modelo lee y acciona (sistema detecta+informa, modelo no orquesta — Inv #9).
+searchMemory **delega** (una línea) y el freshness gate se **extrae** a un `FreshnessDetector` → searchMemory queda
+más limpio. Detectores: Freshness (extraído) · **UnindexedRepo (caso ACME, 1er incremento de valor)** · ThinContent ·
+LiveMetadata (atado a "queries vivas a GitHub" ↓). Lo destapó **ACME**: Vaio se conformó con la descripción del
+conector github sin avisar que existía el repo `KevinJGV/ACME` sin indexar. Specs
+[`…-knowledge-detectors-design.md`](superpowers/specs/2026-06-15-knowledge-detectors-design.md) ·
+[`…-plan.md`](superpowers/specs/2026-06-15-knowledge-detectors-plan.md). **Cada incremento = su propio design+plan al
+priorizar.** El **1er incremento candidato** = fundación (puerto+registry+extraer el gate) → luego el detector ACME.
+
 ### 🔵 Pendiente FUTURO — Queries VIVAS a GitHub (metadata + estado: lenguajes/topics/commits, CI/PRs/deploys)
+> **Es una FUENTE/detector futura de la capa de detectores de arriba** (un `LiveMetadataDetector` + su tool de pull).
 **Planteado por Kevin (2026-06-15).** El RAG tiene el **contenido** de los repos; `recentActivity` el **feed** de
 actividad; `github-stats` totales agregados. Pero **nada cubre preguntas de METADATA/ESTADO VIVO** que no se pueden
 responder con lo ingestado y que las tools actuales no alcanzan. Ejemplos de Kevin:
