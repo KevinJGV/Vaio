@@ -23,6 +23,7 @@ import type {
   StoredAttachment,
 } from "../ports/conversation.js"
 import type { FactStore, PendingFact } from "../ports/facts.js"
+import type { DetectorRegistry } from "../ports/knowledge-detector.js"
 import type { Logger } from "../ports/logger.js"
 import type {
   MediaUnderstanding,
@@ -92,6 +93,8 @@ export interface AgentDeps {
   ownerRepos?: OwnerRepoCatalog | null
   /** Owner de los repos (GITHUB_USER): el sistema arma el spec con esto, nunca el modelo. */
   ownerUser?: string
+  /** Capa de complemento: detectores de conocimiento disponible (señales para searchMemory). */
+  detectors?: DetectorRegistry | null
   /** Zona horaria de Kevin para el "sentido del ahora" (default America/Bogota). */
   ownerTimezone?: string
 }
@@ -162,6 +165,7 @@ export function createAgent(deps: AgentDeps) {
     knownRepos = [],
     ownerRepos = null,
     ownerUser,
+    detectors = null,
     connectors = [],
     ownerTimezone = "America/Bogota",
   } = deps
@@ -312,6 +316,7 @@ export function createAgent(deps: AgentDeps) {
           knownRepos,
           ownerRepos,
           ownerUser,
+          detectors,
           connectors,
         }),
         onChunk({ chunk }) {

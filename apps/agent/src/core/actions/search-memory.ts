@@ -77,34 +77,7 @@ export const searchMemory: ActionDescriptor = {
                 maxDistance: factRetrieveDistance,
               })
             : []
-          let docs = await retrieve()
-          // FRESHNESS GATE (determinístico, TTL interno): si los chunks vienen de un repo:* stale, sincronizar
-          // ANTES de responder (no a criterio del modelo). Si algo se sincronizó inline → re-recuperar una vez.
-          // Degrada SIEMPRE (Invariante #1): sin repoSync o ante error → responde con lo indexado.
-          const repoSources = [
-            ...new Set(
-              docs.map((d) => d.source).filter((s) => s.startsWith("repo:"))
-            ),
-          ]
-          let behindNote = ""
-          if (repoSources.length > 0 && ctx.repoSync) {
-            try {
-              const { refreshed, behind } =
-                await ctx.repoSync.ensureFresh(repoSources)
-              if (refreshed) docs = await retrieve()
-              // El sync va en BACKGROUND → este turno responde con el índice PRE-sync. Si está `behind`,
-              // surfaceamos la staleness para que el modelo sea honesto (no orquesta el sync — Invariante #9;
-              // solo reporta que puede faltar lo MUY reciente). Se auto-sana en el próximo turno.
-              if (behind)
-                behindNote =
-                  "[nota del sistema: tu copia indexada de uno de estos repos estaba un poco atrás de GitHub; ya se está actualizando sola en segundo plano. Respondé con lo que tenés, pero si la pregunta depende de cambios MUY recientes, aclaralo al pasar (que puede que aún no los tengas), sin dramatizar.]"
-            } catch (err) {
-              logger.warn(
-                { err: errMsg(err) },
-                "freshness gate falló (se responde con lo indexado)"
-              )
-            }
-          }
+          const docs = await retrieve()
           // Facts PRIMERO (verdad curada que lidera el contexto), luego los docs del repo.
           // El contexto recuperado va al modelo CRUDO (verbatim): NO se comprime. Comprimir RAG
           // mutilaba la fidelidad de grounding (prosa perdía artículos: 'le gusta el fútbol'→'le
@@ -120,7 +93,25 @@ export const searchMemory: ActionDescriptor = {
                       `[${d.source}${d.url ? ` · ${d.url}` : ""}]\n${d.chunk}`
                   )
                   .join("\n\n")
-          const output = behindNote ? `${behindNote}\n\n${body}` : body
+          // CAPA DE COMPLEMENTO: searchMemory trae el CONTENIDO; los DETECTORES emiten SEÑALES de disponibilidad
+          // (repo:* atrás → FreshnessDetector; repo del owner sin indexar → UnindexedRepoDetector) como notas del
+          // sistema que se anteponen. El sistema detecta+informa; el modelo lee y acciona (Invariante #9).
+          // Best-effort: un fallo de detección nunca rompe la respuesta. Ver knowledge-detectors-design.md.
+          let notes: string[] = []
+          if (ctx.detectors) {
+            try {
+              notes = await ctx.detectors.run({
+                query,
+                retrievedSources: [...new Set(combined.map((d) => d.source))],
+              })
+            } catch (err) {
+              logger.warn(
+                { err: errMsg(err) },
+                "detectores fallaron (se ignora)"
+              )
+            }
+          }
+          const output = notes.length ? `${notes.join("\n")}\n\n${body}` : body
           emit({
             ...ids,
             type: "tool.result",

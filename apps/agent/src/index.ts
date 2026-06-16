@@ -45,13 +45,17 @@ import {
   visionChain,
 } from "./config.js"
 import { type Agent, createAgent } from "./core/agent.js"
+import { createFreshnessDetector } from "./core/detectors/freshness.js"
+import { createDetectorRegistry } from "./core/detectors/registry.js"
+import { createUnindexedRepoDetector } from "./core/detectors/unindexed-repo.js"
 import { DEFAULT_REPO_POLICY } from "./core/repo-ingest.js"
 import type { Connector } from "./ports/connector.js"
-import type { OwnerRepoCatalog } from "./ports/owner-repos.js"
 import type { ConversationStore } from "./ports/conversation.js"
 import type { FactStore } from "./ports/facts.js"
+import type { DetectorRegistry } from "./ports/knowledge-detector.js"
 import type { MediaUnderstanding, Transcriber } from "./ports/media.js"
 import type { MemoryStore } from "./ports/memory.js"
+import type { OwnerRepoCatalog } from "./ports/owner-repos.js"
 import type { RepoSyncPort } from "./ports/repo-sync.js"
 import type { Reranker } from "./ports/rerank.js"
 import type { SpeechSynthesizer } from "./ports/speech.js"
@@ -93,6 +97,7 @@ let speech: SpeechSynthesizer | null = null
 let reranker: Reranker | null = null
 let repoSync: RepoSyncPort | null = null
 let ownerRepos: OwnerRepoCatalog | null = null
+let detectors: DetectorRegistry | null = null
 let connectors: Connector[] = []
 if (env.OPENROUTER_API_KEY && models.length > 0) {
   let memory: MemoryStore | null = null
@@ -134,6 +139,16 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
         token: env.GITHUB_TOKEN,
         logger,
       })
+      // Capa de COMPLEMENTO de la memoria: detectores de conocimiento disponible (searchMemory los corre y
+      // antepone sus notas). FreshnessDetector (repo:* atrás) + UnindexedRepoDetector (repo del owner sin indexar).
+      detectors = createDetectorRegistry([
+        createFreshnessDetector(repoSync),
+        createUnindexedRepoDetector({
+          ownerRepos,
+          ownerUser: env.GITHUB_USER,
+          repoSync,
+        }),
+      ])
       ragEnabled = true
     } else {
       logger.warn(
@@ -223,6 +238,7 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
     knownRepos: rawSourceRepos(env),
     ownerRepos,
     ownerUser: env.GITHUB_USER,
+    detectors,
     connectors,
     ownerTimezone: env.OWNER_TIMEZONE,
   })

@@ -7,6 +7,7 @@ import type { TraceEvent } from "@vaio/contracts"
 import type { Tool } from "ai"
 import type { Connector } from "../../ports/connector.js"
 import type { FactStore } from "../../ports/facts.js"
+import type { DetectorRegistry } from "../../ports/knowledge-detector.js"
 import type { Logger } from "../../ports/logger.js"
 import type { MemoryStore } from "../../ports/memory.js"
 import type { OwnerRepoCatalog } from "../../ports/owner-repos.js"
@@ -55,6 +56,9 @@ export interface ActionContext {
   ownerRepos?: OwnerRepoCatalog | null
   /** Owner de los repos (env GITHUB_USER): el sistema arma el spec con esto, NUNCA con un string del modelo. */
   ownerUser?: string
+  /** Capa de COMPLEMENTO de la memoria: detectores que emiten señales de disponibilidad (notas del sistema)
+   *  que searchMemory antepone a su output. null = sin detectores → solo contenido. */
+  detectors?: DetectorRegistry | null
 }
 
 /** Descriptor de una acción: metadata de gating + cómo construir su tool del AI SDK.

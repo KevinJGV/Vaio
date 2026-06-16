@@ -467,6 +467,17 @@ El código typecheckeó sin cambios de API salvo **dos rupturas reales**:
   el modelo no orquesta (#9), no bloquea (#1). e2e: índice forzado stale → Vaio flaggea "se estaba actualizando…
   puede que algún cambio muy reciente aún no lo tenga" + self-heal. **Lección:** "silencioso" ≠ "opaco" — gestionar
   algo en background NO exime de informarle al usuario su estado (mismo espíritu que `long-tasks-ok-if-notify-not-blocking`).
+- **Capa de detectores de conocimiento disponible — generaliza el `behindNote`** (2026-06-15, 1er incremento de la
+  visión "IA omnisciente"; lo destapó el caso ACME: Vaio se conformó con la descripción del conector github sin
+  avisar que existía el repo `KevinJGV/ACME` sin indexar). **Insight:** 2 tipos de conocimiento — CONTENIDO (lo que
+  searchMemory trae) y SEÑALES de disponibilidad (lo que existe pero no está cargado/está atrás/es metadata). Puerto
+  `KnowledgeDetector` + `DetectorRegistry`: searchMemory **delega** (su único fin = contenido) y antepone las notas;
+  el freshness gate se **extrajo** a un `FreshnessDetector` → searchMemory quedó **más limpio**. `UnindexedRepoDetector`
+  (caso ACME): query matchea un repo del owner no indexado → nota "learnRepo X". **Separación, no amalgama**: sumar
+  una fuente = sumar un detector (unidad chica), sin tocar searchMemory/learnRepo. **Gotcha de match (deferido):** el
+  match es **exacto de token normalizado** (conservador, no falsos positivos) → catchea repos de UN nombre ("ACME")
+  pero NO multi-palabra ("Tastrack_Challenge" no matchea "Tastrack"); afinar el heurístico es un incremento futuro.
+  Specs `2026-06-15-knowledge-detectors-{design,plan}.md` + memoria `knowledge-detectors-vision`.
 - **⚠️ El sync NO debe ser una WRITE-ACTION del modelo — la frescura la gestiona el SISTEMA (Invariante #8)**
   (2026-06-15, hermano del fix del gate; lo destaparon logs de Kevin: un turno de **211s**). Arreglar el gate no
   alcanzó: existía un **tool `syncRepo`** que el modelo invocaba explícitamente al ver "stale", y sincronizaba

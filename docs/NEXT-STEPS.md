@@ -85,6 +85,16 @@
   integración completa en el portafolio**. Hasta entonces, no tocar Railway/secrets. Cuando llegue: `TRENDS_ENABLED=1`
   + `WAKATIME_API_KEY`/`STEAM_API_KEY`/`STEAM_ID` en secrets; `pnpm ingest` acumula la 1ª captura; las tendencias
   reales emergen con la 2ª corrida. (Mismo gate para los 3 conectores nuevos: WakaTime/Steam/GitHub-stats en prod.)
+- [?] **Capa de detectores de conocimiento — FUNDACIÓN + detector ACME — IMPLEMENTADO (pend. verif. conversacional
+  de Kevin por Telegram).** 1er incremento de la visión "IA omnisciente" (§Pendiente FUTURO). Puerto
+  `KnowledgeDetector` + `DetectorRegistry` (corre detectores en paralelo, best-effort, cap de notas) → `searchMemory`
+  **delega** (su único fin sigue siendo CONTENIDO; el freshness gate se **EXTRAJO** a un `FreshnessDetector` → quedó
+  más limpio). **`UnindexedRepoDetector` (caso ACME):** la query matchea un repo público del owner NO indexado
+  (match exacto de token normalizado, conservador) → nota del sistema "tenés X sin indexar → learnRepo". **364
+  tests** (+17: registry 4, freshness-detector 4, unindexed 7, searchMemory ajustado); typecheck/biome limpios.
+  **e2e ✅:** des-indexé ACME → `/chat` "hablame de ACME" → el output de searchMemory trae la nota del detector
+  (verificado en `trace_events`); ACME restaurado (800 chunks). **Falta:** e2e Telegram owner (la nota → el modelo
+  dispara learnRepo solo, sin pedírselo). Specs `2026-06-15-knowledge-detectors-{design,plan}.md`.
 > **✅ Cerrados 2026-06-15 (→ Historial "CLUSTER FRESHNESS/RAG HARDENING"), verificados por el Telegram de Kevin:**
 > Followup ① (RAG verbatim) · Followup ② (gate siempre background + embed fuera de tx) · tools de freshness
 > rediseñadas (eliminado `syncRepo`, Invariante #9) · refinamientos (concurrencia de embeddings + frescura silenciosa).

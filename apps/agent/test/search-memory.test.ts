@@ -154,7 +154,7 @@ describe("searchMemory (descriptor migrado)", () => {
     expect(out.indexOf("c2")).toBeLessThan(out.indexOf("c1"))
   })
 
-  it("freshness gate: si ensureFresh refresca, re-recupera (searchMemory 2 veces)", async () => {
+  it("recupera 1 sola vez (el gate ya no re-recupera; vive en los detectores)", async () => {
     let calls = 0
     const memory: MemoryStore = {
       searchMemory: async () => {
@@ -167,52 +167,12 @@ describe("searchMemory (descriptor migrado)", () => {
       deleteFiles: async () => {},
       replaceFile: async () => {},
     }
-    const repoSync = {
-      freshness: async () => ({ state: "stale" as const }),
-      sync: async () => ({
-        mode: "incremental" as const,
-        embedded: 1,
-        deleted: 0,
-        unchanged: 0,
-      }),
-      isTracked: async () => true,
-      ensureFresh: async () => ({ refreshed: true }),
-    }
-    const t = searchMemory.build(ctx({ memory, repoSync }))
-    await t.execute?.({ query: "kevin" }, { toolCallId: "tc", messages: [] })
-    expect(calls).toBe(2) // recuperó, gate refrescó, re-recuperó
-  })
-
-  it("freshness gate: si NO refresca, recupera 1 sola vez", async () => {
-    let calls = 0
-    const memory: MemoryStore = {
-      searchMemory: async () => {
-        calls++
-        return [{ source: "repo:kev/vaio", url: "u", chunk: "c" }]
-      },
-      upsertDocuments: async () => {},
-      clearSource: async () => {},
-      listIndexedFiles: async () => [],
-      deleteFiles: async () => {},
-      replaceFile: async () => {},
-    }
-    const repoSync = {
-      freshness: async () => ({ state: "fresh" as const }),
-      sync: async () => ({
-        mode: "skipped-fresh" as const,
-        embedded: 0,
-        deleted: 0,
-        unchanged: 0,
-      }),
-      isTracked: async () => true,
-      ensureFresh: async () => ({ refreshed: false }),
-    }
-    const t = searchMemory.build(ctx({ memory, repoSync }))
+    const t = searchMemory.build(ctx({ memory }))
     await t.execute?.({ query: "kevin" }, { toolCallId: "tc", messages: [] })
     expect(calls).toBe(1)
   })
 
-  it("freshness gate: si un repo recuperado está ATRÁS (behind, refrescándose en bg), el output lo AVISA al modelo", async () => {
+  it("antepone las NOTAS de los detectores al output (señales de disponibilidad)", async () => {
     const memory: MemoryStore = {
       searchMemory: async () => [
         { source: "repo:kev/vaio", url: "u", chunk: "código actual" },
@@ -223,26 +183,52 @@ describe("searchMemory (descriptor migrado)", () => {
       deleteFiles: async () => {},
       replaceFile: async () => {},
     }
-    const repoSync = {
-      freshness: async () => ({ state: "stale" as const }),
-      sync: async () => ({
-        mode: "incremental" as const,
-        embedded: 1,
-        deleted: 0,
-        unchanged: 0,
-      }),
-      isTracked: async () => true,
-      ensureFresh: async () => ({ refreshed: false, behind: true }),
+    let runCtx: { query: string; retrievedSources: string[] } | null = null
+    const detectors = {
+      run: async (c: { query: string; retrievedSources: string[] }) => {
+        runCtx = c
+        return ["[nota del sistema: tenés un repo X sin indexar]"]
+      },
     }
     const out = String(
       await searchMemory
-        .build(ctx({ memory, repoSync }))
+        .build(ctx({ memory, detectors }))
+        .execute?.({ query: "ACME", messages: [] } as never, {
+          toolCallId: "tc",
+          messages: [],
+        })
+    )
+    // La nota va ANTES del contenido; el contenido sigue ahí.
+    expect(out).toContain("tenés un repo X sin indexar")
+    expect(out).toContain("código actual")
+    expect(out.indexOf("sin indexar")).toBeLessThan(
+      out.indexOf("código actual")
+    )
+    // El registry recibe la query + los sources recuperados.
+    expect(runCtx).toMatchObject({
+      query: "ACME",
+      retrievedSources: ["repo:kev/vaio"],
+    })
+  })
+
+  it("sin detectores → solo el contenido, sin notas", async () => {
+    const memory: MemoryStore = {
+      searchMemory: async () => [
+        { source: "repo:kev/vaio", url: "u", chunk: "código actual" },
+      ],
+      upsertDocuments: async () => {},
+      clearSource: async () => {},
+      listIndexedFiles: async () => [],
+      deleteFiles: async () => {},
+      replaceFile: async () => {},
+    }
+    const out = String(
+      await searchMemory
+        .build(ctx({ memory }))
         .execute?.({ query: "kevin" }, { toolCallId: "tc", messages: [] })
     )
-    // El sistema surfacea la staleness para que el modelo la flaggee (honesto, sin orquestar).
-    expect(out.toLowerCase()).toMatch(/atrás|segundo plano|actualiz|reciente/)
-    // y el contenido recuperado sigue ahí
     expect(out).toContain("código actual")
+    expect(out).not.toContain("nota del sistema")
   })
 
   it("antepone los facts curados a los docs del repo (no compiten)", async () => {
