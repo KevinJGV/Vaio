@@ -37,4 +37,14 @@ export interface FactStore {
   reject(id: string): Promise<boolean>
   /** Propuestas pendientes de un principal (más recientes primero). */
   listPending(principalId: string, limit?: number): Promise<PendingFact[]>
+  /** Desaprende un fact CONFIRMADO vigente: invalidAt=now, expiredAt=now, decidedAt=now; SIN supersede.
+   *  Reversible/auditable (la fila queda). false si no existe o no está confirmed-vigente (idempotente). */
+  invalidate(id: string): Promise<boolean>
+  /** Facts CONFIRMADOS vigentes de un principal, los más cercanos por coseno a `query` (para desaprender por
+   *  similitud → el owner los ve por ordinal, Inv #8). best-effort: embed falla → []. */
+  findConfirmedNear(
+    query: string,
+    principalId: string,
+    limit?: number
+  ): Promise<ConflictCandidate[]>
 }

@@ -8,8 +8,9 @@ import type { InputAttachment, TurnRequest } from "@vaio/contracts"
 import type { Hono } from "hono"
 import { type Agent, courtesy } from "../../core/agent.js"
 import { shouldSpeak, stripForSpeech } from "../../core/speech-policy.js"
+import type { ConflictJudge } from "../../ports/conflict-judge.js"
 import type { EscalationStore } from "../../ports/escalation.js"
-import type { FactDrafter } from "../../ports/fact-drafter.js"
+import type { FactDecomposer } from "../../ports/fact-decomposer.js"
 import type { FactStore } from "../../ports/facts.js"
 import type { Logger } from "../../ports/logger.js"
 import type { ResolvedMedia } from "../../ports/media.js"
@@ -43,9 +44,11 @@ export interface TelegramDeps {
   /** Cola de escalaciones (Fase 2). Presente → habilita el INBOUND: el reply del owner a una escalada se
    *  correlaciona y cierra el bucle (retomo al visitante + invitación a curar). null/ausente = escalate off. */
   escalations?: EscalationStore
-  /** Curación de facts desde el inbound (default-por-tipo). Opcionales: sin ellos, el inbound solo retoma/confirma. */
+  /** Curación de facts desde el inbound (default-por-tipo + juez de contradicción + atomicidad). Opcionales: sin
+   *  ellos, el inbound solo retoma/confirma. */
   factStore?: FactStore
-  factDrafter?: FactDrafter
+  factDecomposer?: FactDecomposer
+  conflictJudge?: ConflictJudge
   sink: TraceSink
   /** Descarga de media (audio/voz + imágenes). undefined = sin multimodal → se ignoran adjuntos. */
   media?: TelegramMedia
@@ -296,7 +299,8 @@ export function mountTelegram(
           client: deps.client,
           logger: log,
           factStore: deps.factStore,
-          factDrafter: deps.factDrafter,
+          factDecomposer: deps.factDecomposer,
+          conflictJudge: deps.conflictJudge,
         },
         norm
       )

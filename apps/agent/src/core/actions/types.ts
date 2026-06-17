@@ -5,8 +5,10 @@
 
 import type { TraceEvent } from "@vaio/contracts"
 import type { Tool } from "ai"
+import type { ConflictJudge } from "../../ports/conflict-judge.js"
 import type { Connector } from "../../ports/connector.js"
 import type { EscalationStore } from "../../ports/escalation.js"
+import type { FactDecomposer } from "../../ports/fact-decomposer.js"
 import type { FactStore } from "../../ports/facts.js"
 import type { DetectorRegistry } from "../../ports/knowledge-detector.js"
 import type { Logger } from "../../ports/logger.js"
@@ -43,6 +45,10 @@ export interface ActionContext {
   logger: Logger
   /** Memoria de hechos curados (write-actions). null = sin DB → las acciones degradan. */
   factStore?: FactStore | null
+  /** Juez de contradicción (cluster fact): nuevo-vs-vigentes (contradice/duplica/coexiste). null = degrada conservador. */
+  conflictJudge?: ConflictJudge | null
+  /** Descomponedor atómico (cluster fact): parte statements compuestos en facts mono-idea. null = statement crudo. */
+  factDecomposer?: FactDecomposer | null
   /** Rerank de la 2ª etapa del RAG. null = sin rerank → searchMemory cae a vector top-K. */
   reranker?: Reranker | null
   /** Pool de candidatos (wide-K) a recuperar por vector antes de rerankear. Default 30. */

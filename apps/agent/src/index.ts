@@ -5,11 +5,12 @@
 
 import { serve } from "@hono/node-server"
 import { createCompressor } from "./adapters/compress.js"
+import { createConflictJudge } from "./adapters/conflict-judge.js"
 import { buildConnectors } from "./adapters/connectors/index.js"
 import { createDb } from "./adapters/db/client.js"
 import { EMBEDDING_DIM } from "./adapters/db/schema.js"
 import { createEmbedder } from "./adapters/embeddings.js"
-import { createFactDrafter } from "./adapters/fact-drafter.js"
+import { createFactDecomposer } from "./adapters/fact-decomposer.js"
 import { buildApp } from "./adapters/http/routes.js"
 import { createLogger } from "./adapters/logger.js"
 import {
@@ -55,10 +56,11 @@ import { createFreshnessDetector } from "./core/detectors/freshness.js"
 import { createDetectorRegistry } from "./core/detectors/registry.js"
 import { createRepoAwarenessDetector } from "./core/detectors/repo-awareness.js"
 import { DEFAULT_REPO_POLICY } from "./core/repo-ingest.js"
+import type { ConflictJudge } from "./ports/conflict-judge.js"
 import type { Connector } from "./ports/connector.js"
 import type { ConversationStore } from "./ports/conversation.js"
 import type { EscalationStore } from "./ports/escalation.js"
-import type { FactDrafter } from "./ports/fact-drafter.js"
+import type { FactDecomposer } from "./ports/fact-decomposer.js"
 import type { FactStore } from "./ports/facts.js"
 import type { DetectorRegistry } from "./ports/knowledge-detector.js"
 import type { MediaUnderstanding, Transcriber } from "./ports/media.js"
@@ -118,7 +120,8 @@ let ragEnabled = false
 let conversations: ConversationStore | null = null
 let escalations: EscalationStore | null = null
 let factStore: FactStore | null = null
-let factDrafter: FactDrafter | null = null
+let conflictJudge: ConflictJudge | null = null
+let factDecomposer: FactDecomposer | null = null
 let summarizer: Summarizer | null = null
 let transcriber: Transcriber | null = null
 let mediaUnderstanding: MediaUnderstanding | null = null
@@ -148,10 +151,15 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
         concurrency: env.EMBED_CONCURRENCY,
       })
       memory = createMemoryStore(db, embedder, logger)
-      factStore = createFactStore(db, embedder, {
-        conflictDistance: env.FACT_CONFLICT_DISTANCE,
-        conflictCandidates: env.FACT_CONFLICT_CANDIDATES,
-      })
+      factStore = createFactStore(
+        db,
+        embedder,
+        {
+          conflictDistance: env.FACT_CONFLICT_DISTANCE,
+          conflictMax: env.FACT_CONFLICT_MAX,
+        },
+        logger
+      )
       // Sync incremental de repos (frescura + re-embeber solo lo cambiado). Reusa la policy de ingesta.
       repoSync = createRepoSync({
         memory,
@@ -219,7 +227,11 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
   }
   // Redactor de facts (curación de escaladas): usa el modelo de CHAT principal (no el de summary) — `generateObject`
   // (structured output) suele fallar en modelos free/baratos; el de chat es confiable. El costo extra es marginal.
-  factDrafter = createFactDrafter({ model, logger })
+  // Juez de contradicción + descomponedor atómico (cluster ciclo-de-vida del fact): el modelo de CHAT
+  // (generateObject es confiable ahí, no en summary). El juez decide la relación nuevo-vs-vigentes; el decomposer
+  // parte statements compuestos en facts atómicos mono-idea antes de juzgar/curar (reemplazó al viejo FactDrafter).
+  conflictJudge = createConflictJudge({ model, logger })
+  factDecomposer = createFactDecomposer({ model, logger })
   // Comprensión de media POR MODALIDAD (cada una su modelo/endpoint; no la cadena de chat):
   //  - STT: REST /audio/transcriptions con la cadena TRANSCRIBE_MODELS (fallback client-side).
   //  - Visión: chat+file-part con la cadena VISION_MODELS.
@@ -263,6 +275,8 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
     model,
     memory,
     factStore,
+    conflictJudge,
+    factDecomposer,
     conversations,
     summarizer,
     compressor,
@@ -328,7 +342,8 @@ if (
     // Inbound de escalaciones: el reply del owner a una escalada se correlaciona y cierra el bucle (+ curación).
     ...(escalations ? { escalations } : {}),
     ...(factStore ? { factStore } : {}),
-    ...(factDrafter ? { factDrafter } : {}),
+    ...(factDecomposer ? { factDecomposer } : {}),
+    ...(conflictJudge ? { conflictJudge } : {}),
     draftStreaming: env.TELEGRAM_DRAFT_STREAMING,
     sink,
     // Descarga de media de Telegram (audio/voz + imágenes). El core decide transcribir/describir.
@@ -371,7 +386,7 @@ logger.info(
     nativeImages: env.MULTIMODAL_NATIVE_IMAGES,
     telegram: telegram !== undefined,
     escalate: escalations !== null && ownerNotifier !== null,
-    escalateCuration: factStore !== null && factDrafter !== null,
+    escalateCuration: factStore !== null && factDecomposer !== null,
     models,
     logLevel: env.LOG_LEVEL,
     logFormat: env.LOG_FORMAT,

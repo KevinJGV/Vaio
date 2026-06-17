@@ -15,12 +15,14 @@ import { rememberFact } from "./remember-fact.js"
 import { resolveFact } from "./resolve-fact.js"
 import { searchMemory } from "./search-memory.js"
 import type { ActionContext, ActionDescriptor } from "./types.js"
+import { unlearnFact } from "./unlearn-fact.js"
 
 /** Único lugar donde se listan las acciones que el harness sabe construir. */
 export const ACTIONS: ActionDescriptor[] = [
   searchMemory,
   rememberFact,
   resolveFact,
+  unlearnFact,
   checkRepoFreshness,
   learnRepo,
   findRepos,

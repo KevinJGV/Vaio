@@ -2,16 +2,17 @@
 // turno normal. Kevin responde DENTRO del hilo (Threaded Mode → threadId) o citando el DM (replyToMessageId) →
 // correlacionamos por id (Inv #8, el sistema, no el modelo). Si matchea: marca answered (idempotente), RETOMA al
 // visitante (await → "se lo transmití" solo si LLEGÓ de verdad) y, según el TIPO de escalada + lo que Kevin diga,
-// CURA un fact (default-por-tipo, redactado 3ª persona por el FactDrafter, nunca lo sensible) — ejecución
-// DETERMINÍSTICA del sistema (no una tool que el modelo deba decidir → no reintroduce el gap "dice pero no hace").
-// Si NO matchea, es un turno normal de Kevin → devuelve false.
+// CURA facts: descompone en átomos (FactDecomposer, 3ª persona, nunca lo sensible) → el JUEZ decide la relación con
+// los vigentes → persiste/invalida (auto-resuelve; middleware-siempre) — ejecución DETERMINÍSTICA del sistema (no
+// una tool que el modelo deba decidir → no reintroduce el gap "dice pero no hace"). Si NO matchea → false.
 
+import type { ConflictJudge } from "../../ports/conflict-judge.js"
 import type {
   AnsweredEscalation,
   EscalationStore,
 } from "../../ports/escalation.js"
-import type { FactDrafter } from "../../ports/fact-drafter.js"
-import type { FactStore } from "../../ports/facts.js"
+import type { FactDecomposer } from "../../ports/fact-decomposer.js"
+import type { ConflictCandidate, FactStore } from "../../ports/facts.js"
 import type { Logger } from "../../ports/logger.js"
 import type { ConversationResumer } from "../../ports/proactive.js"
 import type { TelegramClient } from "./client.js"
@@ -35,12 +36,13 @@ interface InboundDeps {
   logger: Logger
   /** Curación (opcionales: sin ellos, el inbound solo retoma/confirma — degradación Inv #1). */
   factStore?: FactStore
-  factDrafter?: FactDrafter
+  factDecomposer?: FactDecomposer
+  conflictJudge?: ConflictJudge
 }
 
 interface CurationResult {
-  statement: string | null // lo que se guardó (3ª persona), o null
-  conflict: boolean // chocó con un fact previo → quedó PENDING (Kevin resuelve)
+  learned: string[] // statements guardados (3ª persona)
+  superseded: string[] // statements viejos dados de baja (invalidados) por contradicción de alta confianza
 }
 
 function parseTelegramKey(
@@ -54,8 +56,9 @@ function parseTelegramKey(
   return Number.isInteger(threadId) ? { chatId, threadId } : { chatId }
 }
 
-/** ¿Esta respuesta debe volverse un fact? Default por TIPO, con veto/override del owner. knowledge aprende salvo
- *  veto; contact/claim NO aprenden salvo que Kevin lo fuerce. (El "qué" lo redacta el drafter; esto es el "si".) */
+/** ¿Esta respuesta debe PERSISTIRSE como fact? Default por TIPO, con veto/override del owner. knowledge aprende
+ *  salvo veto; contact/claim NO aprenden salvo que Kevin lo fuerce. (El "qué" lo descompone el decomposer; esto es
+ *  el "si". Nota: aunque no se persista, el middleware-siempre igual invalida contradicciones — ver curate.) */
 function shouldLearn(
   kind: AnsweredEscalation["kind"],
   ownerText: string
@@ -64,8 +67,11 @@ function shouldLearn(
   return FORCE_RE.test(ownerText) // contact | claim
 }
 
-/** Curación DETERMINÍSTICA (sistema): decide por tipo → redacta (drafter) → persiste (FactStore). El LLM solo
- *  produce el statement (Inv #8). Conflicto → deja PENDING (no auto-commit). best-effort: cualquier fallo → no guarda. */
+/** Curación DETERMINÍSTICA (sistema): descompone la respuesta de Kevin en facts ATÓMICOS → el JUEZ decide la
+ *  relación de cada uno con los vigentes (contradice/duplica/coexiste) → el sistema persiste/invalida (Inv #8/#9).
+ *  AUTO-RESUELVE (no cuelga pendientes): contradicción de alta confianza → guarda el nuevo invalidando el viejo;
+ *  duplicado → no duplica; aditivo → guarda. MIDDLEWARE SIEMPRE: aunque el tipo NO aprenda, si la respuesta
+ *  contradice un fact vigente → lo invalida (cierra la fuga de memoria rancia). best-effort: fallo → no toca nada. */
 async function curate(
   deps: InboundDeps,
   esc: AnsweredEscalation,
@@ -73,72 +79,150 @@ async function curate(
   ownerPrincipalId: string,
   locale: "es" | "en"
 ): Promise<CurationResult> {
-  if (!deps.factStore || !deps.factDrafter) {
+  const empty: CurationResult = { learned: [], superseded: [] }
+  if (!deps.factStore || !deps.factDecomposer) {
     deps.logger.info(
       { escId: esc.id },
-      "curación: sin factStore/drafter → skip"
+      "curación: sin factStore/decomposer → skip"
     )
-    return { statement: null, conflict: false }
+    return empty
   }
-  if (!shouldLearn(esc.kind, ownerText)) {
-    deps.logger.info(
-      { escId: esc.id, kind: esc.kind },
-      "curación: no aprende (default del tipo o veto del owner)"
+  const factStore = deps.factStore
+  // Descomponer SIEMPRE (mono-idea). El tipo/veto decide si se PERSISTE; los átomos sirven igual para detectar
+  // contradicciones a invalidar (middleware-siempre). Sin átomos factuales (no-factual/sensible) → nada que hacer.
+  let atoms: string[]
+  try {
+    const r = await deps.factDecomposer.decompose({
+      rawText: ownerText,
+      question: esc.question,
+      locale,
+    })
+    atoms = r.statements
+  } catch {
+    atoms = []
+  }
+  if (atoms.length === 0) return empty
+
+  const learn = shouldLearn(esc.kind, ownerText)
+  const learned: string[] = []
+  const superseded: string[] = []
+  let firstFactId: string | null = null // costura Inc 2: anclar la escalada al 1er fact curado (hilo→fact)
+
+  // Mapear ordinal→uuid y filtrar por veredicto (el juez emite ordinales; el sistema conoce los ids — Inv #8).
+  const verdicts = async (
+    atom: string,
+    candidates: ConflictCandidate[]
+  ): Promise<{ contradicts: ConflictCandidate[]; anyDuplicate: boolean }> => {
+    if (!deps.conflictJudge || candidates.length === 0) {
+      return { contradicts: [], anyDuplicate: false }
+    }
+    const { decisions } = await deps.conflictJudge.judge({
+      rawText: ownerText,
+      statement: atom,
+      candidates: candidates.map((c, i) => ({
+        ordinal: i,
+        statement: c.statement,
+      })),
+      locale,
+    })
+    const contradicts = candidates.filter(
+      (_c, i) =>
+        decisions.find((d) => d.ordinal === i)?.verdict === "contradicts"
     )
-    return { statement: null, conflict: false }
+    const anyDuplicate = decisions.some((d) => d.verdict === "duplicate")
+    return { contradicts, anyDuplicate }
   }
-  const { statement, reason } = await deps.factDrafter.draft({
-    question: esc.question,
-    ownerAnswer: ownerText,
-    locale,
-  })
-  if (!statement) {
-    // no-factual o sensible (salvaguarda anti-fuga) o el drafter falló → no guarda
-    deps.logger.info(
-      { escId: esc.id, reason },
-      "curación: el drafter no produjo fact (no-factual/sensible/error)"
-    )
-    return { statement: null, conflict: false }
+
+  for (const atom of atoms) {
+    try {
+      if (learn) {
+        const { id, conflicts } = await factStore.propose({
+          statement: atom,
+          principalId: ownerPrincipalId,
+          channel: NOTIFY_CHANNEL,
+          conversationId: esc.origin.conversationId,
+        })
+        if (conflicts.length === 0) {
+          await factStore.commit(id)
+          learned.push(atom)
+          firstFactId ??= id
+        } else {
+          const { contradicts, anyDuplicate } = await verdicts(atom, conflicts)
+          if (contradicts.length > 0) {
+            // Contradice (alta confianza) → guarda el nuevo invalidando los viejos (commit con supersedes).
+            await factStore.commit(id, {
+              supersedes: contradicts.map((c) => c.id),
+            })
+            learned.push(atom)
+            superseded.push(...contradicts.map((c) => c.statement))
+            firstFactId ??= id
+          } else if (anyDuplicate) {
+            await factStore.reject(id) // dedup: no duplicar
+          } else {
+            await factStore.commit(id) // coexiste/dudoso → aditivo
+            learned.push(atom)
+            firstFactId ??= id
+          }
+        }
+      } else {
+        // Middleware-siempre: NO persiste, pero si el átomo contradice un vigente → invalidar (sin proponer).
+        const candidates = await factStore.findConfirmedNear(
+          atom,
+          ownerPrincipalId
+        )
+        const { contradicts } = await verdicts(atom, candidates)
+        for (const c of contradicts) {
+          if (await factStore.invalidate(c.id)) superseded.push(c.statement)
+        }
+      }
+    } catch (err) {
+      deps.logger.warn(
+        {
+          escId: esc.id,
+          err: err instanceof Error ? err.message : String(err),
+        },
+        "curación: átomo falló (best-effort)"
+      )
+    }
   }
-  const { id: factId, conflicts } = await deps.factStore.propose({
-    statement,
-    principalId: ownerPrincipalId,
-    channel: NOTIFY_CHANNEL,
-    conversationId: esc.origin.conversationId,
-  })
-  if (conflicts.length > 0) {
-    deps.logger.info(
-      { escId: esc.id, statement },
-      "curación: conflicto con un fact previo → PENDING (Kevin resuelve)"
-    )
-    return { statement: null, conflict: true } // PENDING: Kevin adjudica con resolveFact
-  }
-  await deps.factStore.commit(factId)
-  await deps.escalations.linkFact(esc.id, factId)
+
+  if (firstFactId) await deps.escalations.linkFact(esc.id, firstFactId)
   deps.logger.info(
-    { escId: esc.id, factId, statement },
-    "curación: fact guardado"
+    { escId: esc.id, learned: learned.length, superseded: superseded.length },
+    "curación: resuelta"
   )
-  return { statement, conflict: false }
+  return { learned, superseded }
 }
 
-/** Confirmación a Kevin (en su idioma) según el resultado REAL del retomo + la curación. NO promete "borrar"
- *  (el desaprender es un followup): invita a avisar si algo no cuadra. */
+/** Confirmación a Kevin (en su idioma) según el resultado REAL del retomo + la curación. La invalidación es
+ *  SIEMPRE VISIBLE (nombra lo que dio de baja). Invita a avisar si algo no cuadra. */
 function ownerConfirmation(r: {
   delivered: boolean
-  learned: string | null
-  conflict: boolean
+  learned: string[]
+  superseded: string[]
 }): string {
   const head = r.delivered
     ? "✅ Listo, se lo transmití al visitante."
     : "✅ Anotado (el visitante no está en línea ahora)."
-  if (r.learned) {
-    return `${head} Guardé «${escapeTelegramHtml(r.learned)}» como dato tuyo (avisame si algo no cuadra).`
+  const parts: string[] = [head]
+  if (r.learned.length > 0) {
+    parts.push(
+      `Guardé ${r.learned.map((s) => `«${escapeTelegramHtml(s)}»`).join(", ")} como dato tuyo.`
+    )
   }
-  if (r.conflict) {
-    return `${head} Eso choca con algo que ya sabía — decime con cuál te quedás y lo resuelvo.`
+  if (r.superseded.length > 0) {
+    parts.push(
+      `Di de baja ${r.superseded.map((s) => `«${escapeTelegramHtml(s)}»`).join(", ")} (ya no aplicaba).`
+    )
   }
-  return `${head} Si querés que recuerde algo de esto como dato tuyo, decímelo y lo guardo.`
+  if (r.learned.length === 0 && r.superseded.length === 0) {
+    parts.push(
+      "Si querés que recuerde algo de esto como dato tuyo, decímelo y lo guardo."
+    )
+  } else {
+    parts.push("(avisame si algo no cuadra).")
+  }
+  return parts.join(" ")
 }
 
 /** Intenta tratar `norm` como la respuesta del owner a una escalada. Devuelve true si la CONSUMIÓ (no es un turno
@@ -201,8 +285,8 @@ export async function tryHandleEscalationReply(
         delivered = res.delivered
       }
     }
-    // 2) Curación (default por tipo + veto/override). El dato lo aporta Kevin (owner), gated, 3ª persona.
-    const { statement, conflict } = await curate(
+    // 2) Curación (default por tipo + veto/override + middleware-siempre). El dato lo aporta Kevin (owner), gated.
+    const { learned, superseded } = await curate(
       deps,
       esc,
       norm.text,
@@ -214,7 +298,7 @@ export async function tryHandleEscalationReply(
       norm.threadId !== undefined ? { messageThreadId: norm.threadId } : {}
     await deps.client.sendMessage(
       norm.chatId,
-      ownerConfirmation({ delivered, learned: statement, conflict }),
+      ownerConfirmation({ delivered, learned, superseded }),
       send
     )
   })().catch((err) => {

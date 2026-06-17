@@ -3,9 +3,28 @@ import { describe, expect, it } from "vitest"
 import { rememberFact } from "../src/core/actions/remember-fact.js"
 import { resolveFact } from "../src/core/actions/resolve-fact.js"
 import type { ActionContext } from "../src/core/actions/types.js"
+import { unlearnFact } from "../src/core/actions/unlearn-fact.js"
 import type { Principal } from "../src/core/capabilities.js"
+import type {
+  ConflictJudge,
+  ConflictVerdict,
+} from "../src/ports/conflict-judge.js"
+import type { FactDecomposer } from "../src/ports/fact-decomposer.js"
 import type { LogFields, Logger } from "../src/ports/logger.js"
 import { inMemoryFacts } from "./fakes/in-memory-facts.js"
+
+/** Fake ConflictJudge: marca TODOS los candidatos con el mismo veredicto. */
+function fakeJudge(verdict: ConflictVerdict): ConflictJudge {
+  return {
+    judge: async ({ candidates }) => ({
+      decisions: candidates.map((c) => ({ ordinal: c.ordinal, verdict })),
+    }),
+  }
+}
+/** Fake FactDecomposer: devuelve los átomos fijos. */
+function fakeDecomposer(statements: string[]): FactDecomposer {
+  return { decompose: async () => ({ statements }) }
+}
 
 function noopLogger(): Logger {
   const noop = (_a: LogFields | string, _b?: string): void => {}
@@ -22,12 +41,16 @@ function noopLogger(): Logger {
 const principal: Principal = { channel: "telegram", id: "k", trusted: true }
 function ctx(
   factStore: ActionContext["factStore"],
-  emit: (e: TraceEvent) => void = () => {}
+  emit: (e: TraceEvent) => void = () => {},
+  extra: {
+    conflictJudge?: ConflictJudge
+    factDecomposer?: FactDecomposer
+  } = {}
 ): ActionContext {
   return {
     caps: {
       channel: "telegram",
-      allowedTools: ["rememberFact", "resolveFact"],
+      allowedTools: ["rememberFact", "resolveFact", "unlearnFact"],
       memoryScope: { maxK: 8 },
       policyText: "",
     },
@@ -37,6 +60,8 @@ function ctx(
     emit,
     ids: { requestId: "r", turnId: "t", conversationId: "c" },
     logger: noopLogger(),
+    ...(extra.conflictJudge ? { conflictJudge: extra.conflictJudge } : {}),
+    ...(extra.factDecomposer ? { factDecomposer: extra.factDecomposer } : {}),
   }
 }
 
@@ -182,5 +207,170 @@ describe("resolveFact", () => {
       )
     expect(String(out)).toMatch(/guard/i)
     expect(fs.rows().every((r) => r.invalidAt === null)).toBe(true)
+  })
+})
+
+describe("rememberFact + juez (cluster ciclo-de-vida del fact)", () => {
+  const seed = async (
+    fs: ReturnType<typeof inMemoryFacts>,
+    statement: string
+  ) => {
+    const { id } = await fs.propose({
+      statement,
+      principalId: "k",
+      channel: "telegram",
+    })
+    await fs.commit(id)
+  }
+
+  it("REGRESIÓN pasta/fútbol: cercano pero el juez dice COEXISTE → guarda, NADA pendiente", async () => {
+    const fs = inMemoryFacts()
+    await seed(fs, "A Kevin le gusta el fútbol")
+    const out = await rememberFact
+      .build(
+        ctx(fs, () => {}, {
+          conflictJudge: fakeJudge("coexists"),
+          factDecomposer: fakeDecomposer(["A Kevin le gusta la pasta"]),
+        })
+      )
+      .execute?.(
+        { statement: "A Kevin le gusta la pasta" },
+        { toolCallId: "t", messages: [] }
+      )
+    expect(String(out)).toMatch(/guard/i)
+    expect(await fs.listPending("k")).toHaveLength(0) // no quedó colgado
+  })
+
+  it("cercano + juez DUPLICADO → no duplica (reject), avisa que ya lo tenía", async () => {
+    const fs = inMemoryFacts()
+    await seed(fs, "A Kevin le gusta la pasta")
+    const out = await rememberFact
+      .build(
+        ctx(fs, () => {}, {
+          conflictJudge: fakeJudge("duplicate"),
+          factDecomposer: fakeDecomposer(["A Kevin le gusta la pasta"]),
+        })
+      )
+      .execute?.(
+        { statement: "A Kevin le gusta la pasta" },
+        { toolCallId: "t", messages: [] }
+      )
+    expect(String(out)).toMatch(/ya lo tenía/i)
+    expect(await fs.listPending("k")).toHaveLength(0)
+  })
+
+  it("cercano + juez CONTRADICE → deja PENDIENTE (HITL) con el ordinal + resolveFact", async () => {
+    const fs = inMemoryFacts()
+    await seed(fs, "A Kevin le gusta la pasta")
+    const out = await rememberFact
+      .build(
+        ctx(fs, () => {}, {
+          conflictJudge: fakeJudge("contradicts"),
+          factDecomposer: fakeDecomposer(["A Kevin ya no le gusta la pasta"]),
+        })
+      )
+      .execute?.(
+        { statement: "A Kevin ya no le gusta la pasta" },
+        { toolCallId: "t", messages: [] }
+      )
+    expect(String(out)).toMatch(/pendiente/i)
+    expect(String(out)).toMatch(/\[0\]/)
+    expect(String(out)).toMatch(/resolveFact/)
+    expect(await fs.listPending("k")).toHaveLength(1)
+  })
+
+  it("statement COMPUESTO → guarda átomos separados", async () => {
+    const fs = inMemoryFacts()
+    const out = await rememberFact
+      .build(
+        ctx(fs, () => {}, {
+          // átomos no relacionados → el juez los marca coexistentes (el fake los ve "cercanos" por contrato)
+          conflictJudge: fakeJudge("coexists"),
+          factDecomposer: fakeDecomposer([
+            "A Kevin le gustaba explorar",
+            "A Kevin le daban miedo las piscinas",
+          ]),
+        })
+      )
+      .execute?.(
+        { statement: "me gustaba explorar y las piscinas me daban miedo" },
+        { toolCallId: "t", messages: [] }
+      )
+    expect(String(out)).toMatch(/guard/i)
+    expect(fs.rows().filter((r) => r.status === "confirmed")).toHaveLength(2)
+  })
+
+  it("decomposer vacío → no guarda nada", async () => {
+    const fs = inMemoryFacts()
+    const out = await rememberFact
+      .build(ctx(fs, () => {}, { factDecomposer: fakeDecomposer([]) }))
+      .execute?.(
+        { statement: "mi número es 300…" },
+        { toolCallId: "t", messages: [] }
+      )
+    expect(String(out)).toMatch(/durable|sensible/i)
+    expect(fs.rows()).toHaveLength(0)
+  })
+})
+
+describe("unlearnFact", () => {
+  const seed = async (
+    fs: ReturnType<typeof inMemoryFacts>,
+    statement: string
+  ) => {
+    const { id } = await fs.propose({
+      statement,
+      principalId: "k",
+      channel: "telegram",
+    })
+    await fs.commit(id)
+  }
+
+  it("0 candidatos → avisa que no encontró nada", async () => {
+    const out = await unlearnFact
+      .build(ctx(inMemoryFacts()))
+      .execute?.({ about: "nada parecido" }, { toolCallId: "u", messages: [] })
+    expect(String(out)).toMatch(/no encontré/i)
+  })
+
+  it("1 candidato nítido → lo olvida EN EL TURNO (invalida) y lo nombra", async () => {
+    const fs = inMemoryFacts()
+    await seed(fs, "A Kevin le gusta la pasta")
+    const out = await unlearnFact
+      .build(ctx(fs))
+      .execute?.({ about: "pasta" }, { toolCallId: "u", messages: [] })
+    expect(String(out)).toMatch(/olvidé/i)
+    expect(
+      fs.rows().find((r) => r.statement.includes("pasta"))?.invalidAt
+    ).not.toBeNull()
+  })
+
+  it("≥2 candidatos → lista por ordinal; luego `which` invalida el elegido", async () => {
+    const fs = inMemoryFacts()
+    await seed(fs, "A Kevin le gusta la pasta")
+    await seed(fs, "A Kevin odia la pasta recalentada")
+    const list = await unlearnFact
+      .build(ctx(fs))
+      .execute?.({ about: "pasta" }, { toolCallId: "u1", messages: [] })
+    expect(String(list)).toMatch(/\[0\]/)
+    expect(String(list)).toMatch(/\[1\]/)
+    expect(fs.rows().every((r) => r.invalidAt === null)).toBe(true) // aún no tocó nada
+    const out = await unlearnFact
+      .build(ctx(fs))
+      .execute?.(
+        { about: "pasta", which: 1 },
+        { toolCallId: "u2", messages: [] }
+      )
+    expect(String(out)).toMatch(/olvidé/i)
+    expect(
+      fs.rows().find((r) => r.statement.includes("recalentada"))?.invalidAt
+    ).not.toBeNull()
+  })
+
+  it("degrada si no hay factStore", async () => {
+    const out = await unlearnFact
+      .build(ctx(null))
+      .execute?.({ about: "x" }, { toolCallId: "u", messages: [] })
+    expect(String(out)).toMatch(/no configurada|no puedo/i)
   })
 })

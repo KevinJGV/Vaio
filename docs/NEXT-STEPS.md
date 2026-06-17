@@ -1,6 +1,10 @@
 # Pendientes — Vaio (para retomar)
 
-> **ESTADO ACTUAL (2026-06-14) — fuente de verdad viva.**
+> **ESTADO ACTUAL (2026-06-17) — fuente de verdad viva.**
+> **`origin/main` SINCRONIZADO con `main`** (2026-06-17): escalate v1+v2 (Inc 1), turnos proactivos, fix 400 Telegram
+> y `hasOpenPRs` ya pusheados → el deploy de Railway aplica las migraciones `0009`/`0010`/`0011` por su
+> `preDeployCommand`. **EN CURSO:** cluster "ciclo de vida del fact" **Inc 1** (juez de contradicción + atomicidad +
+> desaprender) en `feat/fact-lifecycle-judge` — diseño aprobado, codeando (ver "🚧 En proceso").
 > **Fase 1: completa y DESPLEGADA** (Railway/Docker; RAG real Neon+pgvector; observabilidad pino) — en `main`.
 > **Iteración 2 — MERGEADA en `main`:** núcleo *stateful* + capacidades por canal + Telegram `/tg`,
 > **compresión cavemem** (`@vaio/compress`), **refinamiento Telegram** (hilos/topics, HTML, identidad/owner),
@@ -103,17 +107,28 @@
 > por escalada (Threaded Mode) + curación default-por-tipo + "transmití real" + los fixes post-e2e (P1 escala directo,
 > hilo desbloqueado, drafter al modelo de chat, visibilidad por kind). Flujo principal verificado en vivo. Queda P2
 > (falso conflicto) diferido al cluster (abajo).
-- [ ] **CLUSTER "ciclo de vida del fact desde el hilo del pendiente"** (PRÓXIMO MAYOR; decisión de Kevin 2026-06-16,
-  diseñar JUNTO — NO aislar el desaprender): (i) el hilo de la escalada como **contexto + puntero/ancla
-  determinística** al pendiente (su `escalationId`/`factId`) → continuar con contexto + ajustar/`cambié de opinión`/
-  desaprender SIN ambigüedad (el sistema sabe el id por el hilo, Inv #8); (ii) **desaprender facts** (reversibilidad:
-  invalidar bi-temporal `invalidAt` vs borrar — su decisión); (iii) **middleware de conflicto SIEMPRE** (aprenda o no):
-  juzgar si la respuesta de Kevin contradice un fact vigente → advertir + invalidar el viejo (cierra la fuga de memoria
-  rancia). **⚠️ CASO que lo motiva (P2, e2e pasta/fútbol):** la curación HOY trata `propose().conflicts` (cercanía por
-  coseno, juicio delegado al modelo) como contradicción → falso «choca» + facts en `pending` colgados (~4 del e2e,
-  limpiar). Diagnóstico + opciones (A commit-coexisten / **B juicio-LLM + dedup**, recomendada) en `LEARNINGS.md`
-  ("cercanía vectorial ≠ contradicción"). Su propio brainstorming/design. Specs base:
-  [`…-escalate-v2-{design,plan}.md`](superpowers/specs/2026-06-16-escalate-v2-design.md).
+- [?] **CLUSTER "ciclo de vida del fact" — Inc 1 IMPLEMENTADO en `feat/fact-lifecycle-judge` (2026-06-17), PEND.
+  e2e de Kevin.** PRÓXIMO MAYOR del roadmap, faseado. **Inc 1 hecho** = (1) **`ConflictJudge`** (puerto+adapter, LLM)
+  compartido por los DOS caminos (`curate` determinístico + `rememberFact` conversacional) — cierra el bug P2
+  (pasta/fútbol: coexiste→commit, NADA pending); (2) **`FactDecomposer`** (reemplazó al `FactDrafter`: facts atómicos
+  mono-idea antes de juzgar); (3) **desaprender** (`FactStore.invalidate` bi-temporal + tool nueva `unlearnFact`,
+  owner-only); + **middleware-siempre** (contradicción invalida aunque no se aprenda, visible) + **juicio completo**
+  (sin truncar, `FACT_CONFLICT_MAX` logueado; `FACT_CONFLICT_CANDIDATES`→presentación "+N más"; umbral 0.45→0.55).
+  **Verificado local:** typecheck/biome/build limpios; **494 tests** (+12); `/health` 200 con `facts:true`,
+  `escalateCuration:true`. Specs [`…-fact-lifecycle-{design,plan}.md`](superpowers/specs/2026-06-17-fact-lifecycle-design.md);
+  lección en `LEARNINGS.md`. **Falta:** e2e de Kevin por Telegram (juez/decompose con LLM real) → atomicidad
+  (compuesto→átomos), conversacional (pasta+fútbol coexisten/sin pending; "ya no" → pending→resolveFact; `unlearnFact`),
+  escalada (contradice→auto-invalida+visible). **Costuras para Inc 2 dejadas:** `invalidate` standalone, juez por
+  ordinales, `linkFact` al 1er fact curado, idempotencia por `escalationId`. Mergear a `main` tras el OK de Kevin.
+- [ ] **CLUSTER — Inc 2 (hilo-puntero)** (después de Inc 1): el hilo de la escalada como **ancla determinística** al
+  `escalationId`/`factId` (Inv #8) → continuar con contexto + ajustar/`cambié de opinión`/desaprender SIN ambigüedad
+  (el sistema sabe el id por el hilo). Inc 1 deja las costuras (`invalidate` standalone, juez por ordinales, `linkFact`
+  siempre, idempotencia por `escalationId`). Su propio par design+plan.
+- [ ] **CLUSTER — diferidos apuntados** (no en Inc 1, decisión de Kevin 2026-06-17): (a) **portfolio↔facts** —
+  reconciliar `documents` (RAG) vs `facts` curados + regla de **precedencia** (un fact confirmado gana sobre la
+  fuente); (b) **consolidación ontológica** ("completar" facts del mismo tópico en vez de acumular parciales) → Fase 3
+  (Graphiti); (c) **feedback cross-fuente del juez** (puente de (a): el juez sugiere corregir el dato en el portfolio;
+  la costura `suggestion` queda lista en Inc 1).
 - [ ] **Registro GLOBAL de pendientes consultable** (decisión de Kevin 2026-06-16): que TODA notificación proactiva
   (escaladas + rutinas + webhooks futuros) se persista en una tabla común y Vaio pueda consultar todo o por
   `kind`/estado; hoy `escalations` solo guarda escaladas de visitantes y el `OwnerNotifier` empuja sin persistir →
@@ -144,11 +159,11 @@
 > detectada + auto-cura), untracked (incidental). El fix `ignoreFresh` (incompleto appendea, no forceFull) salió del
 > propio e2e. El sub-camino repo-awareness `stale` y el append-`ignoreFresh` no se fuerzan en vivo por el guard
 > `notRetrieved` (ACME siempre se recupera) → cubiertos por unit tests; la conducta observable quedó toda verificada.
-- [x] ✅ **Limpieza del seed SINTÉTICO de trends (GROUNDING) — HECHO** (2026-06-15). Se borraron de la DB real los
-  **8** snapshots backdateados (-21d) de `connector_snapshots` (`lastfm`/`steam`/`wakatime`/`github-stats`) + los
-  **4** chunks `trend:*` derivados (en transacción; verificado 0 filas). La violación de grounding (historia
-  fabricada narrada como real) queda resuelta. Nota: ahí estaba el origen del `"se achicó"` del Followup ① ("el
-  espectro musical de Kevin se achicó"). La acumulación real arranca limpia al activar trends.
+> **✅ Cerrado 2026-06-15 (HECHO, movido del estado activo 2026-06-17) → Historial "Limpieza del seed sintético de
+> trends":** se borraron de la DB real los **8** snapshots backdateados (-21d) de `connector_snapshots`
+> (`lastfm`/`steam`/`wakatime`/`github-stats`) + los **4** chunks `trend:*` derivados (en transacción; verificado 0
+> filas). La violación de grounding (historia fabricada narrada como real) queda resuelta — era el origen del
+> `"se achicó"` del Followup ①. La acumulación real arranca limpia al activar trends.
 - [ ] **Activar trends REALES en prod — DIFERIDO (gate: 1ª versión bien establecida + integración completa en el
   portafolio).** Decisión de Kevin (2026-06-15): **toda activación de trends y todo cambio de env en producción** se
   hace recién cuando Vaio tenga una **primera versión bien establecida desplegada**; la **señal disparadora = la

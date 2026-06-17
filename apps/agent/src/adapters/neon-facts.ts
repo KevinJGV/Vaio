@@ -8,28 +8,34 @@ import type {
   FactStore,
   PendingFact,
 } from "../ports/facts.js"
+import type { Logger } from "../ports/logger.js"
 import type { Embedder } from "../ports/memory.js"
 import type { Database } from "./db/client.js"
 import { facts } from "./db/schema.js"
 
 export interface FactConflictConfig {
-  /** Distancia coseno máxima para considerar un fact "cercano" (candidato a conflicto). Generoso a propósito. */
+  /** Distancia coseno máxima para considerar un fact "cercano" (candidato a conflicto). Generoso: el coseno solo
+   *  acota ruido lejano; el JUEZ (ConflictJudge) decide la contradicción real. */
   conflictDistance: number
-  /** Cuántos candidatos cercanos devolver como máximo. */
-  conflictCandidates: number
+  /** Cap de SEGURIDAD del juicio: se traen TODOS los cercanos del umbral hasta este tope (si se alcanza, se loguea
+   *  — no truncar el juicio en silencio). NO es el límite de presentación. */
+  conflictMax: number
 }
 
 export function createFactStore(
   db: Database,
   embedder: Embedder,
-  cfg: FactConflictConfig
+  cfg: FactConflictConfig,
+  logger?: Logger
 ): FactStore {
   // Candidatos a conflicto: facts confirmados vigentes del mismo principal, cercanos por coseno al embedding
-  // dado (excluye `excludeId`). El modelo decide si REALMENTE se contradicen. Reusado por propose y listPending.
+  // dado (excluye `excludeId`). El JUEZ decide si REALMENTE se contradicen. Reusado por propose/listPending/
+  // findConfirmedNear. Trae TODOS los del umbral hasta `conflictMax` (juicio completo, sin cabos sueltos).
   const findNearConfirmed = async (
     emb: number[],
     principalId: string,
-    excludeId: string
+    excludeId: string,
+    limit: number = cfg.conflictMax
   ): Promise<ConflictCandidate[]> => {
     const dist = cosineDistance(facts.embedding, emb)
     const rows = await db
@@ -49,7 +55,14 @@ export function createFactStore(
         )
       )
       .orderBy(asc(dist))
-      .limit(cfg.conflictCandidates)
+      .limit(limit)
+    // No truncar el juicio en silencio: si llenamos el cap, podría haber más cercanos sin evaluar (Inv: cabos sueltos).
+    if (rows.length === limit && limit === cfg.conflictMax) {
+      logger?.warn(
+        { principalId, conflictMax: cfg.conflictMax },
+        "findNearConfirmed alcanzó FACT_CONFLICT_MAX — posibles candidatos sin juzgar"
+      )
+    }
     return rows.map((r) => ({
       id: r.id,
       statement: r.statement,
@@ -174,6 +187,41 @@ export function createFactStore(
         })
       }
       return out
+    },
+
+    async invalidate(id) {
+      // Desaprender = invalidar bi-temporal (reversible: la fila queda). UPDATE condicional → idempotente:
+      // solo toca un confirmed-vigente; 2ª llamada (ya invalidado) afecta 0 filas → false. NUNCA borra.
+      const res = await db
+        .update(facts)
+        .set({
+          invalidAt: sql`now()`,
+          expiredAt: sql`now()`,
+          decidedAt: sql`now()`,
+        })
+        .where(
+          and(
+            eq(facts.id, id),
+            eq(facts.status, "confirmed"),
+            isNull(facts.invalidAt)
+          )
+        )
+        .returning({ id: facts.id })
+      return res.length > 0
+    },
+
+    async findConfirmedNear(query, principalId, limit) {
+      // Best-effort: si el embed falla o no hay vector → [] (no romper el flujo de desaprender por similitud).
+      let emb: number[] | undefined
+      try {
+        const [e] = await embedder.embed([query])
+        emb = e
+      } catch {
+        emb = undefined
+      }
+      if (!emb) return []
+      // excludeId vacío ("") no excluye nada → trae los confirmados vigentes más cercanos a la query.
+      return await findNearConfirmed(emb, principalId, "", limit)
     },
   }
 }

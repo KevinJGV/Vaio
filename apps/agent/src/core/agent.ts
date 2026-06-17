@@ -16,6 +16,7 @@ import {
   streamText,
 } from "ai"
 import type { Compressor, Intensity } from "../ports/compress.js"
+import type { ConflictJudge } from "../ports/conflict-judge.js"
 import type { Connector } from "../ports/connector.js"
 import type {
   ConversationContext,
@@ -23,6 +24,7 @@ import type {
   StoredAttachment,
 } from "../ports/conversation.js"
 import type { EscalationStore } from "../ports/escalation.js"
+import type { FactDecomposer } from "../ports/fact-decomposer.js"
 import type { FactStore, PendingFact } from "../ports/facts.js"
 import type { DetectorRegistry } from "../ports/knowledge-detector.js"
 import type { Logger } from "../ports/logger.js"
@@ -82,6 +84,10 @@ export interface AgentDeps {
   nativeImages?: boolean
   /** Memoria de hechos curados (para listar pendientes y pasarlos a buildTools). null = sin DB. */
   factStore?: FactStore | null
+  /** Juez de contradicción (cluster fact): decide nuevo-vs-vigentes (contradice/duplica/coexiste). null = degrada conservador. */
+  conflictJudge?: ConflictJudge | null
+  /** Descomponedor atómico (cluster fact): parte statements compuestos en facts mono-idea. null = statement crudo como único átomo. */
+  factDecomposer?: FactDecomposer | null
   /** Rerank de la 2ª etapa del RAG. null = sin rerank → searchMemory cae a vector top-K. */
   reranker?: Reranker | null
   /** Pool de candidatos (wide-K) para el rerank. Default 30. */
@@ -176,6 +182,8 @@ export function createAgent(deps: AgentDeps) {
     mediaUnderstanding = null,
     nativeImages = false,
     factStore = null,
+    conflictJudge = null,
+    factDecomposer = null,
     reranker = null,
     rerankCandidates = 30,
     factRetrieveMax = 4,
@@ -337,6 +345,8 @@ export function createAgent(deps: AgentDeps) {
           principal,
           memory,
           factStore,
+          conflictJudge,
+          factDecomposer,
           emit,
           ids,
           logger: ctx.logger,

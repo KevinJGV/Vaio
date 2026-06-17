@@ -4,9 +4,13 @@ import {
   type NormalizeResult,
   normalizeUpdate,
 } from "../src/adapters/telegram/normalize.js"
+import type {
+  ConflictJudge,
+  ConflictVerdict,
+} from "../src/ports/conflict-judge.js"
 import type { EscalationOrigin } from "../src/ports/escalation.js"
-import type { FactDrafter } from "../src/ports/fact-drafter.js"
-import type { FactStore } from "../src/ports/facts.js"
+import type { FactDecomposer } from "../src/ports/fact-decomposer.js"
+import type { ConflictCandidate, FactStore } from "../src/ports/facts.js"
 import type { LogFields, Logger } from "../src/ports/logger.js"
 import type {
   ConversationResumer,
@@ -50,42 +54,69 @@ function fakeResumer(
   }
 }
 
-/** Fake FactStore: registra los commits; `conflict` simula un choque (propose devuelve un candidato). */
+/** Fake FactStore: registra commits/rejects/invalidates. `conflict` → propose devuelve un candidato cercano;
+ *  `near` → lo que devuelve findConfirmedNear (camino middleware-siempre). */
 function fakeFactStore(
-  conflict = false
-): FactStore & { committed: string[]; proposed: string[] } {
-  const committed: string[] = []
+  opts: { conflict?: boolean; near?: ConflictCandidate[] } = {}
+): FactStore & {
+  committed: { id: string; supersedes?: string[] }[]
+  proposed: string[]
+  rejected: string[]
+  invalidated: string[]
+} {
+  const committed: { id: string; supersedes?: string[] }[] = []
   const proposed: string[] = []
+  const rejected: string[] = []
+  const invalidated: string[] = []
   let n = 0
   return {
     committed,
     proposed,
+    rejected,
+    invalidated,
     async propose({ statement }) {
       const id = `f${++n}`
       proposed.push(statement)
       return {
         id,
-        conflicts: conflict
+        conflicts: opts.conflict
           ? [{ id: "old", statement: "dato viejo", validAt: null }]
           : [],
       }
     },
-    async commit(id) {
-      committed.push(id)
+    async commit(id, o) {
+      committed.push({ id, supersedes: o?.supersedes })
       return true
     },
-    async reject() {
+    async reject(id) {
+      rejected.push(id)
       return true
     },
     async listPending() {
       return []
     },
+    async invalidate(id) {
+      invalidated.push(id)
+      return true
+    },
+    async findConfirmedNear() {
+      return opts.near ?? []
+    },
   }
 }
 
-/** Fake FactDrafter: devuelve el statement fijo (o null si no-factual/sensible). */
-function fakeFactDrafter(statement: string | null): FactDrafter {
-  return { draft: async () => ({ statement }) }
+/** Fake FactDecomposer: devuelve los átomos fijos (lista vacía = nada factual/sensible). */
+function fakeDecomposer(statements: string[]): FactDecomposer {
+  return { decompose: async () => ({ statements }) }
+}
+
+/** Fake ConflictJudge: marca TODOS los candidatos con el mismo veredicto (suficiente para los casos del test). */
+function fakeJudge(verdict: ConflictVerdict): ConflictJudge {
+  return {
+    judge: async ({ candidates }) => ({
+      decisions: candidates.map((c) => ({ ordinal: c.ordinal, verdict })),
+    }),
+  }
 }
 
 const ownerReply = (over: Partial<Turn> = {}): Turn => ({
@@ -332,7 +363,7 @@ describe("tryHandleEscalationReply", () => {
   })
 })
 
-describe("inbound: curación default-por-tipo", () => {
+describe("inbound: curación con juez + atomicidad", () => {
   const setup = async (kind: "knowledge" | "contact" | "claim") => {
     const es = inMemoryEscalations()
     const { id } = await es.create({
@@ -346,7 +377,7 @@ describe("inbound: curación default-por-tipo", () => {
   const run = async (
     es: ReturnType<typeof inMemoryEscalations>,
     fs: ReturnType<typeof fakeFactStore>,
-    statement: string | null,
+    opts: { statements: string[]; judge?: ConflictJudge },
     ownerText: string,
     sent: { chatId: number; text: string }[]
   ) =>
@@ -357,72 +388,164 @@ describe("inbound: curación default-por-tipo", () => {
         client: fakeClient(sent),
         logger: noopLogger(),
         factStore: fs,
-        factDrafter: fakeFactDrafter(statement),
+        factDecomposer: fakeDecomposer(opts.statements),
+        ...(opts.judge ? { conflictJudge: opts.judge } : {}),
       },
       ownerReply({ text: ownerText })
     )
 
-  it("knowledge → redacta y guarda (commit + linkFact); confirma «Guardé»", async () => {
-    const { es } = await setup("knowledge")
+  it("knowledge sin cercanos → descompone, guarda (commit + linkFact); confirma «Guardé»", async () => {
+    const { es, id } = await setup("knowledge")
     const fs = fakeFactStore()
     const sent: { chatId: number; text: string }[] = []
-    await run(es, fs, "A Kevin le gusta la pasta", "Sí, me encanta", sent)
+    await run(
+      es,
+      fs,
+      { statements: ["A Kevin le gusta la pasta"] },
+      "Sí, me encanta",
+      sent
+    )
     await vi.waitFor(() => expect(fs.committed).toHaveLength(1))
     expect(fs.proposed).toContain("A Kevin le gusta la pasta")
     await vi.waitFor(() => expect(sent).toHaveLength(1))
     expect(sent[0]?.text).toContain("Guardé")
     expect(sent[0]?.text).toContain("A Kevin le gusta la pasta")
+    void id
   })
 
-  it("knowledge + veto del owner («no lo aprendas») → NO guarda", async () => {
+  it("statement COMPUESTO → se guarda como átomos separados", async () => {
     const { es } = await setup("knowledge")
     const fs = fakeFactStore()
     const sent: { chatId: number; text: string }[] = []
     await run(
       es,
       fs,
-      "A Kevin le gusta la pasta",
+      {
+        statements: [
+          "A Kevin le daban miedo las piscinas",
+          "A Kevin le gustaba explorar",
+        ],
+      },
+      "La piscina me daba miedo y me gustaba explorar",
+      sent
+    )
+    await vi.waitFor(() => expect(fs.committed).toHaveLength(2))
+    expect(fs.proposed).toEqual([
+      "A Kevin le daban miedo las piscinas",
+      "A Kevin le gustaba explorar",
+    ])
+  })
+
+  it("REGRESIÓN pasta/fútbol: cercano pero el juez dice COEXISTE → guarda igual, NADA pendiente", async () => {
+    const { es } = await setup("knowledge")
+    const fs = fakeFactStore({ conflict: true }) // propose devuelve un cercano (fútbol)
+    const sent: { chatId: number; text: string }[] = []
+    await run(
+      es,
+      fs,
+      {
+        statements: ["A Kevin le gusta la pasta"],
+        judge: fakeJudge("coexists"),
+      },
+      "Sí",
+      sent
+    )
+    await vi.waitFor(() => expect(fs.committed).toHaveLength(1))
+    expect(fs.committed[0]?.supersedes ?? []).toHaveLength(0) // no invalidó nada
+    expect(fs.rejected).toHaveLength(0)
+  })
+
+  it("cercano + juez CONTRADICE → guarda invalidando el viejo (supersedes) + avisa «Di de baja»", async () => {
+    const { es } = await setup("knowledge")
+    const fs = fakeFactStore({ conflict: true })
+    const sent: { chatId: number; text: string }[] = []
+    await run(
+      es,
+      fs,
+      {
+        statements: ["A Kevin ya no le gusta la pasta"],
+        judge: fakeJudge("contradicts"),
+      },
+      "Ya no",
+      sent
+    )
+    await vi.waitFor(() => expect(fs.committed).toHaveLength(1))
+    expect(fs.committed[0]?.supersedes).toEqual(["old"])
+    await vi.waitFor(() => expect(sent).toHaveLength(1))
+    expect(sent[0]?.text).toContain("Di de baja")
+  })
+
+  it("cercano + juez DUPLICADO → no duplica (reject), no commit", async () => {
+    const { es } = await setup("knowledge")
+    const fs = fakeFactStore({ conflict: true })
+    const sent: { chatId: number; text: string }[] = []
+    await run(
+      es,
+      fs,
+      {
+        statements: ["A Kevin le gusta la pasta"],
+        judge: fakeJudge("duplicate"),
+      },
+      "Sí",
+      sent
+    )
+    await vi.waitFor(() => expect(fs.rejected).toHaveLength(1))
+    expect(fs.committed).toHaveLength(0)
+  })
+
+  it("MIDDLEWARE-SIEMPRE: contact (no aprende) pero la respuesta CONTRADICE un vigente → lo invalida", async () => {
+    const { es } = await setup("contact")
+    const fs = fakeFactStore({
+      near: [{ id: "old", statement: "Kevin trabaja en X", validAt: null }],
+    })
+    const sent: { chatId: number; text: string }[] = []
+    await run(
+      es,
+      fs,
+      {
+        statements: ["Kevin ya no trabaja en X"],
+        judge: fakeJudge("contradicts"),
+      },
+      "Ya no trabajo ahí",
+      sent
+    )
+    await vi.waitFor(() => expect(fs.invalidated).toEqual(["old"]))
+    expect(fs.committed).toHaveLength(0) // contact no persiste el nuevo
+    await vi.waitFor(() => expect(sent).toHaveLength(1))
+    expect(sent[0]?.text).toContain("Di de baja")
+  })
+
+  it("contact sin override y sin contradicción → no toca nada", async () => {
+    const { es } = await setup("contact")
+    const fs = fakeFactStore()
+    const sent: { chatId: number; text: string }[] = []
+    await run(es, fs, { statements: ["algo"] }, "Decile que me escriba", sent)
+    await vi.waitFor(() => expect(sent).toHaveLength(1))
+    expect(fs.committed).toHaveLength(0)
+    expect(fs.invalidated).toHaveLength(0)
+  })
+
+  it("knowledge + veto («no lo aprendas») → no persiste", async () => {
+    const { es } = await setup("knowledge")
+    const fs = fakeFactStore()
+    const sent: { chatId: number; text: string }[] = []
+    await run(
+      es,
+      fs,
+      { statements: ["A Kevin le gusta la pasta"] },
       "Sí, pero no lo aprendas",
       sent
     )
     await vi.waitFor(() => expect(sent).toHaveLength(1))
     expect(fs.committed).toHaveLength(0)
-    expect(sent[0]?.text).not.toContain("Guardé")
   })
 
-  it("contact → NO guarda por default (pasamanos puro)", async () => {
-    const { es } = await setup("contact")
-    const fs = fakeFactStore()
-    const sent: { chatId: number; text: string }[] = []
-    await run(es, fs, "Algo", "Decile que me escriba al mail", sent)
-    await vi.waitFor(() => expect(sent).toHaveLength(1))
-    expect(fs.committed).toHaveLength(0)
-  })
-
-  it("contact + override del owner («guardalo») → sí guarda", async () => {
-    const { es } = await setup("contact")
-    const fs = fakeFactStore()
-    const sent: { chatId: number; text: string }[] = []
-    await run(es, fs, "X es socio de Kevin", "Es mi socio, guardalo", sent)
-    await vi.waitFor(() => expect(fs.committed).toHaveLength(1))
-  })
-
-  it("drafter devuelve null (sensible/no-factual) → NO guarda", async () => {
+  it("decomposer vacío (sensible/no-factual) → no guarda", async () => {
     const { es } = await setup("knowledge")
     const fs = fakeFactStore()
     const sent: { chatId: number; text: string }[] = []
-    await run(es, fs, null, "Mi número es 300...", sent)
+    await run(es, fs, { statements: [] }, "Mi número es 300...", sent)
     await vi.waitFor(() => expect(sent).toHaveLength(1))
     expect(fs.committed).toHaveLength(0)
-  })
-
-  it("conflicto con un fact previo → NO auto-commit, avisa que choca", async () => {
-    const { es } = await setup("knowledge")
-    const fs = fakeFactStore(true) // propose devuelve un conflicto
-    const sent: { chatId: number; text: string }[] = []
-    await run(es, fs, "A Kevin le gusta la pasta", "Sí", sent)
-    await vi.waitFor(() => expect(sent).toHaveLength(1))
-    expect(fs.committed).toHaveLength(0)
-    expect(sent[0]?.text.toLowerCase()).toContain("choca")
   })
 })

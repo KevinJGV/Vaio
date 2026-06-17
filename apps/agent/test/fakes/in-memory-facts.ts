@@ -94,5 +94,30 @@ export function inMemoryFacts(): FactStore & { rows: () => Row[] } {
             })),
         }))
     },
+    async invalidate(id) {
+      // Desaprende un confirmed-vigente marcando invalidAt (la fila queda). Idempotente: 2ª llamada → ya
+      // invalidado → false. pending/rejected/inexistente → false.
+      const r = rows.find(
+        (x) => x.id === id && x.status === "confirmed" && x.invalidAt === null
+      )
+      if (!r) return false
+      r.invalidAt = FIXED
+      return true
+    },
+    async findConfirmedNear(query, principalId, limit = 10) {
+      // Stub determinístico: confirmados vigentes del mismo principal cuyo statement matchea la query por
+      // substring (la cercanía vectorial real se valida en e2e). Conserva el contrato (ConflictCandidate[]).
+      const q = query.toLowerCase()
+      return rows
+        .filter(
+          (x) =>
+            x.status === "confirmed" &&
+            x.invalidAt === null &&
+            x.principalId === principalId &&
+            x.statement.toLowerCase().includes(q)
+        )
+        .slice(0, limit)
+        .map((x) => ({ id: x.id, statement: x.statement, validAt: x.validAt }))
+    },
   }
 }

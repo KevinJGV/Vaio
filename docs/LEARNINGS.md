@@ -6,6 +6,21 @@ para no repetirlas en próximas sesiones. Una línea por aprendizaje, concreta.
 > Esto es la memoria del **dev**. La memoria del **producto** (lo que el agente sabe de Kevin)
 > vive en Neon/pgvector — ver `docs/SPEC.md`.
 
+- **✅ RESUELTO en Inc 1 del cluster (2026-06-17, rama `feat/fact-lifecycle-judge`) — cercanía vectorial ≠
+  contradicción.** El fix = **opción B**: un puerto `ConflictJudge` (LLM, `generateObject`, modelo de chat) que,
+  dados el statement nuevo + los candidatos cercanos, decide por cada uno `contradicts`/`duplicate`/`coexists`/
+  `unsure` (emite ORDINALES, el sistema mapea a uuids — Inv #8). Compartido por AMBOS caminos (curate determinístico
+  + rememberFact conversacional → un solo criterio). En `curate`: coexiste→commit (NADA pending, **fix pasta/fútbol**),
+  contradice→commit con supersedes (invalida el viejo, **visible**), duplicado→reject. + **middleware-siempre**
+  (aunque el tipo no aprenda, si la respuesta contradice un vigente → `invalidate`). + **atomicidad** (`FactDecomposer`
+  reemplaza al `FactDrafter`: descompone en facts mono-idea ANTES de juzgar — un statement compuesto se embebía en un
+  vector difuso y el juicio por-idea era imposible; **lección durable**). + **desaprender** (`FactStore.invalidate`
+  bi-temporal + tool `unlearnFact`). + **juicio sin cabos sueltos** (se traen TODOS los del umbral hasta
+  `FACT_CONFLICT_MAX`, cap logueado; el viejo `LIMIT` pasó a presentación "+N más"). Specs
+  `2026-06-17-fact-lifecycle-{design,plan}.md`. Conservador (ante duda → coexiste, NUNCA invalida por error). El
+  texto crudo va al juez (no perder el "ya no…" que la redacción borra). **Diferido a Inc 2:** hilo-puntero.
+  **Pendiente de e2e de Kevin** (judge/decompose con LLM real por Telegram). *(Diagnóstico original, conservado:)*
+
 - **Curación auto de escaladas — cercanía vectorial ≠ contradicción** (gotcha jun-2026, caso e2e pasta/fútbol;
   DIFERIDO al cluster "ciclo de vida del fact" por decisión de Kevin — apuntado, NO parcheado, para hacerlo bien
   con bases). La curación automática (`adapters/telegram/escalation-inbound.ts` → `curate`) trataba

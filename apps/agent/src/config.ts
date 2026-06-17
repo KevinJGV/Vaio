@@ -181,12 +181,14 @@ const envSchema = z.object({
   // cualquier otro = visitante capado (Vaio lo presenta). Sin esto, nadie es owner.
   OWNER_TELEGRAM_ID: z.coerce.number().int().optional(),
 
-  // Adjudicación de conflictos de facts: al PROPONER un hecho, se buscan facts confirmados cercanos para que
-  // Vaio decida si el nuevo reemplaza a uno viejo. DISTANCE = distancia coseno máx para considerar "cercano"
-  // (generoso a propósito: el modelo + el owner filtran la contradicción real; el umbral solo corta ruido lejano).
-  // CANDIDATES = cuántos candidatos sugerir como máx.
-  FACT_CONFLICT_DISTANCE: positiveFloatWithDefault(0.45),
-  FACT_CONFLICT_CANDIDATES: positiveIntWithDefault(2),
+  // Adjudicación de conflictos de facts: al PROPONER un hecho, se traen los facts confirmados cercanos para que el
+  // JUEZ (ConflictJudge LLM) decida la relación (contradice/duplica/coexiste). DISTANCE = distancia coseno máx para
+  // considerar "cercano" (generoso: el coseno solo acota ruido lejano, el juez filtra; ~0.55). MAX = cap de
+  // seguridad del JUICIO (se traen TODOS los del umbral hasta este tope; si se alcanza, se loguea — no truncar en
+  // silencio). CANDIDATES = solo PRESENTACIÓN ("+N más" al listar pendientes al owner), no trunca el juicio.
+  FACT_CONFLICT_DISTANCE: positiveFloatWithDefault(0.55),
+  FACT_CONFLICT_MAX: positiveIntWithDefault(50),
+  FACT_CONFLICT_CANDIDATES: positiveIntWithDefault(5),
 })
 
 export type Env = z.infer<typeof envSchema>
