@@ -19,7 +19,14 @@ para no repetirlas en próximas sesiones. Una línea por aprendizaje, concreta.
   `FACT_CONFLICT_MAX`, cap logueado; el viejo `LIMIT` pasó a presentación "+N más"). Specs
   `2026-06-17-fact-lifecycle-{design,plan}.md`. Conservador (ante duda → coexiste, NUNCA invalida por error). El
   texto crudo va al juez (no perder el "ya no…" que la redacción borra). **Diferido a Inc 2:** hilo-puntero.
-  **Pendiente de e2e de Kevin** (judge/decompose con LLM real por Telegram). *(Diagnóstico original, conservado:)*
+  **Dos lecciones de los e2e de Kevin (2026-06-17):** (1) **tests fake-based de facts = query-bugs e2e-only:** un
+  `ne(facts.id, "")` (excludeId vacío) casteaba "" a uuid y Postgres lanzaba; los unit tests (fake con substring JS,
+  sin tipo uuid) no lo cazaron → fix `excludeId` opcional. La cobertura por fake no ve errores de SQL/tipo; ojo con
+  eso al tocar queries. (2) **el `kind` de la escalada gateaba mal la curación:** describe la pregunta del VISITANTE,
+  pero la respuesta del OWNER es info suya, confiable → gatear por `kind` (claim/contact no aprenden) descartaba
+  hechos durables de Kevin (la "tarta" se perdía, solo se invalidaba la pasta). Fix: curación **unificada** — aprende
+  siempre, gateada solo por el decomposer (filtra no-factual/sensible) + veto; el `kind` solo para el framing.
+  *(Diagnóstico original, conservado:)*
 
 - **Curación auto de escaladas — cercanía vectorial ≠ contradicción** (gotcha jun-2026, caso e2e pasta/fútbol;
   DIFERIDO al cluster "ciclo de vida del fact" por decisión de Kevin — apuntado, NO parcheado, para hacerlo bien

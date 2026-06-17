@@ -117,16 +117,22 @@
   **Verificado local:** typecheck/biome/build limpios; **494 tests** (+12); `/health` 200. **e2e #1 de Kevin
   (2026-06-17, `logs.txt`):** ✅ atomicidad (compuesto→3 átomos), ✅ escalada knowledge contradice → `learned:2
   superseded:1` (auto-invalida+visible: "trabaja en Anthropic" dado de baja), ✅ curación knowledge básica.
-  **🐞 BUG encontrado + CORREGIDO** (commit `1977398`): `findConfirmedNear` pasaba `excludeId=""` → `ne(id,"")`
-  casteaba a uuid → Postgres lanzaba → el `try/catch` lo tragaba → **unlearnFact** ("no pude desaprender") y el
-  **middleware-siempre** (escalada claim, "átomo falló") fallaban; también dejó la pasta sin invalidar en el e2e. El
-  path `learn=true`/propose nunca se vio afectado (usa id real). **Gap de testing:** los tests de facts son
-  fake-based (substring JS, sin uuid real) → esta clase de bug de query es **e2e-only**. **Falta re-correr** post-fix:
-  `unlearnFact` (1 match→in-turn; ≥2→lista), middleware (claim contradice→invalida), conversacional
-  (pasta+fútbol coexisten/sin pending; "ya no"→pending→resolveFact). Specs
+  **🐞 BUG uuid CORREGIDO** (commit `1977398`): `findConfirmedNear` pasaba `excludeId=""` → `ne(id,"")` casteaba a
+  uuid → Postgres lanzaba → `unlearnFact` y el middleware fallaban. Gap de testing: facts son fake-based (sin uuid
+  real) → e2e-only. **e2e #2 ✅:** `unlearnFact` completo (1 match→in-turn; ≥2→lista por ordinal→`which`→olvida).
+  **🔧 CURACIÓN UNIFICADA** (commit `45d6fcd`, decisión de Kevin tras e2e #2): el e2e mostró que el gate por `kind`
+  (claim/contact no aprenden) **descartaba hechos durables de la respuesta del owner** (claim "ya no me gusta la
+  pasta, ahora la tarta" → `learned:0` — invalidaba la pasta pero perdía la tarta y el contrapuesto). Fix: el `kind`
+  describe la pregunta del visitante; la respuesta del owner es info suya → la curación **aprende SIEMPRE** (decompose
+  → juez → commit/supersede), gateada solo por el **decomposer** (filtra no-factual/sensible/contacto) + el **veto**;
+  el `kind` queda solo para el framing del DM. Eliminada la rama middleware-solo-invalida y `FORCE_RE`. Caso C →
+  `learned:2, superseded:1` (tarta guardada + contrapuesto de la pasta + viejo invalidado). **495 tests.** Specs
   [`…-fact-lifecycle-{design,plan}.md`](superpowers/specs/2026-06-17-fact-lifecycle-design.md); lección en
-  `LEARNINGS.md`. **Costuras Inc 2 dejadas:** `invalidate` standalone, juez por ordinales, `linkFact` al 1er fact,
-  idempotencia por `escalationId`. Mergear a `main` tras el OK de Kevin (re-e2e).
+  `LEARNINGS.md`. **Falta re-correr (e2e #3):** caso C con la unificación (claim aditivo+contradictorio → ambos),
+  conversacional (pasta+fútbol coexisten/sin pending; "ya no"→pending→resolveFact). **Costuras Inc 2 dejadas:**
+  `invalidate` standalone, juez por ordinales, `linkFact` al 1er fact, idempotencia por `escalationId`. Merge a `main`
+  tras el OK final de Kevin. ⚠️ **Watch (e2e #2):** umbral 0.55 trajo "ya no trabaja en Anthropic" como candidato de
+  "fútbol" en unlearnFact (semánticamente flojo; el modelo desambiguó) → afinar umbral o sumar juez a unlearnFact si molesta.
 - [ ] **CLUSTER — Inc 2: HILO CONSCIENTE DE SU RAZÓN** (reencuadre de Kevin 2026-06-17; antes "hilo-puntero"). El
   aprender/desaprender NATURAL dentro del hilo **ya está** (Inc 1: tras responder, el hilo es charla normal con el
   owner → toolset pleno). Lo que falta: cuando el hilo pasa de "resolver el pendiente" a **charla natural**, que Vaio
