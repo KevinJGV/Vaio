@@ -120,10 +120,20 @@
   (compuesto→átomos), conversacional (pasta+fútbol coexisten/sin pending; "ya no" → pending→resolveFact; `unlearnFact`),
   escalada (contradice→auto-invalida+visible). **Costuras para Inc 2 dejadas:** `invalidate` standalone, juez por
   ordinales, `linkFact` al 1er fact curado, idempotencia por `escalationId`. Mergear a `main` tras el OK de Kevin.
-- [ ] **CLUSTER — Inc 2 (hilo-puntero)** (después de Inc 1): el hilo de la escalada como **ancla determinística** al
-  `escalationId`/`factId` (Inv #8) → continuar con contexto + ajustar/`cambié de opinión`/desaprender SIN ambigüedad
-  (el sistema sabe el id por el hilo). Inc 1 deja las costuras (`invalidate` standalone, juez por ordinales, `linkFact`
-  siempre, idempotencia por `escalationId`). Su propio par design+plan.
+- [ ] **CLUSTER — Inc 2: HILO CONSCIENTE DE SU RAZÓN** (reencuadre de Kevin 2026-06-17; antes "hilo-puntero"). El
+  aprender/desaprender NATURAL dentro del hilo **ya está** (Inc 1: tras responder, el hilo es charla normal con el
+  owner → toolset pleno). Lo que falta: cuando el hilo pasa de "resolver el pendiente" a **charla natural**, que Vaio
+  lleve el **CONTEXTO de su origen** — inyectar como nota del sistema "este hilo nació de una escalada: un visitante
+  preguntó «X», respondiste «Y», aprendí «Z»" (lookup `threadId → escalación` sin filtro de status; `handleTurn`
+  detecta el hilo y pasa el contexto al `ActionContext`). El **anclaje del `factId`** (Inv #8) es el *mecanismo* para
+  "ajustá/desaprendé ESO" por pronombre; la **conciencia del motivo** es el *objetivo*. Costuras de Inc 1 listas
+  (`invalidate` standalone, juez por ordinales, `linkFact` al 1er fact, idempotencia por `escalationId`). Su design+plan.
+- [ ] **CLUSTER — refuerzo del JUEZ: escape ante incertidumbre/gaps** (Kevin 2026-06-17). Hoy `unsure` es conservador
+  (charla→pendiente; escalada→coexiste). Reforzar: (i) en **escalada, hacer VISIBLE** el `unsure`/baja confianza (no
+  coexistir en silencio → confirmar "guardé X, puede relacionarse con Y pero no estoy seguro, revisalo" vía
+  `suggestion`); (ii) **abstención explícita** cuando la data es ambigua/incompleta → el juez puede decir "no tengo
+  info suficiente" → el sistema NO actúa destructivo + flaggea al owner. Reusa la costura `suggestion`. ¿Polish de
+  Inc 1 o su propio mini-incremento? — decidir.
 - [ ] **CLUSTER — diferidos apuntados** (no en Inc 1, decisión de Kevin 2026-06-17): (a) **portfolio↔facts** —
   reconciliar `documents` (RAG) vs `facts` curados + regla de **precedencia** (un fact confirmado gana sobre la
   fuente); (b) **consolidación ontológica** ("completar" facts del mismo tópico en vez de acumular parciales) → Fase 3
