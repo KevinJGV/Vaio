@@ -99,20 +99,35 @@
 ## 🚧 En proceso / verificación (lista viva — cerrar y mover al Historial al completarse)
 > Estados: `- [ ]` pendiente · `- [~]` parcial · `- [?]` hecho, pend. verificación de Kevin · `- [x]` verificado→Historial.
 > **Al cambiar de foco, reconciliar esto PRIMERO** (regla en `CLAUDE.md` → "Integridad documental").
-- [?] **`escalate` + infra de notificación proactiva genérica (Fase 2) — IMPLEMENTADO en `main` (local), pend.
-  e2e EN VIVO de Kevin** (2026-06-16). Paso mayor del roadmap, aprobado en plan mode tras brainstorming + 3 Plan
-  agents (arquitectura + adversarial + infra). **F0-F6 ✅** (specs durables · puertos `OwnerNotifier`/`EscalationStore`
-  + tabla `escalations` migración `0009` · adapters · acción `escalate` (web+visitante, anti-spam/dedup/saneo) ·
-  retomo cross-conversation `ConversationResumer` + `toolDenylist` anti-loop · inbound reply-to determinístico ·
-  wiring index.ts). **450 tests** (+11), typecheck/build/biome limpios, `/health` 200, boot `escalate: true`.
-  Decisiones de Kevin: `OwnerNotifier` genérico (maleable, base para rutinas/webhooks/WhatsApp), persistir, correlación
-  reply-to, retomo donde haya push (web vía fact), **curación 100% gated** (el adversarial atrapó que auto-curar el
-  reply = corrupción/fuga). **Invariante del feature:** Vaio NUNCA aprende facts por su cuenta de los visitantes.
-  Specs [`…-escalate-owner-notifier-{design,plan}.md`](superpowers/specs/2026-06-16-escalate-owner-notifier-design.md).
-  **Falta solo el e2e en vivo de Kevin** (ngrok + 2º Telegram + aplicar `0009` a la DB dev: `db:push` a branch Neon,
-  NO prod). **Followups:** push al visitante web (pedir contacto → política de datos), recordatorio/expiración de
-  huérfanas (cron), persistir el dedupe `seen`, que Vaio PROPONGA el statement del fact, 2º consumidor del notifier
-  (rutina/webhook), adapters WhatsApp/correo.
+> **✅ Cerrado 2026-06-16 (VERIFICADO EN VIVO + commiteado en `main`) → Historial "ESCALATE v2 (Inc 1)":** hilos nativos
+> por escalada (Threaded Mode) + curación default-por-tipo + "transmití real" + los fixes post-e2e (P1 escala directo,
+> hilo desbloqueado, drafter al modelo de chat, visibilidad por kind). Flujo principal verificado en vivo. Queda P2
+> (falso conflicto) diferido al cluster (abajo).
+- [ ] **CLUSTER "ciclo de vida del fact desde el hilo del pendiente"** (PRÓXIMO MAYOR; decisión de Kevin 2026-06-16,
+  diseñar JUNTO — NO aislar el desaprender): (i) el hilo de la escalada como **contexto + puntero/ancla
+  determinística** al pendiente (su `escalationId`/`factId`) → continuar con contexto + ajustar/`cambié de opinión`/
+  desaprender SIN ambigüedad (el sistema sabe el id por el hilo, Inv #8); (ii) **desaprender facts** (reversibilidad:
+  invalidar bi-temporal `invalidAt` vs borrar — su decisión); (iii) **middleware de conflicto SIEMPRE** (aprenda o no):
+  juzgar si la respuesta de Kevin contradice un fact vigente → advertir + invalidar el viejo (cierra la fuga de memoria
+  rancia). **⚠️ CASO que lo motiva (P2, e2e pasta/fútbol):** la curación HOY trata `propose().conflicts` (cercanía por
+  coseno, juicio delegado al modelo) como contradicción → falso «choca» + facts en `pending` colgados (~4 del e2e,
+  limpiar). Diagnóstico + opciones (A commit-coexisten / **B juicio-LLM + dedup**, recomendada) en `LEARNINGS.md`
+  ("cercanía vectorial ≠ contradicción"). Su propio brainstorming/design. Specs base:
+  [`…-escalate-v2-{design,plan}.md`](superpowers/specs/2026-06-16-escalate-v2-design.md).
+- [ ] **Registro GLOBAL de pendientes consultable** (decisión de Kevin 2026-06-16): que TODA notificación proactiva
+  (escaladas + rutinas + webhooks futuros) se persista en una tabla común y Vaio pueda consultar todo o por
+  `kind`/estado; hoy `escalations` solo guarda escaladas de visitantes y el `OwnerNotifier` empuja sin persistir →
+  generalizar la persistencia del notifier + tool owner de consulta. Feature mayor con su propio brainstorming.
+- [ ] **Incremento 2 — guard transversal "dice pero no hace"**: el modelo narra una acción side-effecting sin emitir
+  el tool call (o pregunta en vez de actuar — el fix de prompt P1 lo reduce pero no lo cierra). Registro de tool calls
+  del turno + firma de promesa por tool + 2º `streamText` forzado (`prepareStep`/`toolChoice`). Toca el hot path del
+  streaming → su propio design/plan.
+> **✅ Cerrado 2026-06-16 (VERIFICADO EN VIVO por el Telegram de Kevin) → Historial "ESCALATE v1":** el e2e completo
+> cerró dos veces (DM #262/#271 entregados → `tg: escalada respondida por el owner` → `tg: retomo cross-conversation`
+> chatId 703228104 → Vaio relató al visitante en su voz sin mencionar el mecanismo). Bug de la 1ª prueba (tabla
+> `escalations` inexistente) = migración `0009` sin aplicar (Kevin la aplicó). Ajustes post-verificación (proactividad
+> sin pedir permiso, voz coloquial sin tecnicismos, marco visual del DM, fix del "+ la aprendo") aplicados (455 tests).
+> Lo que destapó (hilos, curación, "transmití real", guard) → escalate v2 (WIP arriba).
 > **✅ Cerrado 2026-06-16 (VERIFICADO EN VIVO por Telegram de Kevin) → Historial "TURNOS PROACTIVOS (Nivel C) seam
 > v1 + learnRepo":** "hablame de greenforge frontend" → learnRepo ("ya voy, te retomo") → ingest full (42 chunks) →
 > `tg: turno proactivo (resume)` → Vaio re-entró y mandó SOLO el 2º mensaje con el contenido real del repo. La
@@ -180,6 +195,44 @@
 ---
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
+
+**🟢 ESCALATE v2 (Incremento 1) — hilos por escalada + curación default-por-tipo + "transmití real" — EN `main`
+(local) + VERIFICADO EN VIVO por el Telegram de Kevin** (2026-06-16, commiteado en `main`). Aprobado en plan mode tras
+brainstorming + 3 Explore agents + context7 (Telegram Bot API 9.3, AI SDK v6). **3 sub-piezas:** (A) **hilo nativo
+por escalada** vía **Threaded Mode** — `createForumTopic` en chat PRIVADO (sin admin), título = la pregunta;
+correlación por `topic_id` (Kevin responde EN el hilo, sin citar; fallback reply-to; matchea SOLO `notified` → tras
+responder, los mensajes siguientes son turno normal y puede continuar). Migración `0010` (`notify_topic_id`). (B)
+**"se lo transmití real"** — `ConversationResumer` → `Promise<{delivered}>`; el inbound corre en background tras el
+ACK y confirma honesto según si el visitante recibió de verdad. (C) **curación default-por-tipo** — `escalate` gana
+`kind` (enum knowledge|contact|claim, Inv #8); puerto+adapter `FactDrafter` (`generateObject` con el **modelo de
+chat**, statement 3ª persona, `null` si sensible/no-factual); ejecución DETERMINÍSTICA en el inbound (gated por
+veto/override del owner) reusando `FactStore.propose/commit`; confirma "qué guardé". Migración `0011` (`kind`).
+**Fixes post-e2e:** P1 (la persona base contradecía la policy con "ofrecé proyectos/contacto" → eliminada → escala
+DIRECTO sin preguntar, **verificado en vivo ×2**); hilo desbloqueado; drafter al modelo de chat (el de summary
+fallaba `generateObject`); visibilidad de intención por `kind` en el DM; observabilidad de la curación. **465 tests**
+(+11); typecheck/biome/build limpios; `/health` 200; boot `escalateCuration:true`. **e2e EN VIVO ✅:** escaló directo,
+hilos (topics 300/304), retomo, continuar la charla, drafter redactando. Specs
+[`…-escalate-v2-{design,plan}.md`](superpowers/specs/2026-06-16-escalate-v2-design.md). **Deuda diferida (cluster):**
+P2 — la curación trata cercanía vectorial como contradicción (falso conflicto pasta/fútbol → facts en `pending`);
+juicio real + hilo-puntero + desaprender = el cluster (ver WIP + `LEARNINGS.md`).
+
+**🟢 ESCALATE v1 — canal humano + infra de notificación proactiva genérica (Fase 2) — EN `main` (local) +
+VERIFICADO EN VIVO por el Telegram de Kevin** (2026-06-16, commit `3576f85`). El 1er consumidor de una infra de
+**notificación proactiva al owner GENÉRICA** (`OwnerNotifier`, maleable para rutinas/webhooks/WhatsApp futuros):
+un visitante (web/telegram-no-owner) pregunta algo no-sabido de Kevin → `escalate` lo persiste (`escalations`,
+migración `0009`) + notifica al owner por DM → Kevin responde citando → el inbound correlaciona por `message_id`
+(Inv #8), retoma al visitante donde haya push (`ConversationResumer` + `toolDenylist` anti-loop) y deja la
+curación 100% gated. Puertos `OwnerNotifier`/`EscalationStore`; anti-spam (rate-limit+dedup), saneo+marco visual
+del DM. **Invariante del feature:** Vaio NUNCA aprende facts por su cuenta de los visitantes (el adversarial
+atrapó que auto-curar el reply = corrupción/fuga). **455 tests**; typecheck/biome/build limpios. **e2e EN VIVO ✅:**
+cerró dos veces (DM #262/#271 → `tg: escalada respondida por el owner` → `tg: retomo cross-conversation` → Vaio
+relató al visitante en su voz sin mencionar el mecanismo). Bug de la 1ª prueba = tabla inexistente (migración
+`0009` sin aplicar; Kevin la aplicó). **Ajustes post-verificación:** proactividad sin pedir permiso (escala
+directo), voz coloquial sin tecnicismos con visitantes, marco visual del DM por `kind`, fix del "+ la aprendo"
+(contradecía la curación gated), escape del input no confiable. Specs
+[`…-escalate-owner-notifier-{design,plan}.md`](superpowers/specs/2026-06-16-escalate-owner-notifier-design.md) +
+memoria `escalate-owner-notifier-decisions`. **Continúa en → escalate v2** (hilos + curación default-por-tipo +
+transmití real; WIP). Followups heredados: push web, expiración de huérfanas, persistir el dedupe `seen`.
 
 **🟢 TURNOS PROACTIVOS (Nivel C) — SEAM v1 + learnRepo cableado — EN `main` (local) + VERIFICADO EN VIVO por Telegram**
 (2026-06-16). Vaio RETOMA solo tras una tarea en background: dispara algo largo, sigue, y al COMPLETAR re-entra el

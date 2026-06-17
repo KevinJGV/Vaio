@@ -41,3 +41,10 @@ export function sanitizeTelegramHtml(text: string): string {
 export function stripTelegramHtml(text: string): string {
   return text.replace(TAG_RE, "")
 }
+
+/** Escapa `& < >` a entities para meter texto NO confiable (p.ej. la pregunta de un visitante) dentro de un
+ *  mensaje HTML SIN que inyecte tags (`<b>`, `<a href>`…) ni rompa el parse (400 "can't parse entities"). El
+ *  orden importa: `&` primero. Lo usa el marco de notificación del owner (frameOwnerNotification). */
+export function escapeTelegramHtml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+}

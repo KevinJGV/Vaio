@@ -9,6 +9,7 @@ import { buildConnectors } from "./adapters/connectors/index.js"
 import { createDb } from "./adapters/db/client.js"
 import { EMBEDDING_DIM } from "./adapters/db/schema.js"
 import { createEmbedder } from "./adapters/embeddings.js"
+import { createFactDrafter } from "./adapters/fact-drafter.js"
 import { buildApp } from "./adapters/http/routes.js"
 import { createLogger } from "./adapters/logger.js"
 import {
@@ -57,6 +58,7 @@ import { DEFAULT_REPO_POLICY } from "./core/repo-ingest.js"
 import type { Connector } from "./ports/connector.js"
 import type { ConversationStore } from "./ports/conversation.js"
 import type { EscalationStore } from "./ports/escalation.js"
+import type { FactDrafter } from "./ports/fact-drafter.js"
 import type { FactStore } from "./ports/facts.js"
 import type { DetectorRegistry } from "./ports/knowledge-detector.js"
 import type { MediaUnderstanding, Transcriber } from "./ports/media.js"
@@ -116,6 +118,7 @@ let ragEnabled = false
 let conversations: ConversationStore | null = null
 let escalations: EscalationStore | null = null
 let factStore: FactStore | null = null
+let factDrafter: FactDrafter | null = null
 let summarizer: Summarizer | null = null
 let transcriber: Transcriber | null = null
 let mediaUnderstanding: MediaUnderstanding | null = null
@@ -214,6 +217,9 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
       )
     )
   }
+  // Redactor de facts (curación de escaladas): usa el modelo de CHAT principal (no el de summary) — `generateObject`
+  // (structured output) suele fallar en modelos free/baratos; el de chat es confiable. El costo extra es marginal.
+  factDrafter = createFactDrafter({ model, logger })
   // Comprensión de media POR MODALIDAD (cada una su modelo/endpoint; no la cadena de chat):
   //  - STT: REST /audio/transcriptions con la cadena TRANSCRIBE_MODELS (fallback client-side).
   //  - Visión: chat+file-part con la cadena VISION_MODELS.
@@ -314,12 +320,15 @@ if (
   telegram = {
     agent,
     // Reusa el client singleton (mismo que el OwnerNotifier de escalate); fallback defensivo por si fuese null.
-    client: telegramClient ?? createTelegramClient(env.TELEGRAM_BOT_TOKEN, logger),
+    client:
+      telegramClient ?? createTelegramClient(env.TELEGRAM_BOT_TOKEN, logger),
     allowedIds: telegramAllowedIds(env),
     webhookSecret: env.TELEGRAM_WEBHOOK_SECRET,
     ownerId: env.OWNER_TELEGRAM_ID,
-    // Inbound de escalaciones: el reply del owner a una escalada se correlaciona y cierra el bucle.
+    // Inbound de escalaciones: el reply del owner a una escalada se correlaciona y cierra el bucle (+ curación).
     ...(escalations ? { escalations } : {}),
+    ...(factStore ? { factStore } : {}),
+    ...(factDrafter ? { factDrafter } : {}),
     draftStreaming: env.TELEGRAM_DRAFT_STREAMING,
     sink,
     // Descarga de media de Telegram (audio/voz + imágenes). El core decide transcribir/describir.
@@ -362,6 +371,7 @@ logger.info(
     nativeImages: env.MULTIMODAL_NATIVE_IMAGES,
     telegram: telegram !== undefined,
     escalate: escalations !== null && ownerNotifier !== null,
+    escalateCuration: factStore !== null && factDrafter !== null,
     models,
     logLevel: env.LOG_LEVEL,
     logFormat: env.LOG_FORMAT,

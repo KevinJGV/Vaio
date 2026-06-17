@@ -215,12 +215,14 @@ export const escalations = pgTable(
     locale: text("locale").notNull().default("es"),
     // CONTENIDO
     question: text("question").notNull(), // la duda en NL (saneada al ir al DM)
+    kind: text("kind").notNull().default("knowledge"), // knowledge|contact|claim → default de curación
     answer: text("answer"), // reply de Kevin (nullable hasta 'answered')
     // CORRELACIÓN (Inv #8): message_id del DM al owner → Kevin responde citándolo. text para no atarlo al
     // rango de int de Telegram y servir a otros canales (WhatsApp wamid, correo Message-ID). Ambos nullable: se
     // setean al NOTIFICAR (markNotified); en 'pending' aún no se sabe por qué canal/mensaje se avisó.
     notifyChannel: text("notify_channel"), // 'telegram' hoy (null hasta notified)
     notifyMessageId: text("notify_message_id"),
+    notifyTopicId: text("notify_topic_id"), // message_thread_id del hilo (Threaded Mode): Kevin responde DENTRO
     // ESTADO
     status: text("status").notNull().default("pending"), // pending|notified|answered|dismissed|failed
     factId: uuid("fact_id"), // linaje si Kevin curó un fact desde esta escalada (auditoría)
@@ -229,8 +231,9 @@ export const escalations = pgTable(
     answeredAt: timestamp("answered_at", { withTimezone: true }),
   },
   (t) => [
-    // Correlación O(1) cuando llega el reply de Kevin.
+    // Correlación O(1) cuando llega el reply de Kevin (por message_id citado o por topic del hilo).
     index("escalations_notify_msg_idx").on(t.notifyChannel, t.notifyMessageId),
+    index("escalations_notify_topic_idx").on(t.notifyChannel, t.notifyTopicId),
     // Listado de abiertas por principal/estado (anti-spam: rate-limit + dedup; huérfanas a futuro).
     index("escalations_status_idx").on(t.status, t.createdAt),
     index("escalations_principal_idx").on(t.askerPrincipalId, t.status),

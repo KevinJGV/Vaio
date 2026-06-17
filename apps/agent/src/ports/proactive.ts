@@ -31,7 +31,11 @@ export interface ResumeConversationInput {
 
 /** Re-entra el loop del agente en una conversación CONCRETA (la del visitante origen), inyectando un insumo
  *  nuevo (la respuesta de Kevin) y entregando el resultado a SU hilo. best-effort, no tira; web → no-op.
- *  Complementa a ProactiveResume (ése cierra sobre el turno actual; éste apunta a otra conversación). */
+ *  Complementa a ProactiveResume (ése cierra sobre el turno actual; éste apunta a otra conversación).
+ *  Devuelve si la respuesta LLEGÓ de verdad al visitante (`delivered`) → el llamador confirma honesto al owner
+ *  ("se lo transmití" solo si fue real). `delivered:false` = canal sin push (web) o el envío falló. */
 export interface ConversationResumer {
-  resumeConversation(input: ResumeConversationInput): void
+  resumeConversation(
+    input: ResumeConversationInput
+  ): Promise<{ delivered: boolean }>
 }

@@ -3,9 +3,10 @@
 // transiciones de estado son UPDATE CONDICIONAL por el estado previo válido → idempotentes ante reintentos de
 // webhook (Telegram reintenta; el dedupe in-memory se pierde al restart → esto es el guard real).
 
-import { and, desc, eq, inArray, sql } from "drizzle-orm"
+import { and, desc, eq, inArray, type SQL, sql } from "drizzle-orm"
 import type {
   AnsweredEscalation,
+  EscalationKind,
   EscalationStore,
 } from "../ports/escalation.js"
 import type { Database } from "./db/client.js"
@@ -19,13 +20,51 @@ function normalizeQuestion(q: string): string {
   return q.trim().toLowerCase().replace(/\s+/g, " ")
 }
 
+/** SELECT + map compartido por las dos correlaciones (por message_id citado o por topic del hilo). Matchea SOLO
+ *  'notified' (pendiente de responder): la PRIMERA respuesta del owner la procesa; una vez 'answered', los
+ *  mensajes siguientes en el hilo NO se consumen → siguen como conversación normal (Kevin puede continuar). El
+ *  retry de webhook lo filtra el dedupe por update_id del router; markAnswered (UPDATE WHERE notified) es la red. */
+async function findOneAnswered(
+  db: Database,
+  match: SQL | undefined
+): Promise<AnsweredEscalation | null> {
+  const [row] = await db
+    .select({
+      id: escalations.id,
+      question: escalations.question,
+      kind: escalations.kind,
+      originChannel: escalations.originChannel,
+      originConversationId: escalations.originConversationId,
+      originThreadKey: escalations.originThreadKey,
+      askerPrincipalId: escalations.askerPrincipalId,
+      locale: escalations.locale,
+    })
+    .from(escalations)
+    .where(and(match, eq(escalations.status, "notified")))
+    .limit(1)
+  if (!row) return null
+  return {
+    id: row.id,
+    question: row.question,
+    kind: row.kind as EscalationKind,
+    origin: {
+      channel: row.originChannel,
+      conversationId: row.originConversationId ?? undefined,
+      threadKey: row.originThreadKey ?? undefined,
+      askerPrincipalId: row.askerPrincipalId,
+      locale: row.locale,
+    },
+  }
+}
+
 export function createEscalationStore(db: Database): EscalationStore {
   return {
-    async create({ question, origin }) {
+    async create({ question, kind, origin }) {
       const [row] = await db
         .insert(escalations)
         .values({
           question,
+          kind,
           originChannel: origin.channel,
           originConversationId: origin.conversationId,
           originThreadKey: origin.threadKey,
@@ -38,13 +77,14 @@ export function createEscalationStore(db: Database): EscalationStore {
       return { id: row.id }
     },
 
-    async markNotified(id, notifyChannel, notifyMessageId) {
+    async markNotified(id, notifyChannel, notifyMessageId, notifyTopicId) {
       await db
         .update(escalations)
         .set({
           status: "notified",
           notifyChannel,
           notifyMessageId,
+          notifyTopicId: notifyTopicId ?? null,
           notifiedAt: sql`now()`,
         })
         .where(and(eq(escalations.id, id), eq(escalations.status, "pending")))
@@ -57,43 +97,24 @@ export function createEscalationStore(db: Database): EscalationStore {
         .where(and(eq(escalations.id, id), eq(escalations.status, "pending")))
     },
 
-    async findByNotifyMessage(
-      notifyChannel,
-      notifyMessageId
-    ): Promise<AnsweredEscalation | null> {
-      // Matchea notified|answered: el message_id fue de una escalada REAL. La idempotencia (no re-actuar ante un
-      // retry) la garantiza markAnswered (UPDATE condicional WHERE status='notified'), no este filtro.
-      const [row] = await db
-        .select({
-          id: escalations.id,
-          question: escalations.question,
-          originChannel: escalations.originChannel,
-          originConversationId: escalations.originConversationId,
-          originThreadKey: escalations.originThreadKey,
-          askerPrincipalId: escalations.askerPrincipalId,
-          locale: escalations.locale,
-        })
-        .from(escalations)
-        .where(
-          and(
-            eq(escalations.notifyChannel, notifyChannel),
-            eq(escalations.notifyMessageId, notifyMessageId),
-            inArray(escalations.status, ["notified", "answered"])
-          )
+    async findByNotifyMessage(notifyChannel, notifyMessageId) {
+      return findOneAnswered(
+        db,
+        and(
+          eq(escalations.notifyChannel, notifyChannel),
+          eq(escalations.notifyMessageId, notifyMessageId)
         )
-        .limit(1)
-      if (!row) return null
-      return {
-        id: row.id,
-        question: row.question,
-        origin: {
-          channel: row.originChannel,
-          conversationId: row.originConversationId ?? undefined,
-          threadKey: row.originThreadKey ?? undefined,
-          askerPrincipalId: row.askerPrincipalId,
-          locale: row.locale,
-        },
-      }
+      )
+    },
+
+    async findByNotifyTopic(notifyChannel, notifyTopicId) {
+      return findOneAnswered(
+        db,
+        and(
+          eq(escalations.notifyChannel, notifyChannel),
+          eq(escalations.notifyTopicId, notifyTopicId)
+        )
+      )
     },
 
     async markAnswered(id, answer, factId) {
@@ -109,6 +130,10 @@ export function createEscalationStore(db: Database): EscalationStore {
         .where(and(eq(escalations.id, id), eq(escalations.status, "notified")))
         .returning({ id: escalations.id })
       return res.length > 0
+    },
+
+    async linkFact(id, factId) {
+      await db.update(escalations).set({ factId }).where(eq(escalations.id, id))
     },
 
     async countOpenByPrincipal(principalId) {

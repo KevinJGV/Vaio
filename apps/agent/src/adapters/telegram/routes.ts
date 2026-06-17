@@ -9,6 +9,8 @@ import type { Hono } from "hono"
 import { type Agent, courtesy } from "../../core/agent.js"
 import { shouldSpeak, stripForSpeech } from "../../core/speech-policy.js"
 import type { EscalationStore } from "../../ports/escalation.js"
+import type { FactDrafter } from "../../ports/fact-drafter.js"
+import type { FactStore } from "../../ports/facts.js"
 import type { Logger } from "../../ports/logger.js"
 import type { ResolvedMedia } from "../../ports/media.js"
 import type { SpeechSynthesizer } from "../../ports/speech.js"
@@ -41,6 +43,9 @@ export interface TelegramDeps {
   /** Cola de escalaciones (Fase 2). Presente → habilita el INBOUND: el reply del owner a una escalada se
    *  correlaciona y cierra el bucle (retomo al visitante + invitación a curar). null/ausente = escalate off. */
   escalations?: EscalationStore
+  /** Curación de facts desde el inbound (default-por-tipo). Opcionales: sin ellos, el inbound solo retoma/confirma. */
+  factStore?: FactStore
+  factDrafter?: FactDrafter
   sink: TraceSink
   /** Descarga de media (audio/voz + imágenes). undefined = sin multimodal → se ignoran adjuntos. */
   media?: TelegramMedia
@@ -267,13 +272,14 @@ export function mountTelegram(
       void replyUnsupported(norm)
       return c.json({ ok: true })
     }
-    // INBOUND de escalaciones: ¿es la RESPUESTA del owner a una escalada (reply citando el DM del aviso)? Si sí, la
-    // consumimos acá (correlación por message_id, Inv #8) y cerramos el bucle — NO es un turno conversacional nuevo.
+    // INBOUND de escalaciones: ¿es la RESPUESTA del owner a una escalada? Kevin responde DENTRO del hilo (Threaded
+    // Mode → trae threadId) o citando el DM (replyToMessageId). Si correlaciona, la consumimos acá (por id, Inv #8)
+    // y cerramos el bucle — NO es un turno conversacional nuevo.
     if (
       deps.escalations &&
       deps.agent &&
       isOwnerId(deps.ownerId, norm.fromId) &&
-      norm.replyToMessageId !== undefined
+      (norm.threadId !== undefined || norm.replyToMessageId !== undefined)
     ) {
       const log = c.get("log")
       const resumer = createTelegramConversationResumer({
@@ -289,6 +295,8 @@ export function mountTelegram(
           resumer,
           client: deps.client,
           logger: log,
+          factStore: deps.factStore,
+          factDrafter: deps.factDrafter,
         },
         norm
       )

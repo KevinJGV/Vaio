@@ -1,0 +1,1 @@
+ALTER TABLE "escalations" ADD COLUMN "kind" text DEFAULT 'knowledge' NOT NULL;

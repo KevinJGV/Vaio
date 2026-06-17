@@ -24,15 +24,21 @@ describe("EscalationStore (contrato, vía fake)", () => {
     expect(found?.origin.askerPrincipalId).toBe("visitor1")
   })
 
-  it("markAnswered es idempotente (2º reply → false); el message_id sigue correlacionable (el guard es markAnswered)", async () => {
+  it("markAnswered idempotente; tras 'answered' ya NO correlaciona (Kevin puede continuar en el hilo)", async () => {
     const es = inMemoryEscalations()
-    const { id } = await es.create({ question: "¿Y?", origin: origin() })
+    const { id } = await es.create({
+      question: "¿Y?",
+      kind: "knowledge",
+      origin: origin(),
+    })
     await es.markNotified(id, "telegram", "7")
-    expect(await es.markAnswered(id, "la respuesta")).toBe(true)
-    // 2º procesamiento (retry de webhook) no afecta filas → el inbound lo consume sin re-actuar
-    expect(await es.markAnswered(id, "otra")).toBe(false)
-    // sigue correlacionando por el message_id (notified|answered) → el reply se reconoce, pero markAnswered guarda
+    // mientras está 'notified' correlaciona (la 1ª respuesta del owner se procesa)
     expect(await es.findByNotifyMessage("telegram", "7")).not.toBeNull()
+    expect(await es.markAnswered(id, "la respuesta")).toBe(true)
+    // 2º markAnswered (retry) no afecta filas
+    expect(await es.markAnswered(id, "otra")).toBe(false)
+    // tras 'answered' ya NO correlaciona → los mensajes siguientes en el hilo son turno normal (continúa la charla)
+    expect(await es.findByNotifyMessage("telegram", "7")).toBeNull()
   })
 
   it("markFailed solo desde pending; no correlaciona", async () => {

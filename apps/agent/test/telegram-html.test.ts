@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  escapeTelegramHtml,
   sanitizeTelegramHtml,
   stripTelegramHtml,
 } from "../src/adapters/telegram/html.js"
@@ -44,5 +45,27 @@ describe("stripTelegramHtml", () => {
     expect(
       stripTelegramHtml("<b>bold</b> <code>y</code> 4<span>0</span>4")
     ).toBe("bold y 404")
+  })
+})
+
+describe("escapeTelegramHtml", () => {
+  it("neutraliza tags inyectados por un visitante (no se renderizan como HTML)", () => {
+    expect(escapeTelegramHtml("<b>x</b>")).toBe("&lt;b&gt;x&lt;/b&gt;")
+    // tras escapar, sanitize ya no ve tags → el visitante no puede inyectar formato
+    expect(sanitizeTelegramHtml(escapeTelegramHtml("<b>x</b>"))).toBe(
+      "&lt;b&gt;x&lt;/b&gt;"
+    )
+  })
+
+  it("escapa `&` primero (no doble-escapa)", () => {
+    expect(escapeTelegramHtml("Tom & Jerry < 5 > 3")).toBe(
+      "Tom &amp; Jerry &lt; 5 &gt; 3"
+    )
+  })
+
+  it("deja intacto el texto sin metacaracteres", () => {
+    expect(escapeTelegramHtml("¿le gusta la pasta?")).toBe(
+      "¿le gusta la pasta?"
+    )
   })
 })

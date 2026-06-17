@@ -18,18 +18,48 @@ const MAX_OPEN_PER_PRINCIPAL = 3
 /** Largo máximo de la pregunta que llega al DM (anti-payloads enormes / abuso). */
 const MAX_QUESTION_LEN = 600
 
-/** Arma el DM al owner: enmarca la pregunta del visitante como DATO NO CONFIABLE (anti prompt-injection) +
- *  trunca. La sanitización de HTML la hace el cliente de Telegram al enviar (este texto es plano). */
+/** Pie del DM según el `kind`: le da VISIBILIDAD a Kevin de qué hará Vaio con su respuesta (transmitir + aprender,
+ *  solo transmitir, validar) y cómo anularlo — así no queda ciego de la intención al responder. */
+function replyHint(
+  kind: "knowledge" | "contact" | "claim",
+  locale: "es" | "en"
+): string {
+  if (locale === "en") {
+    if (kind === "knowledge")
+      return "↩️ Reply: I'll pass it on AND remember it as a fact about you (say “don't learn it” to skip)."
+    if (kind === "contact")
+      return "↩️ Reply: I'll pass it on (I won't save it unless you say “save it”)."
+    return "↩️ Reply to validate it: I'll pass it on; say “save it” if you want me to remember it."
+  }
+  if (kind === "knowledge")
+    return "↩️ Respondé: se la transmito Y lo recuerdo como dato tuyo (decí «no lo aprendas» si preferís que no)."
+  if (kind === "contact")
+    return "↩️ Respondé: se lo transmito (no lo guardo como dato salvo que digas «guardalo»)."
+  return "↩️ Respondé para validarlo: se lo transmito; decí «guardalo» si querés que lo recuerde."
+}
+
+/** Arma el CUERPO del DM al owner (texto PLANO): delimita la pregunta del visitante como DATO NO CONFIABLE
+ *  (anti prompt-injection) + trunca + pie por `kind` (visibilidad de la intención). El ENCABEZADO visual y el
+ *  ESCAPE de HTML los pone el adapter del OwnerNotifier (frameOwnerNotification) — el formato es telegram-específico,
+ *  no del core (Inv #4). La curación sigue gated por Kevin (default por tipo + veto/override). */
 function buildOwnerDM(
   question: string,
-  who: { channel: string; id: string },
+  who: { channel: string },
+  kind: "knowledge" | "contact" | "claim",
   locale: "es" | "en"
 ): string {
   const q = question.slice(0, MAX_QUESTION_LEN)
-  const from = who.channel === "telegram" ? `telegram:${who.id}` : who.channel
-  return locale === "en"
-    ? `New question I couldn't answer — from a visitor (${from}). Reply TO this message and I'll relay it + learn it.\n\nVisitor question (unverified text): «${q}»`
-    : `Una consulta que no supe responder — de un visitante (${from}). Respondé A ESTE mensaje y se la transmito + la aprendo.\n\nPregunta del visitante (texto sin verificar): «${q}»`
+  const via =
+    who.channel === "telegram"
+      ? "Telegram"
+      : locale === "en"
+        ? "the web"
+        : "la web"
+  const head =
+    locale === "en"
+      ? `A visitor (via ${via}) asked something I couldn't answer:\n\n«${q}»\n(unverified text)`
+      : `Un visitante (por ${via}) preguntó algo que no supe responder:\n\n«${q}»\n(texto sin verificar)`
+  return `${head}\n\n${replyHint(kind, locale)}`
 }
 
 export const escalate: ActionDescriptor = {
@@ -39,7 +69,7 @@ export const escalate: ActionDescriptor = {
   build(ctx: ActionContext) {
     return tool({
       description:
-        "Escalá a Kevin una duda concreta sobre ÉL que NO pudiste responder con tu memoria (searchMemory no trajo nada útil) y que SOLO él podría contestar — o un pedido de contacto. Pasá solo la pregunta, reformulada clara y autocontenida; el sistema le avisa a Kevin y, cuando responda, te lo hago llegar. NO la uses para cosas que sí podés responder ni para inventar.",
+        "Escalá a Kevin una duda concreta sobre ÉL que NO pudiste responder con tu memoria (searchMemory no trajo nada útil) y que SOLO él podría contestar — o un pedido de contacto. Usala APENAS detectás el gap, en el MISMO turno y SIN preguntarle al visitante si querés consultarle (es un protocolo automático, no una sugerencia que ofrecés). Pasá solo la pregunta, reformulada clara y autocontenida; el sistema le avisa a Kevin y, cuando responda, te lo hago llegar. NO la uses para cosas que sí podés responder ni para inventar.",
       inputSchema: z.object({
         question: z
           .string()
@@ -47,8 +77,13 @@ export const escalate: ActionDescriptor = {
           .describe(
             "La duda del visitante sobre Kevin que no supiste, reformulada clara y autocontenida (3ª persona)."
           ),
+        kind: z
+          .enum(["knowledge", "contact", "claim"])
+          .describe(
+            "Tipo: 'knowledge' = duda sobre un dato/conocimiento de Kevin · 'contact' = pedido de contacto o recado para Kevin · 'claim' = el visitante AFIRMA algo sobre Kevin que conviene que él valide."
+          ),
       }),
-      execute: async ({ question }, { toolCallId }) => {
+      execute: async ({ question, kind }, { toolCallId }) => {
         const t0 = Date.now()
         const locale: "es" | "en" = ctx.locale === "en" ? "en" : "es"
         const done = (ok: boolean, output: string): string => {
@@ -100,6 +135,7 @@ export const escalate: ActionDescriptor = {
           // Persistir la escalada (sobrevive restart; guarda el origen para retomar/cerrar).
           const { id } = await ctx.escalations.create({
             question,
+            kind,
             origin: {
               channel: ctx.principal.channel,
               conversationId: ctx.ids.conversationId,
@@ -111,11 +147,18 @@ export const escalate: ActionDescriptor = {
           // Notificar a Kevin (best-effort). El message_id devuelto ancla el reply-to (Inv #8).
           const res = await ctx.notifier.notify({
             kind: "escalation",
-            text: buildOwnerDM(question, ctx.principal, locale),
+            text: buildOwnerDM(question, ctx.principal, kind, locale),
+            // Título del hilo (Threaded Mode): la pregunta en una línea, recortada (límite Bot API 128).
+            title: question.replace(/\s+/g, " ").slice(0, 80),
             locale,
           })
           if (res.delivered && res.ref) {
-            await ctx.escalations.markNotified(id, res.channel, res.ref)
+            await ctx.escalations.markNotified(
+              id,
+              res.channel,
+              res.ref,
+              res.topicId
+            )
             // Telegram-visitante tiene push → prometemos retomo. Web no → se cierra cuando vuelva (o vía el fact).
             const willPush = ctx.principal.channel === "telegram"
             return done(

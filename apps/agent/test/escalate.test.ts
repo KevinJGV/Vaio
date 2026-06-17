@@ -68,7 +68,12 @@ function ctx(partial: Partial<ActionContext>): ActionContext {
 }
 
 const exec = (t: ReturnType<typeof escalate.build>, question: string) =>
-  t.execute?.({ question }, { toolCallId: "c", messages: [] }).then(String)
+  t
+    .execute?.(
+      { question, kind: "knowledge" },
+      { toolCallId: "c", messages: [] }
+    )
+    .then(String)
 
 describe("escalate (acción)", () => {
   it("visitante Telegram (push) → persiste + notifica + markNotified con el ref; promete retomar", async () => {

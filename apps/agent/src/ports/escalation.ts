@@ -4,6 +4,11 @@
 // el message_id persistido — el modelo nunca toca ids (Inv #8). El core depende del puerto; el adapter es Drizzle+Neon.
 // Ver docs/superpowers/specs/2026-06-16-escalate-owner-notifier-design.md.
 
+/** Tipo de escalada → define el DEFAULT de curación (lo gestiona el sistema, no el modelo más allá del enum):
+ *  knowledge=duda sobre un dato de Kevin (default: aprende) · contact=pedido de contacto/recado (default: no
+ *  aprende) · claim=afirmación del visitante a validar (default: no aprende salvo que Kevin lo fuerce). Inv #8. */
+export type EscalationKind = "knowledge" | "contact" | "claim"
+
 /** Origen de la duda: a dónde retomar (si hay push) y a quién/qué canal adjudicar el cierre. */
 export interface EscalationOrigin {
   channel: string // 'web' | 'telegram'
@@ -13,10 +18,11 @@ export interface EscalationOrigin {
   locale: string
 }
 
-/** Una escalada recuperada por la correlación reply-to, lista para retomar/cerrar. */
+/** Una escalada recuperada por la correlación, lista para retomar/cerrar/curar. */
 export interface AnsweredEscalation {
   id: string
   question: string
+  kind: EscalationKind
   origin: EscalationOrigin
 }
 
@@ -24,13 +30,16 @@ export interface EscalationStore {
   /** Crea una escalada en estado 'pending'. Devuelve su id (el sistema lo gestiona; nunca el modelo). */
   create(input: {
     question: string
+    kind: EscalationKind
     origin: EscalationOrigin
   }): Promise<{ id: string }>
-  /** Marca 'notified' y guarda por qué canal + message_id se avisó al owner (la clave de correlación). */
+  /** Marca 'notified' y guarda por qué canal + message_id + (opcional) topic del hilo se avisó al owner.
+   *  Ambos son claves de correlación: el reply del owner casa por topic (responde EN el hilo) o por message_id. */
   markNotified(
     id: string,
     notifyChannel: string,
-    notifyMessageId: string
+    notifyMessageId: string,
+    notifyTopicId?: string
   ): Promise<void>
   /** Marca 'failed' (el DM al owner no salió). El visitante igual recibió respuesta honesta. */
   markFailed(id: string): Promise<void>
@@ -40,9 +49,18 @@ export interface EscalationStore {
     notifyChannel: string,
     notifyMessageId: string
   ): Promise<AnsweredEscalation | null>
+  /** Correlación por HILO (Threaded Mode): la escalada cuyo topic_id coincide → Kevin respondió DENTRO del hilo
+   *  (sin citar). null = ese topic no es de una escalada (otra conversación). NO muta. */
+  findByNotifyTopic(
+    notifyChannel: string,
+    notifyTopicId: string
+  ): Promise<AnsweredEscalation | null>
   /** Marca 'answered', guarda la respuesta + (opcional) el fact curado. UPDATE condicional
    *  (WHERE status='notified') → idempotente ante reintentos de webhook; devuelve si afectó filas. */
   markAnswered(id: string, answer: string, factId?: string): Promise<boolean>
+  /** Liga un fact curado a una escalada ya respondida (el factId se conoce DESPUÉS del markAnswered, tras redactar).
+   *  Linaje/auditoría: qué duda derivó en qué fact. Idempotente; no cambia el estado. */
+  linkFact(id: string, factId: string): Promise<void>
   /** Anti-spam: cuántas escaladas sin resolver tiene este principal (pending|notified). */
   countOpenByPrincipal(principalId: string): Promise<number>
   /** Anti-spam (dedup): una escalada abierta del mismo principal con pregunta equivalente (normalizada).

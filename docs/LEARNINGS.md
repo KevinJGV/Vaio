@@ -6,6 +6,25 @@ para no repetirlas en próximas sesiones. Una línea por aprendizaje, concreta.
 > Esto es la memoria del **dev**. La memoria del **producto** (lo que el agente sabe de Kevin)
 > vive en Neon/pgvector — ver `docs/SPEC.md`.
 
+- **Curación auto de escaladas — cercanía vectorial ≠ contradicción** (gotcha jun-2026, caso e2e pasta/fútbol;
+  DIFERIDO al cluster "ciclo de vida del fact" por decisión de Kevin — apuntado, NO parcheado, para hacerlo bien
+  con bases). La curación automática (`adapters/telegram/escalation-inbound.ts` → `curate`) trataba
+  `factStore.propose().conflicts.length > 0` como **contradicción real** → dejaba el fact en `pending` + le avisaba
+  a Kevin "Eso choca con algo que ya sabía". PERO `neon-facts.ts` `findNearConfirmed` devuelve **candidatos CERCANOS
+  por coseno** (umbral `conflictDistance`, "generoso a propósito" — comentario en el código), cuyo juicio de
+  contradicción el diseño **delega al MODELO** (flujo conversacional `resolveFact`/`rememberFact`), no son
+  contradicciones. **Caso real:** «A Kevin le gusta la pasta» se marcó en conflicto con «…el fútbol» (vecino
+  vectorial por el patrón "le gusta X", sin relación temática) → 2 corridas del e2e dejaron **2 facts de pasta
+  colgados en `pending`**; al consultarlos, el flujo conversacional ofreció "¿reemplazo el fútbol, coexisten, o
+  descarto?" (ruido por el falso candidato). **Diagnóstico:** la curación auto hace una versión ROTA del
+  "middleware de conflicto" que Kevin pidió. **Fix correcto (al retomar el cluster):** (A) commitear siempre
+  (coexisten — correcto para gustos/datos ADITIVOS; difiere el juicio y acepta una fuga acotada), o (B —
+  recomendado, el núcleo del middleware) un **juicio LLM** que, dados los candidatos cercanos, decida cuáles
+  REALMENTE contradice → `commit` con `supersede(contradichos)`, coexisten los demás; + **dedup de duplicados
+  exactos** (dist≈0, evita 2 «pasta» idénticos). El caso común es aditivo → coexistir es lo correcto; la
+  contradicción real (cambió de trabajo, "ya no le gusta X") es menos frecuente y se resuelve con el juicio + el
+  hilo-puntero + desaprender. Hasta el cluster, el bug persiste (decisión consciente de Kevin). Ver el cluster en
+  `NEXT-STEPS.md`. Aparte: limpiar los 2 `pending` de pasta del e2e (data sucia: `reject` conversacional o DELETE manual).
 - **`openrouter/free` NO sirve para VISIÓN** (gotcha real jun-2026): el "free router" rota entre TODOS los
   modelos gratis que aceptan la modalidad, y el pool de imagen incluye modelos que **aceptan imágenes pero no
   describen** — p.ej. `nvidia/nemotron-3.5-content-safety:free` (moderación): devolvió `User Safety: unsafe /

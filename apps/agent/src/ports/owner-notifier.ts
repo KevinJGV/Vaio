@@ -17,10 +17,14 @@ export type OwnerNotifyKind =
 
 export interface OwnerNotifyInput {
   kind: OwnerNotifyKind
-  /** Texto ya listo para el owner (system-authored o renderizado por el llamador). El adapter solo lo entrega
-   *  + formatea por canal; el llamador es responsable de sanearlo si incluye contenido no confiable. */
+  /** Cuerpo en TEXTO PLANO (system-authored o renderizado por el llamador). El adapter lo formatea/enmarca y lo
+   *  ESCAPA por canal — el llamador NO necesita conocer el markup del canal (Telegram HTML, etc.). Puede incluir
+   *  contenido no confiable (p.ej. la pregunta de un visitante): el escape del borde de salida lo neutraliza. */
   text: string
   locale?: string
+  /** Título del HILO (si el canal soporta topics, p.ej. Telegram Threaded Mode). El consumidor lo pasa (escalate
+   *  → la pregunta truncada); el adapter cae a un default por `kind` si falta. */
+  title?: string
   /** Metadata opcional del disparador (p.ej. { escalationId }). Para logging / que el adapter decida formato;
    *  NUNCA datos que el modelo deba relayar (Inv #8). */
   payload?: Record<string, unknown>
@@ -35,6 +39,9 @@ export interface OwnerNotifyResult {
   /** Ancla opaca del mensaje enviado (Telegram: String(message_id); WhatsApp: wamid; correo: Message-ID).
    *  El consumidor la persiste para correlacionar la respuesta. undefined si !delivered o el canal no la expone. */
   ref?: string
+  /** Ancla del HILO creado para este aviso (Telegram: String(message_thread_id)). El consumidor la persiste para
+   *  correlacionar la respuesta del owner DENTRO del hilo (sin citar). undefined si el canal no usa topics. */
+  topicId?: string
   /** Chat/destino donde quedó el mensaje (Telegram: String(owner chat id)). Para casar/anclar el reply-to. */
   channelChatId?: string
 }

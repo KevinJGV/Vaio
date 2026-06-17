@@ -33,7 +33,7 @@ export function createTelegramConversationResumer(deps: {
   newRequestId: () => string
 }): ConversationResumer {
   return {
-    resumeConversation(input) {
+    async resumeConversation(input) {
       const chatId = input.routing?.chatId
       // Web (sin push) → no-op limpio: el cierre va por el fact (la próxima consulta lo recupera).
       if (chatId === undefined) {
@@ -41,14 +41,13 @@ export function createTelegramConversationResumer(deps: {
           { channel: input.channel },
           "resumeConversation: sin push (web) → no-op"
         )
-        return
+        return { delivered: false }
       }
       const thread =
         input.routing?.threadId !== undefined
           ? { messageThreadId: input.routing.threadId }
           : {}
-      // No bloquea: corre fuera del hilo del que disparó (el inbound ya ACKeó).
-      void (async () => {
+      try {
         deps.logger.info(
           { channel: input.channel, chatId },
           "tg: retomo cross-conversation (escalada respondida)"
@@ -72,14 +71,17 @@ export function createTelegramConversationResumer(deps: {
           toolDenylist: ["escalate"],
         })
         const answer = await text
-        await deps.client.sendMessage(chatId, answer, thread)
-      })().catch((err) => {
-        // best-effort (Inv #1): un fallo acá no rompe nada (el visitante ya recibió "se lo paso a Kevin").
+        // `delivered` = el mensaje LLEGÓ de verdad (message_id presente) → el inbound confirma honesto al owner.
+        const messageId = await deps.client.sendMessage(chatId, answer, thread)
+        return { delivered: messageId !== undefined }
+      } catch (err) {
+        // best-effort (Inv #1): un fallo acá no rompe nada; reportamos no-entregado para no mentirle al owner.
         deps.logger.warn(
           { err: err instanceof Error ? err.message : String(err) },
           "tg: retomo cross-conversation falló"
         )
-      })
+        return { delivered: false }
+      }
     },
   }
 }

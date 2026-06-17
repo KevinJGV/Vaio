@@ -71,6 +71,20 @@
       "when": 1781635340568,
       "tag": "0009_long_blade",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1781657576216,
+      "tag": "0010_fearless_raza",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1781658518186,
+      "tag": "0011_red_gunslinger",
+      "breakpoints": true
     }
   ]
 }

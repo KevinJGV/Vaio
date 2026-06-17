@@ -1,5 +1,6 @@
 import type {
   AnsweredEscalation,
+  EscalationKind,
   EscalationOrigin,
   EscalationStore,
 } from "../../src/ports/escalation.js"
@@ -9,9 +10,11 @@ type Status = "pending" | "notified" | "answered" | "dismissed" | "failed"
 interface Row {
   id: string
   question: string
+  kind: EscalationKind
   origin: EscalationOrigin
   notifyChannel: string | null
   notifyMessageId: string | null
+  notifyTopicId: string | null
   status: Status
   answer: string | null
   factId: string | null
@@ -27,26 +30,29 @@ export function inMemoryEscalations(): EscalationStore & { rows: () => Row[] } {
   let n = 0
   return {
     rows: () => rows,
-    async create({ question, origin }) {
+    async create({ question, kind, origin }) {
       const id = `e${++n}`
       rows.push({
         id,
         question,
+        kind,
         origin,
         notifyChannel: null,
         notifyMessageId: null,
+        notifyTopicId: null,
         status: "pending",
         answer: null,
         factId: null,
       })
       return { id }
     },
-    async markNotified(id, notifyChannel, notifyMessageId) {
+    async markNotified(id, notifyChannel, notifyMessageId, notifyTopicId) {
       const r = rows.find((x) => x.id === id && x.status === "pending")
       if (!r) return
       r.status = "notified"
       r.notifyChannel = notifyChannel
       r.notifyMessageId = notifyMessageId
+      r.notifyTopicId = notifyTopicId ?? null
     },
     async markFailed(id) {
       const r = rows.find((x) => x.id === id && x.status === "pending")
@@ -59,11 +65,27 @@ export function inMemoryEscalations(): EscalationStore & { rows: () => Row[] } {
       // notified|answered: el message_id fue de una escalada real; la idempotencia la da markAnswered.
       const r = rows.find(
         (x) =>
-          (x.status === "notified" || x.status === "answered") &&
+          x.status === "notified" &&
           x.notifyChannel === notifyChannel &&
           x.notifyMessageId === notifyMessageId
       )
-      return r ? { id: r.id, question: r.question, origin: r.origin } : null
+      return r
+        ? { id: r.id, question: r.question, kind: r.kind, origin: r.origin }
+        : null
+    },
+    async findByNotifyTopic(
+      notifyChannel,
+      notifyTopicId
+    ): Promise<AnsweredEscalation | null> {
+      const r = rows.find(
+        (x) =>
+          x.status === "notified" &&
+          x.notifyChannel === notifyChannel &&
+          x.notifyTopicId === notifyTopicId
+      )
+      return r
+        ? { id: r.id, question: r.question, kind: r.kind, origin: r.origin }
+        : null
     },
     async markAnswered(id, answer, factId) {
       const r = rows.find((x) => x.id === id && x.status === "notified")
@@ -72,6 +94,10 @@ export function inMemoryEscalations(): EscalationStore & { rows: () => Row[] } {
       r.answer = answer
       r.factId = factId ?? null
       return true
+    },
+    async linkFact(id, factId) {
+      const r = rows.find((x) => x.id === id)
+      if (r) r.factId = factId
     },
     async countOpenByPrincipal(principalId) {
       return rows.filter(

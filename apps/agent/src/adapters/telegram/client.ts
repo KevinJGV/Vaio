@@ -48,6 +48,9 @@ export interface TelegramClient {
     draftId: number,
     text: string
   ): Promise<boolean>
+  /** Crea un topic/hilo (Threaded Mode, Bot API 9.3: vale en chat PRIVADO con el bot, sin admin). Devuelve el
+   *  `message_thread_id` del hilo creado, o undefined si falló (best-effort: el caller degrada a DM plano). */
+  createForumTopic(chatId: number, name: string): Promise<number | undefined>
   setWebhook(url: string, secret: string): Promise<void>
 }
 
@@ -85,7 +88,7 @@ export function createTelegramClient(
   const request = async (
     method: string,
     body: unknown
-  ): Promise<{ ok: boolean; messageId?: number }> => {
+  ): Promise<{ ok: boolean; messageId?: number; threadId?: number }> => {
     try {
       const res = await fetch(`${base}/${method}`, {
         method: "POST",
@@ -110,12 +113,15 @@ export function createTelegramClient(
         return { ok: false }
       }
       const json = (await res.json().catch(() => null)) as {
-        result?: { message_id?: number }
+        result?: { message_id?: number; message_thread_id?: number }
       } | null
       const messageId = json?.result?.message_id
-      return typeof messageId === "number"
-        ? { ok: true, messageId }
-        : { ok: true }
+      const threadId = json?.result?.message_thread_id
+      return {
+        ok: true,
+        ...(typeof messageId === "number" ? { messageId } : {}),
+        ...(typeof threadId === "number" ? { threadId } : {}),
+      }
     } catch (err) {
       logger.warn(
         { method, err: err instanceof Error ? err.message : String(err) },
@@ -203,6 +209,15 @@ export function createTelegramClient(
         draft_id: draftId,
         text,
       })
+    },
+    async createForumTopic(chatId, name) {
+      // Threaded Mode: crea el hilo en el DM del owner. Devuelve el message_thread_id (ancla del hilo) o
+      // undefined si falló → el caller degrada a DM plano (Inv #1). name 1–128 chars (límite Bot API).
+      const res = await request("createForumTopic", {
+        chat_id: chatId,
+        name: name.slice(0, 128),
+      })
+      return res.ok ? res.threadId : undefined
     },
     async setWebhook(url, secret) {
       await call("setWebhook", { url, secret_token: secret })
