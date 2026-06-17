@@ -1,10 +1,11 @@
 // INBOUND de escalaciones: intercepta la RESPUESTA del owner (Kevin) a una escalada antes de tratarla como un
 // turno normal. Kevin responde DENTRO del hilo (Threaded Mode → threadId) o citando el DM (replyToMessageId) →
 // correlacionamos por id (Inv #8, el sistema, no el modelo). Si matchea: marca answered (idempotente), RETOMA al
-// visitante (await → "se lo transmití" solo si LLEGÓ de verdad) y, según el TIPO de escalada + lo que Kevin diga,
-// CURA facts: descompone en átomos (FactDecomposer, 3ª persona, nunca lo sensible) → el JUEZ decide la relación con
-// los vigentes → persiste/invalida (auto-resuelve; middleware-siempre) — ejecución DETERMINÍSTICA del sistema (no
-// una tool que el modelo deba decidir → no reintroduce el gap "dice pero no hace"). Si NO matchea → false.
+// visitante (await → "se lo transmití" solo si LLEGÓ de verdad) y CURA facts de la respuesta de Kevin: descompone
+// en átomos (FactDecomposer, 3ª persona, nunca lo sensible) → el JUEZ decide la relación con los vigentes →
+// persiste/invalida (auto-resuelve: contradice→guarda+invalida el viejo, dup→no duplica, aditivo→guarda). Aprende
+// SIEMPRE de la respuesta del owner (info suya), gateado solo por el decomposer + el veto; el `kind` es solo para el
+// framing del DM. Ejecución DETERMINÍSTICA (no una tool que el modelo decida → sin gap "dice pero no hace"). Si NO matchea → false.
 
 import type { ConflictJudge } from "../../ports/conflict-judge.js"
 import type {
@@ -23,11 +24,9 @@ type Turn = Extract<NormalizeResult, { kind: "turn" }>
 
 const NOTIFY_CHANNEL = "telegram"
 
-/** Veto del owner: "no lo aprendas / no guardes / no lo recuerdes" → no curar aunque el tipo aprenda por default. */
+/** Veto del owner: "no lo aprendas / no guardes / no lo recuerdes" → no tocar la memoria con esta respuesta. */
 const VETO_RE =
   /\bno\s+(lo\s+|los\s+|la\s+)?(aprend|guard|recuerd|almacen|anot)/i
-/** Override del owner: "guardalo / agregalo / recordá / anotá" → curar aunque el tipo NO aprenda por default. */
-const FORCE_RE = /\b(guard[aá]|agreg[aá]|record[aá]|almacen[aá]|anot[aá])/i
 
 interface InboundDeps {
   escalations: EscalationStore
@@ -56,22 +55,17 @@ function parseTelegramKey(
   return Number.isInteger(threadId) ? { chatId, threadId } : { chatId }
 }
 
-/** ¿Esta respuesta debe PERSISTIRSE como fact? Default por TIPO, con veto/override del owner. knowledge aprende
- *  salvo veto; contact/claim NO aprenden salvo que Kevin lo fuerce. (El "qué" lo descompone el decomposer; esto es
- *  el "si". Nota: aunque no se persista, el middleware-siempre igual invalida contradicciones — ver curate.) */
-function shouldLearn(
-  kind: AnsweredEscalation["kind"],
-  ownerText: string
-): boolean {
-  if (kind === "knowledge") return !VETO_RE.test(ownerText)
-  return FORCE_RE.test(ownerText) // contact | claim
+/** ¿El owner VETÓ tocar la memoria con esta respuesta? ("no lo aprendas / no guardes / no lo recuerdes".) */
+function isVetoed(ownerText: string): boolean {
+  return VETO_RE.test(ownerText)
 }
 
 /** Curación DETERMINÍSTICA (sistema): descompone la respuesta de Kevin en facts ATÓMICOS → el JUEZ decide la
- *  relación de cada uno con los vigentes (contradice/duplica/coexiste) → el sistema persiste/invalida (Inv #8/#9).
- *  AUTO-RESUELVE (no cuelga pendientes): contradicción de alta confianza → guarda el nuevo invalidando el viejo;
- *  duplicado → no duplica; aditivo → guarda. MIDDLEWARE SIEMPRE: aunque el tipo NO aprenda, si la respuesta
- *  contradice un fact vigente → lo invalida (cierra la fuga de memoria rancia). best-effort: fallo → no toca nada. */
+ *  relación de cada uno con los vigentes → el sistema persiste/invalida (Inv #8/#9). AUTO-RESUELVE (no cuelga
+ *  pendientes): contradicción de alta confianza → guarda el nuevo INVALIDANDO el viejo (el contrapuesto queda
+ *  registrado); duplicado → no duplica; aditivo → guarda. **Aprende SIEMPRE de la respuesta del owner** (info suya,
+ *  confiable) gateado solo por el decomposer (filtra no-factual/sensible/contacto) + el veto; el `kind` es solo para
+ *  el framing del DM, no gatea la curación. best-effort: fallo → no toca nada. */
 async function curate(
   deps: InboundDeps,
   esc: AnsweredEscalation,
@@ -87,9 +81,15 @@ async function curate(
     )
     return empty
   }
+  if (isVetoed(ownerText)) {
+    deps.logger.info(
+      { escId: esc.id },
+      "curación: veto del owner → no toca la memoria"
+    )
+    return empty
+  }
   const factStore = deps.factStore
-  // Descomponer SIEMPRE (mono-idea). El tipo/veto decide si se PERSISTE; los átomos sirven igual para detectar
-  // contradicciones a invalidar (middleware-siempre). Sin átomos factuales (no-factual/sensible) → nada que hacer.
+  // Descomponer en átomos mono-idea (el decomposer ya filtra lo no-factual/sensible/contacto → [] si no hay nada).
   let atoms: string[]
   try {
     const r = await deps.factDecomposer.decompose({
@@ -103,12 +103,11 @@ async function curate(
   }
   if (atoms.length === 0) return empty
 
-  const learn = shouldLearn(esc.kind, ownerText)
   const learned: string[] = []
   const superseded: string[] = []
   let firstFactId: string | null = null // costura Inc 2: anclar la escalada al 1er fact curado (hilo→fact)
 
-  // Mapear ordinal→uuid y filtrar por veredicto (el juez emite ordinales; el sistema conoce los ids — Inv #8).
+  // Veredicto del juez por candidato cercano (emite ordinales; el sistema conoce los ids — Inv #8).
   const verdicts = async (
     atom: string,
     candidates: ConflictCandidate[]
@@ -135,44 +134,32 @@ async function curate(
 
   for (const atom of atoms) {
     try {
-      if (learn) {
-        const { id, conflicts } = await factStore.propose({
-          statement: atom,
-          principalId: ownerPrincipalId,
-          channel: NOTIFY_CHANNEL,
-          conversationId: esc.origin.conversationId,
-        })
-        if (conflicts.length === 0) {
-          await factStore.commit(id)
+      const { id, conflicts } = await factStore.propose({
+        statement: atom,
+        principalId: ownerPrincipalId,
+        channel: NOTIFY_CHANNEL,
+        conversationId: esc.origin.conversationId,
+      })
+      if (conflicts.length === 0) {
+        await factStore.commit(id)
+        learned.push(atom)
+        firstFactId ??= id
+      } else {
+        const { contradicts, anyDuplicate } = await verdicts(atom, conflicts)
+        if (contradicts.length > 0) {
+          // Contradice (alta confianza) → guarda el nuevo invalidando los viejos (commit con supersedes).
+          await factStore.commit(id, {
+            supersedes: contradicts.map((c) => c.id),
+          })
+          learned.push(atom)
+          superseded.push(...contradicts.map((c) => c.statement))
+          firstFactId ??= id
+        } else if (anyDuplicate) {
+          await factStore.reject(id) // dedup: no duplicar
+        } else {
+          await factStore.commit(id) // coexiste/dudoso → aditivo
           learned.push(atom)
           firstFactId ??= id
-        } else {
-          const { contradicts, anyDuplicate } = await verdicts(atom, conflicts)
-          if (contradicts.length > 0) {
-            // Contradice (alta confianza) → guarda el nuevo invalidando los viejos (commit con supersedes).
-            await factStore.commit(id, {
-              supersedes: contradicts.map((c) => c.id),
-            })
-            learned.push(atom)
-            superseded.push(...contradicts.map((c) => c.statement))
-            firstFactId ??= id
-          } else if (anyDuplicate) {
-            await factStore.reject(id) // dedup: no duplicar
-          } else {
-            await factStore.commit(id) // coexiste/dudoso → aditivo
-            learned.push(atom)
-            firstFactId ??= id
-          }
-        }
-      } else {
-        // Middleware-siempre: NO persiste, pero si el átomo contradice un vigente → invalidar (sin proponer).
-        const candidates = await factStore.findConfirmedNear(
-          atom,
-          ownerPrincipalId
-        )
-        const { contradicts } = await verdicts(atom, candidates)
-        for (const c of contradicts) {
-          if (await factStore.invalidate(c.id)) superseded.push(c.statement)
         }
       }
     } catch (err) {

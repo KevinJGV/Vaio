@@ -493,33 +493,51 @@ describe("inbound: curación con juez + atomicidad", () => {
     expect(fs.committed).toHaveLength(0)
   })
 
-  it("MIDDLEWARE-SIEMPRE: contact (no aprende) pero la respuesta CONTRADICE un vigente → lo invalida", async () => {
-    const { es } = await setup("contact")
-    const fs = fakeFactStore({
-      near: [{ id: "old", statement: "Kevin trabaja en X", validAt: null }],
-    })
+  it("UNIFICADO: claim que contradice → guarda el nuevo invalidando el viejo (no más gate por kind)", async () => {
+    const { es } = await setup("claim")
+    const fs = fakeFactStore({ conflict: true }) // propose devuelve "dato viejo"
     const sent: { chatId: number; text: string }[] = []
     await run(
       es,
       fs,
       {
-        statements: ["Kevin ya no trabaja en X"],
+        statements: ["A Kevin ya no le gusta la pasta"],
         judge: fakeJudge("contradicts"),
       },
-      "Ya no trabajo ahí",
+      "Ya no me gusta la pasta",
       sent
     )
-    await vi.waitFor(() => expect(fs.invalidated).toEqual(["old"]))
-    expect(fs.committed).toHaveLength(0) // contact no persiste el nuevo
+    await vi.waitFor(() => expect(fs.committed).toHaveLength(1))
+    expect(fs.committed[0]?.supersedes).toEqual(["old"]) // invalidó el viejo
     await vi.waitFor(() => expect(sent).toHaveLength(1))
     expect(sent[0]?.text).toContain("Di de baja")
   })
 
-  it("contact sin override y sin contradicción → no toca nada", async () => {
+  it("UNIFICADO (caso C): claim aditivo+contradictorio → guarda AMBOS (tarta + contrapuesto)", async () => {
+    const { es } = await setup("claim")
+    const fs = fakeFactStore() // sin conflicto en el fake → ambos átomos commitean
+    const sent: { chatId: number; text: string }[] = []
+    await run(
+      es,
+      fs,
+      {
+        statements: [
+          "A Kevin ya no le gusta la pasta",
+          "A Kevin le gusta la tarta de manzana",
+        ],
+      },
+      "Ya no me gusta la pasta, ahora me gusta la tarta de manzana",
+      sent
+    )
+    await vi.waitFor(() => expect(fs.committed).toHaveLength(2)) // claim AHORA aprende (antes learned:0)
+    expect(fs.proposed).toContain("A Kevin le gusta la tarta de manzana")
+  })
+
+  it("contact con instrucción no-factual (decomposer vacío) → no toca nada", async () => {
     const { es } = await setup("contact")
     const fs = fakeFactStore()
     const sent: { chatId: number; text: string }[] = []
-    await run(es, fs, { statements: ["algo"] }, "Decile que me escriba", sent)
+    await run(es, fs, { statements: [] }, "Decile que me escriba", sent)
     await vi.waitFor(() => expect(sent).toHaveLength(1))
     expect(fs.committed).toHaveLength(0)
     expect(fs.invalidated).toHaveLength(0)
