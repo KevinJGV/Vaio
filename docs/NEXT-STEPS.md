@@ -114,12 +114,19 @@
   mono-idea antes de juzgar); (3) **desaprender** (`FactStore.invalidate` bi-temporal + tool nueva `unlearnFact`,
   owner-only); + **middleware-siempre** (contradicción invalida aunque no se aprenda, visible) + **juicio completo**
   (sin truncar, `FACT_CONFLICT_MAX` logueado; `FACT_CONFLICT_CANDIDATES`→presentación "+N más"; umbral 0.45→0.55).
-  **Verificado local:** typecheck/biome/build limpios; **494 tests** (+12); `/health` 200 con `facts:true`,
-  `escalateCuration:true`. Specs [`…-fact-lifecycle-{design,plan}.md`](superpowers/specs/2026-06-17-fact-lifecycle-design.md);
-  lección en `LEARNINGS.md`. **Falta:** e2e de Kevin por Telegram (juez/decompose con LLM real) → atomicidad
-  (compuesto→átomos), conversacional (pasta+fútbol coexisten/sin pending; "ya no" → pending→resolveFact; `unlearnFact`),
-  escalada (contradice→auto-invalida+visible). **Costuras para Inc 2 dejadas:** `invalidate` standalone, juez por
-  ordinales, `linkFact` al 1er fact curado, idempotencia por `escalationId`. Mergear a `main` tras el OK de Kevin.
+  **Verificado local:** typecheck/biome/build limpios; **494 tests** (+12); `/health` 200. **e2e #1 de Kevin
+  (2026-06-17, `logs.txt`):** ✅ atomicidad (compuesto→3 átomos), ✅ escalada knowledge contradice → `learned:2
+  superseded:1` (auto-invalida+visible: "trabaja en Anthropic" dado de baja), ✅ curación knowledge básica.
+  **🐞 BUG encontrado + CORREGIDO** (commit `1977398`): `findConfirmedNear` pasaba `excludeId=""` → `ne(id,"")`
+  casteaba a uuid → Postgres lanzaba → el `try/catch` lo tragaba → **unlearnFact** ("no pude desaprender") y el
+  **middleware-siempre** (escalada claim, "átomo falló") fallaban; también dejó la pasta sin invalidar en el e2e. El
+  path `learn=true`/propose nunca se vio afectado (usa id real). **Gap de testing:** los tests de facts son
+  fake-based (substring JS, sin uuid real) → esta clase de bug de query es **e2e-only**. **Falta re-correr** post-fix:
+  `unlearnFact` (1 match→in-turn; ≥2→lista), middleware (claim contradice→invalida), conversacional
+  (pasta+fútbol coexisten/sin pending; "ya no"→pending→resolveFact). Specs
+  [`…-fact-lifecycle-{design,plan}.md`](superpowers/specs/2026-06-17-fact-lifecycle-design.md); lección en
+  `LEARNINGS.md`. **Costuras Inc 2 dejadas:** `invalidate` standalone, juez por ordinales, `linkFact` al 1er fact,
+  idempotencia por `escalationId`. Mergear a `main` tras el OK de Kevin (re-e2e).
 - [ ] **CLUSTER — Inc 2: HILO CONSCIENTE DE SU RAZÓN** (reencuadre de Kevin 2026-06-17; antes "hilo-puntero"). El
   aprender/desaprender NATURAL dentro del hilo **ya está** (Inc 1: tras responder, el hilo es charla normal con el
   owner → toolset pleno). Lo que falta: cuando el hilo pasa de "resolver el pendiente" a **charla natural**, que Vaio
