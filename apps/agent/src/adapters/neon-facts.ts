@@ -34,10 +34,26 @@ export function createFactStore(
   const findNearConfirmed = async (
     emb: number[],
     principalId: string,
-    excludeId: string,
+    excludeId: string | undefined,
     limit: number = cfg.conflictMax
   ): Promise<ConflictCandidate[]> => {
     const dist = cosineDistance(facts.embedding, emb)
+    // `excludeId` opcional: solo se filtra cuando hay un id real (propose excluye la fila recién insertada). NO
+    // pasar "" → `facts.id != ''` castea "" a uuid y Postgres lanza "invalid input syntax for type uuid".
+    const where = excludeId
+      ? and(
+          eq(facts.status, "confirmed"),
+          isNull(facts.invalidAt),
+          eq(facts.principalId, principalId),
+          ne(facts.id, excludeId),
+          lt(dist, cfg.conflictDistance)
+        )
+      : and(
+          eq(facts.status, "confirmed"),
+          isNull(facts.invalidAt),
+          eq(facts.principalId, principalId),
+          lt(dist, cfg.conflictDistance)
+        )
     const rows = await db
       .select({
         id: facts.id,
@@ -45,15 +61,7 @@ export function createFactStore(
         validAt: facts.validAt,
       })
       .from(facts)
-      .where(
-        and(
-          eq(facts.status, "confirmed"),
-          isNull(facts.invalidAt),
-          eq(facts.principalId, principalId),
-          ne(facts.id, excludeId),
-          lt(dist, cfg.conflictDistance)
-        )
-      )
+      .where(where)
       .orderBy(asc(dist))
       .limit(limit)
     // No truncar el juicio en silencio: si llenamos el cap, podría haber más cercanos sin evaluar (Inv: cabos sueltos).
@@ -220,8 +228,8 @@ export function createFactStore(
         emb = undefined
       }
       if (!emb) return []
-      // excludeId vacío ("") no excluye nada → trae los confirmados vigentes más cercanos a la query.
-      return await findNearConfirmed(emb, principalId, "", limit)
+      // Sin excludeId → no filtra por id (trae los confirmados vigentes más cercanos a la query).
+      return await findNearConfirmed(emb, principalId, undefined, limit)
     },
   }
 }
