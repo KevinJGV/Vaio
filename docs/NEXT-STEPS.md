@@ -131,8 +131,13 @@
   `LEARNINGS.md`. **Falta re-correr (e2e #3):** caso C con la unificación (claim aditivo+contradictorio → ambos),
   conversacional (pasta+fútbol coexisten/sin pending; "ya no"→pending→resolveFact). **Costuras Inc 2 dejadas:**
   `invalidate` standalone, juez por ordinales, `linkFact` al 1er fact, idempotencia por `escalationId`. Merge a `main`
-  tras el OK final de Kevin. ⚠️ **Watch (e2e #2):** umbral 0.55 trajo "ya no trabaja en Anthropic" como candidato de
-  "fútbol" en unlearnFact (semánticamente flojo; el modelo desambiguó) → afinar umbral o sumar juez a unlearnFact si molesta.
+  tras el OK final de Kevin. **e2e #3 (2026-06-17):** ✅ `unlearnFact` pasta (which:0→olvida); **🔧 BUG corregido**
+  (commit `ef1bfe6`): "olvidá el fútbol" (fact ya borrado) ofrecía «pizza»/«pasta» — `findConfirmedNear` es solo
+  coseno (0.55) sin filtro semántico → ahora el **juez filtra** los candidatos (coseno=recall, juez "duplicate"=
+  precisión); ninguno coincide → "no encontré". **497 tests.** ⚠️ **NO es del cluster:** en e2e #3, "acordate piña"
+  tras "acordate napolitana" → el modelo razonó "voy a guardarlos" pero `finishReason:stop` **sin emitir el tool
+  call** → es el **"dice pero no hace"** (WIP "Incremento 2 — guard transversal", abajo), comportamiento del modelo,
+  no de la curación. **Falta e2e #4:** re-correr la piña (coexistencia) cuando el modelo sí dispare la tool.
 - [ ] **CLUSTER — Inc 2: HILO CONSCIENTE DE SU RAZÓN** (reencuadre de Kevin 2026-06-17; antes "hilo-puntero"). El
   aprender/desaprender NATURAL dentro del hilo **ya está** (Inc 1: tras responder, el hilo es charla normal con el
   owner → toolset pleno). Lo que falta: cuando el hilo pasa de "resolver el pendiente" a **charla natural**, que Vaio
