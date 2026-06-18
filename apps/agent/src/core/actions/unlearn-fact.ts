@@ -44,8 +44,15 @@ export const unlearnFact: ActionDescriptor = {
           .describe(
             "true SOLO si el owner confirmó olvidar TODOS los de la lista que te mostré."
           ),
+        thisThread: z
+          .boolean()
+          .optional()
+          .describe(
+            "true si el owner se refiere, por deixis/pronombre ('eso', 'lo que se aprendió acá'), al dato que se " +
+              "curó EN ESTE hilo de escalada. El sistema sabe cuál es y lo desaprende directo; no pases ids."
+          ),
       }),
-      execute: async ({ about, which, all }, { toolCallId }) => {
+      execute: async ({ about, which, all, thisThread }, { toolCallId }) => {
         const t0 = Date.now()
         const emit = (ok: boolean, output: string): string => {
           ctx.emit({
@@ -67,6 +74,18 @@ export const unlearnFact: ActionDescriptor = {
         }
         const factStore = ctx.factStore
         try {
+          // ANCLA determinística (Inc 2, Inv #8): el owner se refiere por deixis ("eso") al fact curado EN ESTE
+          // hilo de escalada. El modelo solo pasó un booleano; el sistema mapea al uuid anclado (server-side) e
+          // invalida directo (sin recall-total ni matcher). Sin ancla → cae al flujo normal por `about`.
+          if (thisThread === true && ctx.threadOrigin?.factId) {
+            const ok = await factStore.invalidate(ctx.threadOrigin.factId)
+            return emit(
+              ok,
+              ok
+                ? `Listo, lo olvidé: «${ctx.threadOrigin.statement ?? "ese dato"}».`
+                : "No pude darlo de baja (quizá ya estaba olvidado)."
+            )
+          }
           const locale = ctx.locale === "en" ? "en" : "es"
           const cap = ctx.factUnlearnMax ?? 150
           // RECALL TOTAL: traer TODOS los confirmados vigentes del owner (hasta cap). No hay corte semántico previo

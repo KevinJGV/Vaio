@@ -10,7 +10,7 @@ import type {
   EscalationStore,
 } from "../ports/escalation.js"
 import type { Database } from "./db/client.js"
-import { escalations } from "./db/schema.js"
+import { escalations, facts } from "./db/schema.js"
 
 /** Estados "abiertos" (aún sin resolver) para el anti-spam (rate-limit + dedup). */
 const OPEN_STATUSES = ["pending", "notified"] as const
@@ -134,6 +134,35 @@ export function createEscalationStore(db: Database): EscalationStore {
 
     async linkFact(id, factId) {
       await db.update(escalations).set({ factId }).where(eq(escalations.id, id))
+    },
+
+    async findResolvedByTopic(notifyChannel, notifyTopicId) {
+      // Conciencia del hilo (Inc 2): la escalada ya RESUELTA cuyo topic coincide + el fact curado (LEFT JOIN
+      // por escalations.fact_id → facts.statement, que puede no existir si la curación no guardó nada). NO muta.
+      const [row] = await db
+        .select({
+          question: escalations.question,
+          answer: escalations.answer,
+          factId: escalations.factId,
+          statement: facts.statement,
+        })
+        .from(escalations)
+        .leftJoin(facts, eq(facts.id, escalations.factId))
+        .where(
+          and(
+            eq(escalations.notifyChannel, notifyChannel),
+            eq(escalations.notifyTopicId, notifyTopicId),
+            eq(escalations.status, "answered")
+          )
+        )
+        .limit(1)
+      if (!row) return null
+      return {
+        question: row.question,
+        answer: row.answer ?? "",
+        ...(row.statement ? { statement: row.statement } : {}),
+        ...(row.factId ? { factId: row.factId } : {}),
+      }
     },
 
     async countOpenByPrincipal(principalId) {

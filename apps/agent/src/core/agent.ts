@@ -23,7 +23,7 @@ import type {
   ConversationStore,
   StoredAttachment,
 } from "../ports/conversation.js"
-import type { EscalationStore } from "../ports/escalation.js"
+import type { EscalationStore, ThreadOrigin } from "../ports/escalation.js"
 import type { FactDecomposer } from "../ports/fact-decomposer.js"
 import type { FactMatcher } from "../ports/fact-matcher.js"
 import type { FactStore, PendingFact } from "../ports/facts.js"
@@ -134,6 +134,10 @@ export interface TurnContext {
   /** Tools a deshabilitar SOLO en este turno (se restan de caps.allowedTools en buildTools). Lo usa el retomo
    *  cross-conversation de escalate: el turno sintético corre con `escalate` denegada → anti-loop (no re-escala). */
   toolDenylist?: ToolName[]
+  /** Inc 2 — conciencia del hilo: si este turno ocurre en un hilo de escalada YA RESUELTA, su origen (lo deriva
+   *  el adapter de canal por lookup). Inyecta una nota de fondo al prompt + ancla el factId para "desaprendé ESO"
+   *  (server-side; el modelo nunca toca el uuid, Inv #8). null/ausente = turno normal. */
+  threadOrigin?: ThreadOrigin | null
 }
 
 /** Resultado de un turno: `stream` (passthrough HTTP) + `text` (drenaje no-streaming, p.ej. Telegram).
@@ -344,6 +348,7 @@ export function createAgent(deps: AgentDeps) {
           summary: compressedSummary,
           pendingFacts,
           now: formatNow(new Date(), ownerTimezone, locale),
+          ...(ctx.threadOrigin ? { threadOrigin: ctx.threadOrigin } : {}),
         }),
         messages,
         stopWhen: stepCountIs(10),
@@ -373,6 +378,7 @@ export function createAgent(deps: AgentDeps) {
           resume: ctx.resume ?? null,
           escalations,
           notifier: ownerNotifier,
+          threadOrigin: ctx.threadOrigin ?? null,
           conversationKey: req.conversationKey,
           locale,
         }),

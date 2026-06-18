@@ -41,6 +41,26 @@ describe("EscalationStore (contrato, vía fake)", () => {
     expect(await es.findByNotifyMessage("telegram", "7")).toBeNull()
   })
 
+  it("findResolvedByTopic (Inc 2): solo tras 'answered' trae origen+answer+factId del hilo", async () => {
+    const es = inMemoryEscalations()
+    const { id } = await es.create({
+      question: "¿toca el piano?",
+      kind: "knowledge",
+      origin: origin(),
+    })
+    await es.markNotified(id, "telegram", "99", "topic-7")
+    // mientras está 'notified' NO es un hilo resuelto (lo maneja el inbound, no la conciencia)
+    expect(await es.findResolvedByTopic("telegram", "topic-7")).toBeNull()
+    await es.markAnswered(id, "sí, desde chico")
+    await es.linkFact(id, "fact-123")
+    const to = await es.findResolvedByTopic("telegram", "topic-7")
+    expect(to?.question).toBe("¿toca el piano?")
+    expect(to?.answer).toBe("sí, desde chico")
+    expect(to?.factId).toBe("fact-123")
+    // topic ajeno → null
+    expect(await es.findResolvedByTopic("telegram", "otro")).toBeNull()
+  })
+
   it("markFailed solo desde pending; no correlaciona", async () => {
     const es = inMemoryEscalations()
     const { id } = await es.create({ question: "¿Z?", origin: origin() })

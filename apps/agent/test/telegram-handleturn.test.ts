@@ -7,9 +7,10 @@ import type {
   TelegramClient,
 } from "../src/adapters/telegram/client.js"
 import { mountTelegram } from "../src/adapters/telegram/routes.js"
-import type { Agent } from "../src/core/agent.js"
+import type { Agent, TurnContext } from "../src/core/agent.js"
 import type { Logger } from "../src/ports/logger.js"
 import type { TraceSink } from "../src/ports/trace.js"
+import { inMemoryEscalations } from "./fakes/in-memory-escalations.js"
 
 const noopLog: Logger = {
   trace() {},
@@ -84,6 +85,30 @@ const fakeAgent = (chunks: string[], finalText: string): Agent =>
       text: Promise.resolve(finalText),
     }),
   }) as unknown as Agent
+
+/** Agente que captura el TurnContext recibido (para verificar el threading de threadOrigin). */
+const capturingAgent = (cap: { ctx?: TurnContext }): Agent =>
+  ({
+    respond: async (_req: unknown, ctx: TurnContext) => {
+      cap.ctx = ctx
+      return { stream: streamOf(["ok"]), text: Promise.resolve("ok") }
+    },
+  }) as unknown as Agent
+
+/** Cliente mínimo que solo resuelve `done` al mandar el mensaje final (para los tests de wiring). */
+const silentClient = (done: () => void): TelegramClient => ({
+  async sendMessage() {
+    done()
+  },
+  async sendAudio() {
+    return true
+  },
+  async sendChatAction() {},
+  async sendMessageDraft() {
+    return false
+  },
+  async setWebhook() {},
+})
 
 const sink: TraceSink = { emit() {} }
 
@@ -172,5 +197,72 @@ describe("handleTurn — streaming/typing", () => {
     expect(calls.draft).toBe(1) // solo el probe
     expect(calls.typing).toBeGreaterThan(0) // cayó a typing
     expect(calls.sent).toContain("y")
+  })
+})
+
+describe("handleTurn — conciencia del hilo (Inc 2)", () => {
+  /** Siembra una escalada YA RESUELTA en el topic dado y devuelve el store listo. */
+  const resolvedEsc = async (topicId: string) => {
+    const es = inMemoryEscalations()
+    const { id } = await es.create({
+      question: "¿toca el piano?",
+      kind: "knowledge",
+      origin: {
+        channel: "telegram",
+        askerPrincipalId: "visitor1",
+        locale: "es",
+      },
+    })
+    await es.markNotified(id, "telegram", "m1", topicId)
+    await es.markAnswered(id, "sí, desde chico")
+    await es.linkFact(id, "fact-xyz")
+    return es
+  }
+
+  it("owner en un hilo de escalada resuelta → threadOrigin llega al respond", async () => {
+    const cap: { ctx?: TurnContext } = {}
+    let resolve!: () => void
+    const done = new Promise<void>((r) => {
+      resolve = r
+    })
+    const app = mkApp({
+      agent: capturingAgent(cap),
+      client: silentClient(resolve),
+      allowedIds: new Set(),
+      webhookSecret: "s",
+      sink,
+      ownerId: 42, // el `from.id` del helper msg → trusted
+      escalations: await resolvedEsc("5"),
+    })
+    await post(
+      app,
+      msg({ chat: { id: 999, type: "supergroup" }, message_thread_id: 5 })
+    )
+    await done
+    expect(cap.ctx?.threadOrigin?.question).toBe("¿toca el piano?")
+    expect(cap.ctx?.threadOrigin?.answer).toBe("sí, desde chico")
+    expect(cap.ctx?.threadOrigin?.factId).toBe("fact-xyz")
+  })
+
+  it("visitante (no owner) en el mismo hilo → NO se hace lookup (sin threadOrigin)", async () => {
+    const cap: { ctx?: TurnContext } = {}
+    let resolve!: () => void
+    const done = new Promise<void>((r) => {
+      resolve = r
+    })
+    const app = mkApp({
+      agent: capturingAgent(cap),
+      client: silentClient(resolve),
+      allowedIds: new Set(),
+      webhookSecret: "s",
+      ownerId: 7, // distinto del from.id (42) → visitante
+      escalations: await resolvedEsc("5"),
+    })
+    await post(
+      app,
+      msg({ chat: { id: 999, type: "supergroup" }, message_thread_id: 5 })
+    )
+    await done
+    expect(cap.ctx?.threadOrigin == null).toBe(true)
   })
 })

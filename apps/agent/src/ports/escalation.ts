@@ -26,6 +26,21 @@ export interface AnsweredEscalation {
   origin: EscalationOrigin
 }
 
+/** Inc 2 — "hilo consciente de su razón": el contexto del ORIGEN de un hilo de escalada YA RESUELTA, para que
+ *  Vaio lo lleve como nota de fondo cuando el owner sigue charlando en ese hilo (que ya NO correlaciona como
+ *  pendiente). El `factId`/`statement` (del fact curado vía `linkFact`) habilitan el "ajustá/desaprendé ESO" por
+ *  pronombre de forma determinística — el `factId` vive SOLO server-side, JAMÁS llega al modelo (Inv #8). */
+export interface ThreadOrigin {
+  /** La duda del visitante que originó la escalada. */
+  question: string
+  /** Lo que respondió el owner (Kevin) y cerró la escalada. */
+  answer: string
+  /** Statement del fact curado a partir de la respuesta (linkFact). Ausente si la curación no guardó nada. */
+  statement?: string
+  /** uuid del fact anclado — SOLO server-side (ancla del "desaprendé ESO"); nunca se expone al modelo (Inv #8). */
+  factId?: string
+}
+
 export interface EscalationStore {
   /** Crea una escalada en estado 'pending'. Devuelve su id (el sistema lo gestiona; nunca el modelo). */
   create(input: {
@@ -61,6 +76,14 @@ export interface EscalationStore {
   /** Liga un fact curado a una escalada ya respondida (el factId se conoce DESPUÉS del markAnswered, tras redactar).
    *  Linaje/auditoría: qué duda derivó en qué fact. Idempotente; no cambia el estado. */
   linkFact(id: string, factId: string): Promise<void>
+  /** Inc 2 — conciencia del hilo: el contexto del origen de la escalada YA RESUELTA (status 'answered') cuyo topic
+   *  coincide, con su respuesta y el fact curado (JOIN con facts → statement + id). Distinto de findByNotifyTopic
+   *  (que filtra 'notified' para el inbound): acá el hilo ya está cerrado y el owner sigue charlando. null = ese
+   *  topic no es de una escalada resuelta. NO muta. */
+  findResolvedByTopic(
+    notifyChannel: string,
+    notifyTopicId: string
+  ): Promise<ThreadOrigin | null>
   /** Anti-spam: cuántas escaladas sin resolver tiene este principal (pending|notified). */
   countOpenByPrincipal(principalId: string): Promise<number>
   /** Anti-spam (dedup): una escalada abierta del mismo principal con pregunta equivalente (normalizada).

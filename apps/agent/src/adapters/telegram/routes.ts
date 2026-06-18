@@ -9,7 +9,7 @@ import type { Hono } from "hono"
 import { type Agent, courtesy } from "../../core/agent.js"
 import { shouldSpeak, stripForSpeech } from "../../core/speech-policy.js"
 import type { ConflictJudge } from "../../ports/conflict-judge.js"
-import type { EscalationStore } from "../../ports/escalation.js"
+import type { EscalationStore, ThreadOrigin } from "../../ports/escalation.js"
 import type { FactDecomposer } from "../../ports/fact-decomposer.js"
 import type { FactStore } from "../../ports/facts.js"
 import type { Logger } from "../../ports/logger.js"
@@ -151,9 +151,30 @@ export function mountTelegram(
         ...(norm.threadId !== undefined ? { threadId: norm.threadId } : {}),
         newRequestId: randomUUID,
       })
+      // Inc 2 — conciencia del hilo: si el OWNER sigue charlando en un hilo de escalada YA RESUELTA (que no
+      // correlaciona como pendiente), traemos su origen para inyectarlo como nota de fondo + anclar el factId.
+      // Best-effort (Inv #1): solo owner en un hilo; un hipo de DB no cuesta el turno.
+      let threadOrigin: ThreadOrigin | null = null
+      if (
+        deps.escalations &&
+        norm.threadId !== undefined &&
+        isOwnerId(deps.ownerId, norm.fromId)
+      ) {
+        try {
+          threadOrigin = await deps.escalations.findResolvedByTopic(
+            "telegram",
+            String(norm.threadId)
+          )
+        } catch (err) {
+          log.warn(
+            { err: err instanceof Error ? err.message : String(err) },
+            "tg: findResolvedByTopic falló (best-effort)"
+          )
+        }
+      }
       const { stream, text } = await deps.agent.respond(
         req,
-        { logger: log, sink: deps.sink, requestId, resume },
+        { logger: log, sink: deps.sink, requestId, resume, threadOrigin },
         resolved
       )
       // Salida de voz (TTS): default texto; voz si entró voz (espejo) o el usuario la pidió. Decidible por la

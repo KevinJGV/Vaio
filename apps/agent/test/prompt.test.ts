@@ -186,6 +186,64 @@ describe("buildSystemPrompt", () => {
     expect(p).not.toContain("pendientes de tu confirmación")
   })
 
+  it("threadOrigin: inyecta la nota de fondo del origen del hilo (sin statement) y NO el factId", () => {
+    const p = buildSystemPrompt({
+      locale: "es",
+      audience: "owner",
+      policyText: "",
+      summary: "",
+      threadOrigin: {
+        question: "¿Kevin sabe tocar el piano?",
+        answer: "Sí, desde chico",
+        factId: "f-uuid-secreto",
+      },
+    })
+    expect(p).toContain("escalada") // contexto del origen
+    expect(p).toContain("¿Kevin sabe tocar el piano?")
+    expect(p).toContain("Sí, desde chico")
+    expect(p).not.toContain("f-uuid-secreto") // Inv #8: el uuid JAMÁS al modelo
+  })
+
+  it("threadOrigin: con statement nombra el dato curado e instruye el ancla (thisThread)", () => {
+    const p = buildSystemPrompt({
+      locale: "es",
+      audience: "owner",
+      policyText: "",
+      summary: "",
+      threadOrigin: {
+        question: "¿toca el piano?",
+        answer: "sí",
+        statement: "Kevin sabe tocar el piano",
+        factId: "f1",
+      },
+    })
+    expect(p).toContain("Kevin sabe tocar el piano")
+    expect(p).toContain("thisThread") // pista del ancla determinística
+    expect(p).not.toContain("f1")
+  })
+
+  it("threadOrigin (en): nota localizada en inglés", () => {
+    const p = buildSystemPrompt({
+      locale: "en",
+      audience: "owner",
+      policyText: "",
+      summary: "",
+      threadOrigin: { question: "Does Kevin play piano?", answer: "Yes" },
+    })
+    expect(p.toLowerCase()).toContain("escalation")
+    expect(p).toContain("Does Kevin play piano?")
+  })
+
+  it("sin threadOrigin, no agrega la nota del hilo", () => {
+    const p = buildSystemPrompt({
+      locale: "es",
+      audience: "owner",
+      policyText: "",
+      summary: "",
+    })
+    expect(p).not.toContain("este hilo nació de una escalada")
+  })
+
   it("bloque de resumen localizado y solo cuando no está vacío", () => {
     const es = buildSystemPrompt({
       locale: "es",

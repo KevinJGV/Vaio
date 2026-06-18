@@ -8,6 +8,7 @@
 // prompt minimiza ese error.
 
 import type { Locale } from "@vaio/contracts"
+import type { ThreadOrigin } from "../ports/escalation.js"
 import type { PendingFact } from "../ports/facts.js"
 
 function personaEs(): string {
@@ -92,6 +93,9 @@ export function buildSystemPrompt(args: {
   pendingFacts?: PendingFact[]
   /** Fecha/hora actual ya formateada (TZ de Kevin) — "sentido del ahora". "" si no se proveyó. */
   now?: string
+  /** Inc 2: si este turno ocurre en un hilo de escalada YA RESUELTA, el contexto de su origen → nota de fondo
+   *  (sin el uuid; el factId vive solo server-side). Ausente = turno normal. */
+  threadOrigin?: ThreadOrigin
 }): string {
   const now = (args.now ?? "").trim()
   const nowBlock = now
@@ -130,6 +134,28 @@ export function buildSystemPrompt(args: {
           ? "\nConfirm replacing → resolveFact(decision:confirm, replaces:[numbers], which:N). Coexist → resolveFact(decision:confirm, which:N). Discard → resolveFact(decision:reject, which:N). which 0 = newest (default)."
           : "\nConfirmar reemplazando → resolveFact(decision:confirm, replaces:[números], which:N). Coexisten → resolveFact(decision:confirm, which:N). Descartar → resolveFact(decision:reject, which:N). which 0 = la más reciente (default).")
       : ""
+  // Inc 2 — conciencia del hilo: nota de FONDO (no narrar salvo que el owner lo retome). Sin sujetos
+  // hardcodeados (Inv #2): solo interpolación dinámica. NUNCA el factId/uuid (Inv #8) — solo el statement en NL.
+  const to = args.threadOrigin
+  const threadOriginBlock = to
+    ? args.locale === "en"
+      ? `[system note (background context — don't mention it unless the owner brings it back up): this thread ` +
+        `started from an escalation. A visitor asked «${to.question}»; you answered «${to.answer}».` +
+        (to.statement
+          ? ` From that you saved as Kevin's fact: «${to.statement}». If the owner asks to adjust or unlearn it ` +
+            `by deixis ("that", "what you just learned here"), they mean THAT fact: unlearn it with ` +
+            `unlearnFact(thisThread:true), or correct it with rememberFact.`
+          : ``) +
+        `]`
+      : `[nota del sistema (contexto de fondo, no lo menciones salvo que el owner lo retome): este hilo nació de ` +
+        `una escalada. Un visitante preguntó «${to.question}»; le respondiste «${to.answer}».` +
+        (to.statement
+          ? ` De eso guardé como dato de Kevin: «${to.statement}». Si el owner pide ajustarlo o desaprenderlo por ` +
+            `deixis ("eso", "lo que aprendiste acá"), se refiere a ESE dato: desaprendé con ` +
+            `unlearnFact(thisThread:true) o corregí con rememberFact.`
+          : ``) +
+        `]`
+    : ""
   return [
     personaPrompt(args.locale),
     identityBlock(args.audience, args.locale),
@@ -137,6 +163,7 @@ export function buildSystemPrompt(args: {
     args.policyText.trim(),
     summaryBlock,
     pendingBlock,
+    threadOriginBlock,
   ]
     .filter(Boolean)
     .join("\n\n")

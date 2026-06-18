@@ -7,7 +7,7 @@ import type { TraceEvent } from "@vaio/contracts"
 import type { Tool } from "ai"
 import type { ConflictJudge } from "../../ports/conflict-judge.js"
 import type { Connector } from "../../ports/connector.js"
-import type { EscalationStore } from "../../ports/escalation.js"
+import type { EscalationStore, ThreadOrigin } from "../../ports/escalation.js"
 import type { FactDecomposer } from "../../ports/fact-decomposer.js"
 import type { FactMatcher } from "../../ports/fact-matcher.js"
 import type { FactStore } from "../../ports/facts.js"
@@ -85,6 +85,10 @@ export interface ActionContext {
   escalations?: EscalationStore | null
   /** Notificación proactiva al owner (outbound genérico). null = sin canal owner → escalate degrada honesto. */
   notifier?: OwnerNotifier | null
+  /** Inc 2 — conciencia del hilo: si el turno ocurre en un hilo de escalada YA RESUELTA, su origen + el factId
+   *  curado (ancla del "desaprendé ESO" por pronombre, Inv #8: el factId NUNCA se expone al modelo). null = turno
+   *  normal. */
+  threadOrigin?: ThreadOrigin | null
   /** conversationKey crudo del turno (para que escalate persista el threadKey del origen y poder retomar). */
   conversationKey?: string
   /** locale del turno (para componer el DM al owner y el retomo en el idioma del visitante). */

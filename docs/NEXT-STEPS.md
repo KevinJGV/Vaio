@@ -1,10 +1,12 @@
 # Pendientes — Vaio (para retomar)
 
-> **ESTADO ACTUAL (2026-06-17) — fuente de verdad viva.**
-> **`origin/main` SINCRONIZADO con `main`** (2026-06-17): escalate v1+v2 (Inc 1), turnos proactivos, fix 400 Telegram
-> y `hasOpenPRs` ya pusheados → el deploy de Railway aplica las migraciones `0009`/`0010`/`0011` por su
-> `preDeployCommand`. **EN CURSO:** cluster "ciclo de vida del fact" **Inc 1** (juez de contradicción + atomicidad +
-> desaprender) en `feat/fact-lifecycle-judge` — diseño aprobado, codeando (ver "🚧 En proceso").
+> **ESTADO ACTUAL (2026-06-18) — fuente de verdad viva.**
+> **`origin/main` SINCRONIZADO con `main`** (2026-06-18): escalate v1+v2 (Inc 1), turnos proactivos, fix 400 Telegram,
+> `hasOpenPRs` y **el cluster "ciclo de vida del fact" Inc 1** ya pusheados → el deploy de Railway aplica las
+> migraciones por su `preDeployCommand`. **RECONCILIADO 2026-06-18:** `main`, `feat/fact-lifecycle-judge` y
+> `origin/main` apuntan al MISMO commit `b9613a0` (historia lineal) → el cluster **Inc 1 está MERGEADO en `main` y
+> pusheado**, e2e #1-6 ✅ (recall total verificado). Ya **no** es "EN CURSO/codeando" (drift corregido). Detalle del
+> cluster e Inc 2/followups abiertos → "🚧 En proceso".
 > **Fase 1: completa y DESPLEGADA** (Railway/Docker; RAG real Neon+pgvector; observabilidad pino) — en `main`.
 > **Iteración 2 — MERGEADA en `main`:** núcleo *stateful* + capacidades por canal + Telegram `/tg`,
 > **compresión cavemem** (`@vaio/compress`), **refinamiento Telegram** (hilos/topics, HTML, identidad/owner),
@@ -107,8 +109,10 @@
 > por escalada (Threaded Mode) + curación default-por-tipo + "transmití real" + los fixes post-e2e (P1 escala directo,
 > hilo desbloqueado, drafter al modelo de chat, visibilidad por kind). Flujo principal verificado en vivo. Queda P2
 > (falso conflicto) diferido al cluster (abajo).
-- [?] **CLUSTER "ciclo de vida del fact" — Inc 1 IMPLEMENTADO en `feat/fact-lifecycle-judge` (2026-06-17), PEND.
-  e2e de Kevin.** PRÓXIMO MAYOR del roadmap, faseado. **Inc 1 hecho** = (1) **`ConflictJudge`** (puerto+adapter, LLM)
+- [?] **CLUSTER "ciclo de vida del fact" — Inc 1 MERGEADO en `main` + pusheado a `origin/main` (commit `b9613a0`),
+  e2e #1-6 ✅ (VERIFICADO por Kevin).** ⏳ *Reconciliado 2026-06-18: estaba marcado "PEND. e2e / en `feat/fact-lifecycle-judge`"
+  pero git muestra `main`==`feat/fact-lifecycle-judge`==`origin/main` en el mismo commit → ya está integrado. Falta solo
+  el OK de Kevin para mover este bloque al Historial.* PRÓXIMO MAYOR del roadmap, faseado. **Inc 1 hecho** = (1) **`ConflictJudge`** (puerto+adapter, LLM)
   compartido por los DOS caminos (`curate` determinístico + `rememberFact` conversacional) — cierra el bug P2
   (pasta/fútbol: coexiste→commit, NADA pending); (2) **`FactDecomposer`** (reemplazó al `FactDrafter`: facts atómicos
   mono-idea antes de juzgar); (3) **desaprender** (`FactStore.invalidate` bi-temporal + tool nueva `unlearnFact`,
@@ -166,7 +170,15 @@
   fabrica). (4) **extiende la costura `suggestion` del juez** (ya existe) + hermano de "feedback consciente de
   fuentes". **Dos altitudes:** acotado (unlearn→contrafact grounded) vs capacidad transversal. **Decisión de Kevin:
   completar con su propio `brainstorming`/design antes de codear** (no meterlo crudo en este cluster).
-- [ ] **CLUSTER — Inc 2: HILO CONSCIENTE DE SU RAZÓN** (reencuadre de Kevin 2026-06-17; antes "hilo-puntero"). El
+- [~] **CLUSTER — Inc 2: HILO CONSCIENTE DE SU RAZÓN** — 🚧 EN PROGRESO (2026-06-18, rama `feat/fact-lifecycle-inc2`).
+  Brainstorming + plan aprobados por Kevin. **Decisiones:** anclaje determinístico por pronombre (no solo conciencia) +
+  nota **cada turno** (stateless, sin migración). **Hallazgo clave:** el intercambio de la escalada NO toca
+  `conversations` → el historial del hilo está vacío de su origen ⇒ la nota es necesaria sí o sí. Specs durables:
+  [`…-inc2-thread-aware-{design,plan}.md`](superpowers/specs/2026-06-18-fact-lifecycle-inc2-thread-aware-design.md).
+  Slice: `findResolvedByTopic` (port+adapter, LEFT JOIN a facts) → `TurnContext.threadOrigin` → nota en
+  `buildSystemPrompt` (sin uuid, Inv #2) → ancla `thisThread` en `unlearnFact` (Inv #8/#10). "ajustá eso" lo cubre
+  `rememberFact`+juez (YAGNI). Ejecución directa (slice acoplado/secuencial). (reencuadre de Kevin 2026-06-17; antes
+  "hilo-puntero"). El
   aprender/desaprender NATURAL dentro del hilo **ya está** (Inc 1: tras responder, el hilo es charla normal con el
   owner → toolset pleno). Lo que falta: cuando el hilo pasa de "resolver el pendiente" a **charla natural**, que Vaio
   lleve el **CONTEXTO de su origen** — inyectar como nota del sistema "este hilo nació de una escalada: un visitante

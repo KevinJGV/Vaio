@@ -3,6 +3,7 @@ import type {
   EscalationKind,
   EscalationOrigin,
   EscalationStore,
+  ThreadOrigin,
 } from "../../src/ports/escalation.js"
 
 type Status = "pending" | "notified" | "answered" | "dismissed" | "failed"
@@ -98,6 +99,24 @@ export function inMemoryEscalations(): EscalationStore & { rows: () => Row[] } {
     async linkFact(id, factId) {
       const r = rows.find((x) => x.id === id)
       if (r) r.factId = factId
+    },
+    async findResolvedByTopic(
+      notifyChannel,
+      notifyTopicId
+    ): Promise<ThreadOrigin | null> {
+      // El fake no tiene JOIN a facts → devuelve sin `statement` (el render del statement se testea aparte).
+      const r = rows.find(
+        (x) =>
+          x.status === "answered" &&
+          x.notifyChannel === notifyChannel &&
+          x.notifyTopicId === notifyTopicId
+      )
+      if (!r) return null
+      return {
+        question: r.question,
+        answer: r.answer ?? "",
+        ...(r.factId ? { factId: r.factId } : {}),
+      }
     },
     async countOpenByPrincipal(principalId) {
       return rows.filter(

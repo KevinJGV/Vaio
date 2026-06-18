@@ -58,6 +58,7 @@ function ctx(
     factDecomposer?: FactDecomposer
     factMatcher?: FactMatcher
     factUnlearnMax?: number
+    threadOrigin?: ActionContext["threadOrigin"]
   } = {}
 ): ActionContext {
   return {
@@ -78,6 +79,9 @@ function ctx(
     ...(extra.factMatcher ? { factMatcher: extra.factMatcher } : {}),
     ...(extra.factUnlearnMax !== undefined
       ? { factUnlearnMax: extra.factUnlearnMax }
+      : {}),
+    ...(extra.threadOrigin !== undefined
+      ? { threadOrigin: extra.threadOrigin }
       : {}),
   }
 }
@@ -459,6 +463,56 @@ describe("unlearnFact", () => {
         .filter((r) => r.statement.toLowerCase().includes("pizza"))
         .every((r) => r.invalidAt !== null)
     ).toBe(true) // ambas pizzas invalidadas
+  })
+
+  it("ANCLA (thisThread): con threadOrigin.factId → invalida ESE fact directo, sin llamar al matcher", async () => {
+    const fs = inMemoryFacts()
+    await seed(fs, "A Kevin le gusta el piano") // queda como f1 (1er propuesto+confirmado)
+    // matcher que EXPLOTA si lo invocan → prueba que el ancla NO pasa por el matcher
+    const boom: FactMatcher = {
+      match: async () => {
+        throw new Error("el matcher NO debe invocarse con thisThread")
+      },
+    }
+    const out = await unlearnFact
+      .build(
+        ctx(fs, () => {}, {
+          factMatcher: boom,
+          threadOrigin: {
+            question: "¿toca el piano?",
+            answer: "sí",
+            statement: "A Kevin le gusta el piano",
+            factId: "f1",
+          },
+        })
+      )
+      .execute?.(
+        { about: "eso", thisThread: true },
+        { toolCallId: "u", messages: [] }
+      )
+    expect(String(out)).toMatch(/olvidé/i)
+    expect(String(out)).toContain("piano") // nombra el statement anclado (fallo visible)
+    expect(fs.rows().find((r) => r.id === "f1")?.invalidAt).not.toBeNull()
+  })
+
+  it("ANCLA (thisThread) sin factId en el threadOrigin → cae al flujo normal por `about`", async () => {
+    const fs = inMemoryFacts()
+    await seed(fs, "A Kevin le gusta la pasta")
+    const out = await unlearnFact
+      .build(
+        ctx(fs, () => {}, {
+          factMatcher: fakeMatcher("pasta"),
+          threadOrigin: { question: "q", answer: "a" }, // sin factId (curación no guardó)
+        })
+      )
+      .execute?.(
+        { about: "pasta", thisThread: true },
+        { toolCallId: "u", messages: [] }
+      )
+    expect(String(out)).toMatch(/olvidé/i) // resolvió por el flujo normal (matcher → pasta)
+    expect(
+      fs.rows().find((r) => r.statement.includes("pasta"))?.invalidAt
+    ).not.toBeNull()
   })
 
   it("CAP: con más facts que el cap, se acota (truncación visible por log) → un fact fuera del cap se escapa", async () => {
