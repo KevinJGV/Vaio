@@ -1,7 +1,8 @@
 // unlearnFact — desaprende un hecho CONFIRMADO vigente sobre Kevin (owner-only). Intención distinta de
 // resolveFact (que adjudica PROPUESTAS pendientes); acá se olvida algo ya sabido. Invariante #8 (el modelo
 // nunca toca uuids): pasa una descripción en lenguaje natural + (si hay lista) un ORDINAL; el sistema busca los
-// candidatos confirmados cercanos, mapea ordinal→uuid e INVALIDA bi-temporal (reversible/auditable, no borra).
+// candidatos confirmados cercanos (coseno = recall), el JUEZ los filtra a los que DE VERDAD coinciden (precisión:
+// evita ofrecer facts no relacionados), mapea ordinal→uuid e INVALIDA bi-temporal (reversible/auditable, no borra).
 // Patrón 2-fases auto-contenido: 1 match nítido → lo olvida en el acto (resolver en el turno); varios → lista.
 
 import { tool } from "ai"
@@ -56,11 +57,38 @@ export const unlearnFact: ActionDescriptor = {
           )
         }
         try {
-          const candidates = await ctx.factStore.findConfirmedNear(
+          const locale = ctx.locale === "en" ? "en" : "es"
+          // Red ANCHA por coseno (recall): trae cualquier "le gusta X" cercano a la descripción.
+          const near = await ctx.factStore.findConfirmedNear(
             about,
             ctx.principal.id
           )
-          if (candidates.length === 0) {
+          // Filtro SEMÁNTICO (precisión): el juez deja solo los que DE VERDAD coinciden con la descripción
+          // (verdict "duplicate" = el fact dice lo mismo que pedís olvidar). Evita ofrecer facts no relacionados
+          // (ej. "olvidá el fútbol" no debe listar pizza/pasta). Sin juez o si falla → red de coseno (best-effort).
+          let matches = near
+          if (ctx.conflictJudge && near.length > 0) {
+            try {
+              const { decisions } = await ctx.conflictJudge.judge({
+                rawText: about,
+                statement: about,
+                candidates: near.map((c, i) => ({
+                  ordinal: i,
+                  statement: c.statement,
+                })),
+                locale,
+              })
+              const dup = new Set(
+                decisions
+                  .filter((d) => d.verdict === "duplicate")
+                  .map((d) => d.ordinal)
+              )
+              matches = near.filter((_c, i) => dup.has(i)) // puede quedar vacío → "no encontré"
+            } catch {
+              // juez falló → quedarse con la red de coseno (no peor que antes)
+            }
+          }
+          if (matches.length === 0) {
             return emit(
               true,
               "No encontré nada parecido guardado para olvidar."
@@ -68,7 +96,7 @@ export const unlearnFact: ActionDescriptor = {
           }
           // Fase 2: el owner ya eligió un número de la lista → invalidar ese (mapeo ordinal→uuid, Inv #8).
           if (which !== undefined) {
-            const target = candidates[which]
+            const target = matches[which]
             if (!target) {
               return emit(
                 false,
@@ -84,8 +112,8 @@ export const unlearnFact: ActionDescriptor = {
             )
           }
           // Fase 1, 1 match nítido → resolver EN EL TURNO (reversible + el resultado nombra qué olvidó = fallo visible).
-          if (candidates.length === 1) {
-            const only = candidates[0]
+          if (matches.length === 1) {
+            const only = matches[0]
             if (!only) {
               return emit(true, "No encontré nada parecido guardado.")
             }
@@ -97,8 +125,8 @@ export const unlearnFact: ActionDescriptor = {
                 : "No pude darlo de baja (quizá ya estaba olvidado)."
             )
           }
-          // Varios candidatos → listar por ordinal y pedir el número (el modelo re-llama con `which`).
-          const list = candidates
+          // Varios matches → listar por ordinal y pedir el número (el modelo re-llama con `which`).
+          const list = matches
             .map((c, i) => `  [${i}] «${c.statement}»`)
             .join("\n")
           return emit(

@@ -25,6 +25,19 @@ function fakeJudge(verdict: ConflictVerdict): ConflictJudge {
 function fakeDecomposer(statements: string[]): FactDecomposer {
   return { decompose: async () => ({ statements }) }
 }
+/** Fake ConflictJudge SELECTIVO: marca "duplicate" los candidatos cuyo statement incluye `needle`, el resto "coexists". */
+function fakeJudgeMatching(needle: string): ConflictJudge {
+  return {
+    judge: async ({ candidates }) => ({
+      decisions: candidates.map((c) => ({
+        ordinal: c.ordinal,
+        verdict: c.statement.toLowerCase().includes(needle.toLowerCase())
+          ? ("duplicate" as const)
+          : ("coexists" as const),
+      })),
+    }),
+  }
+}
 
 function noopLogger(): Logger {
   const noop = (_a: LogFields | string, _b?: string): void => {}
@@ -372,5 +385,35 @@ describe("unlearnFact", () => {
       .build(ctx(null))
       .execute?.({ about: "x" }, { toolCallId: "u", messages: [] })
     expect(String(out)).toMatch(/no configurada|no puedo/i)
+  })
+
+  it("FILTRO del juez: el coseno trae no-relacionados pero ninguno coincide → «no encontré» (caso fútbol)", async () => {
+    const fs = inMemoryFacts()
+    await seed(fs, "A Kevin le gusta la pizza")
+    await seed(fs, "A Kevin le gusta la pasta")
+    // El fake trae por substring; forzamos red ancha con `about` que matchea ambos ("le gusta"), y el juez (que
+    // busca "fútbol") no marca ninguno como duplicate → matches vacío → no ofrece pizza/pasta.
+    const out = await unlearnFact
+      .build(ctx(fs, () => {}, { conflictJudge: fakeJudgeMatching("fútbol") }))
+      .execute?.({ about: "le gusta" }, { toolCallId: "u", messages: [] })
+    expect(String(out)).toMatch(/no encontré/i)
+    expect(fs.rows().every((r) => r.invalidAt === null)).toBe(true) // no tocó nada
+  })
+
+  it("FILTRO del juez: red ancha (≥2 coseno) → el juez deja 1 → lo olvida en el turno", async () => {
+    const fs = inMemoryFacts()
+    await seed(fs, "A Kevin le gusta la pasta")
+    await seed(fs, "A Kevin le gusta la pizza")
+    const out = await unlearnFact
+      .build(ctx(fs, () => {}, { conflictJudge: fakeJudgeMatching("pasta") }))
+      .execute?.({ about: "le gusta" }, { toolCallId: "u", messages: [] })
+    expect(String(out)).toMatch(/olvidé/i)
+    expect(String(out)).toContain("pasta")
+    expect(
+      fs.rows().find((r) => r.statement.includes("pasta"))?.invalidAt
+    ).not.toBeNull()
+    expect(
+      fs.rows().find((r) => r.statement.includes("pizza"))?.invalidAt
+    ).toBeNull() // la pizza intacta
   })
 })
