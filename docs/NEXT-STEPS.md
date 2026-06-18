@@ -147,8 +147,25 @@
   REDISEÑADO** (commit `bf4a5b8`): `unlearnFact` usa **RECALL TOTAL** — el `FactMatcher` (LLM) juzga sobre **TODOS**
   los facts confirmados del owner (`FactStore.listConfirmed`, cap `FACT_UNLEARN_MAX=150` logueado). Removido el corte
   coseno (`findConfirmedNear`/`FACT_UNLEARN_DISTANCE`). **Norte Fase 3:** estructura (entidad/tag/grafo) → query
-  determinística. Lección "completitud ≠ retrieval" en `LEARNINGS.md`. **505 tests.** **Falta e2e #6:** "olvidá lo de
-  [tema]" → debe listar TODOS los del tema (incl. los redactados distinto, como la piña). **"dice pero no hace"** (Inc 2 aparte).
+  determinística. Lección "completitud ≠ retrieval" en `LEARNINGS.md`. **505 tests.** **e2e #6 ✅ (recall total
+  VERIFICADO):** "olvidá lo de la pizza" listó las **3** (incl. «ahora le gusta la pizza con piña»). **Inc 1
+  funcionalmente verificado (e2e #1-6); listo para MERGE a `main` tras el OK final de Kevin.** Observaciones laterales
+  registradas (no bloquean): (i) continuidad de ordinales entre turnos — el modelo cambió `about` entre listar y
+  elegir → `which` no matcheó (cae en el problema que Inc 2/hilo-puntero resuelve; el modelo se recuperó re-llamando);
+  (ii) latencia alta (`rememberFact` 99s con múltiples átomos+conflictos) → followup de perf del juez/decompose.
+  **"dice pero no hace"** (Inc 2 aparte).
+- [ ] **CLUSTER — "CONCIENCIA DE HUECOS" / self-feedback (VISIÓN, Kevin 2026-06-17; completar con su propio
+  brainstorming+análisis).** Disparador: al olvidar «le gusta la pizza con piña» quedó un GAP (al re-preguntar, Vaio
+  no sabía nada) cuando el contrafact valioso era «ya no le gusta». **Razonamiento (memoria
+  `gap-aware-self-feedback-vision`):** (1) **dos intenciones bajo "olvidá X"** — purga (ausencia correcta) vs
+  actualización/inversión (lo correcto es el NUEVO estado, un *supersede*); el modelo ruteó una inversión a unlearn
+  (purga). (2) **idea general = conciencia de huecos (metacognición):** tras CUALQUIER mutación de conocimiento (o un
+  "no sé"), una reflexión "¿dejé un hueco que el contexto implica llenar, con qué fact GROUNDED?" — transversal a todo
+  LLM-in-loop. (3) **guardrail crítico** (inverso de la curación → si se hace mal, inventa/contamina): GROUNDED (solo
+  evidencia conversacional explícita) + VISIBLE/gated (propuesto, no inyectado) + CONSERVADOR (razón ambigua → no
+  fabrica). (4) **extiende la costura `suggestion` del juez** (ya existe) + hermano de "feedback consciente de
+  fuentes". **Dos altitudes:** acotado (unlearn→contrafact grounded) vs capacidad transversal. **Decisión de Kevin:
+  completar con su propio `brainstorming`/design antes de codear** (no meterlo crudo en este cluster).
 - [ ] **CLUSTER — Inc 2: HILO CONSCIENTE DE SU RAZÓN** (reencuadre de Kevin 2026-06-17; antes "hilo-puntero"). El
   aprender/desaprender NATURAL dentro del hilo **ya está** (Inc 1: tras responder, el hilo es charla normal con el
   owner → toolset pleno). Lo que falta: cuando el hilo pasa de "resolver el pendiente" a **charla natural**, que Vaio
