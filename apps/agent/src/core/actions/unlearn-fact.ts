@@ -1,10 +1,10 @@
 // unlearnFact — desaprende hecho(s) CONFIRMADO(s) vigente(s) sobre Kevin (owner-only). Intención distinta de
 // resolveFact (que adjudica PROPUESTAS pendientes); acá se olvida algo ya sabido. Invariante #8 (el modelo nunca
 // toca uuids): pasa una descripción en lenguaje natural + (si hay lista) un ORDINAL o `all`; el sistema mapea e
-// INVALIDA bi-temporal (reversible/auditable, no borra). HÍBRIDO de matching: (1) corte ESTRICTO por coseno
-// (rápido, recall acotado: "olvidá el fútbol" no trae pizza/pasta); (2) si quedan ≥2, el FactMatcher (LLM) los
-// filtra por RELEVANCIA/tema (precisión: "lo de la pizza" matchea todas las pizzas). 1 match → lo olvida en el
-// turno; varios → lista por ordinal y ofrece elegir uno (`which`) o todos (`all`).
+// INVALIDA bi-temporal (reversible/auditable, no borra). HÍBRIDO de matching: (1) red ANCHA por coseno (RECALL:
+// trae todo lo del mismo tema aunque esté redactado distinto); (2) el FactMatcher (LLM) filtra por RELEVANCIA/tema
+// (PRECISIÓN; corre con ≥1 candidato). Tras filtrar: 1 match → lo olvida en el turno; varios → lista por ordinal y
+// ofrece elegir uno (`which`) o todos (`all`); ninguno → "no encontré".
 
 import { tool } from "ai"
 import { z } from "zod"
@@ -67,17 +67,17 @@ export const unlearnFact: ActionDescriptor = {
         const factStore = ctx.factStore
         try {
           const locale = ctx.locale === "en" ? "en" : "es"
-          // (1) Corte ESTRICTO por coseno (rápido, sin LLM): si nada está cerca → "no encontré" (no gasta el matcher).
+          // (1) Red ANCHA por coseno (RECALL): trae todo lo del mismo tema, aunque esté redactado distinto. Si nada
+          // está siquiera cerca → "no encontré" (fast-path, sin LLM).
           const near = await factStore.findConfirmedNear(
             about,
             ctx.principal.id,
-            {
-              maxDistance: ctx.factUnlearnDistance,
-            }
+            { maxDistance: ctx.factUnlearnDistance }
           )
-          // (2) Si quedan ≥2, el matcher desambigua por relevancia (precisión). 0/1 → confío en el corte estricto.
+          // (2) PRECISIÓN: el matcher (LLM) deja solo los que de verdad pertenecen al tema. Corre con ≥1 candidato
+          // (un único cercano de la red ancha también puede ser ajeno → no borrarlo a ciegas). Sin matcher → coseno.
           let matches: ConflictCandidate[] = near
-          if (near.length >= 2 && ctx.factMatcher) {
+          if (near.length >= 1 && ctx.factMatcher) {
             const { ordinals } = await ctx.factMatcher.match({
               description: about,
               candidates: near.map((c, i) => ({
@@ -87,8 +87,7 @@ export const unlearnFact: ActionDescriptor = {
               locale,
             })
             const keep = new Set(ordinals)
-            const filtered = near.filter((_c, i) => keep.has(i))
-            matches = filtered.length > 0 ? filtered : []
+            matches = near.filter((_c, i) => keep.has(i)) // puede quedar vacío → "no encontré"
           }
           if (matches.length === 0) {
             return emit(

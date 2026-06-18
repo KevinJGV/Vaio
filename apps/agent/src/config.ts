@@ -189,9 +189,10 @@ const envSchema = z.object({
   FACT_CONFLICT_DISTANCE: positiveFloatWithDefault(0.55),
   FACT_CONFLICT_MAX: positiveIntWithDefault(50),
   FACT_CONFLICT_CANDIDATES: positiveIntWithDefault(5),
-  // unlearnFact (desaprender por descripción): umbral coseno ESTRICTO para el 1er corte (más que el de conflicto:
-  // "olvidá el fútbol" no debe traer pizza/pasta). Si quedan ≥2, el FactMatcher (LLM) desambigua por relevancia.
-  FACT_UNLEARN_DISTANCE: positiveFloatWithDefault(0.35),
+  // unlearnFact (desaprender por descripción): red coseno ANCHA (RECALL — captura facts del mismo tema aunque estén
+  // redactados distinto). La PRECISIÓN la pone el FactMatcher (LLM): filtra a los que de verdad pertenecen al tema.
+  // (Un umbral estricto recortaría recall: dejaría afuera facts relevantes pero lejanos en el vector.)
+  FACT_UNLEARN_DISTANCE: positiveFloatWithDefault(0.6),
 })
 
 export type Env = z.infer<typeof envSchema>

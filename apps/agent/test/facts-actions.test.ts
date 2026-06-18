@@ -400,6 +400,17 @@ describe("unlearnFact", () => {
     expect(fs.rows().every((r) => r.invalidAt === null)).toBe(true) // no tocó nada
   })
 
+  it("MATCHER: 1 único cercano de la red ancha pero ajeno al tema → el matcher lo descarta → «no encontré»", async () => {
+    const fs = inMemoryFacts()
+    await seed(fs, "A Kevin le gusta el color negro")
+    // red ancha trae el único cercano por substring; el matcher (tema "pizza") no lo deja → no se borra a ciegas.
+    const out = await unlearnFact
+      .build(ctx(fs, () => {}, { factMatcher: fakeMatcher("pizza") }))
+      .execute?.({ about: "le gusta" }, { toolCallId: "u", messages: [] })
+    expect(String(out)).toMatch(/no encontré/i)
+    expect(fs.rows().every((r) => r.invalidAt === null)).toBe(true)
+  })
+
   it("MATCHER: red ancha (≥2) → el matcher deja 1 → lo olvida en el turno", async () => {
     const fs = inMemoryFacts()
     await seed(fs, "A Kevin le gusta la pasta")
