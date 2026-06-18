@@ -42,12 +42,14 @@ export const findRepos: ActionDescriptor = {
   build(ctx: ActionContext) {
     return tool({
       description:
-        "Listá los repos PÚBLICOS de Kevin filtrando por lenguaje, topic y/o por PRs sin mergear (p.ej. '¿qué proyectos tiene en Java?', 'repos con topic X', '¿qué repos tienen PRs sin mergear?'). Sin filtros, lista todos. Devuelve nombre + descripción + lenguaje + URL (+ los PRs abiertos si filtrás por hasOpenPRs).",
+        "Listá los repos PÚBLICOS de Kevin filtrando por lenguaje, topic y/o por PRs sin mergear (consultas tipo '¿qué proyectos tiene en [lenguaje]?', 'repos con cierto topic', '¿qué repos tienen PRs sin mergear?'). Sin filtros, lista todos. Devuelve nombre + descripción + lenguaje + URL (+ los PRs abiertos si filtrás por hasOpenPRs).",
       inputSchema: z.object({
         language: z
           .string()
           .optional()
-          .describe("Lenguaje de programación por el que filtrar (el nombre del lenguaje)."),
+          .describe(
+            "Lenguaje de programación por el que filtrar (el nombre del lenguaje)."
+          ),
         topic: z.string().optional().describe("Topic/tema del repo."),
         hasOpenPRs: z
           .boolean()

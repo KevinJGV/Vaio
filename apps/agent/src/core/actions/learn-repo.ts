@@ -29,7 +29,7 @@ export const learnRepo: ActionDescriptor = {
           .string()
           .min(1)
           .describe(
-            "El nombre del repo de Kevin que mencionó (p.ej. 'mi-proyecto'). Solo el nombre, no 'owner/'."
+            "El nombre del repo de Kevin que mencionó: solo el nombre del repo, sin el 'owner/' adelante."
           ),
       }),
       execute: async ({ repo }, { toolCallId }) => {

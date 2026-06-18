@@ -45,25 +45,31 @@ describe("FactStore.invalidate (desaprender, contrato vía fake)", () => {
   })
 })
 
-describe("FactStore.findConfirmedNear (buscar para desaprender por similitud)", () => {
-  it("trae confirmados vigentes del mismo principal que matchean; excluye otros principales", async () => {
+describe("FactStore.listConfirmed (todos los confirmados vigentes para desaprender)", () => {
+  it("trae los confirmados vigentes del principal; excluye otros principales", async () => {
     const fs = inMemoryFacts()
-    const { id } = await fs.propose({
+    const a = await fs.propose({
       statement: "A Kevin le gusta la pasta",
       principalId: "k",
       channel: "telegram",
     })
-    await fs.commit(id)
+    await fs.commit(a.id)
+    const b = await fs.propose({
+      statement: "A Kevin le gusta el cine",
+      principalId: "k",
+      channel: "telegram",
+    })
+    await fs.commit(b.id)
     await fs.propose({
       statement: "A Otro le gusta la pasta",
       principalId: "otro",
       channel: "telegram",
     })
-    const found = await fs.findConfirmedNear("pasta", "k")
-    expect(found.map((c) => c.id)).toEqual([id])
+    const found = await fs.listConfirmed("k", 50)
+    expect(new Set(found.map((c) => c.id))).toEqual(new Set([a.id, b.id]))
   })
 
-  it("no trae un fact ya invalidado", async () => {
+  it("no trae un fact ya invalidado; respeta el limit", async () => {
     const fs = inMemoryFacts()
     const { id } = await fs.propose({
       statement: "A Kevin le gusta la pasta",
@@ -72,6 +78,6 @@ describe("FactStore.findConfirmedNear (buscar para desaprender por similitud)", 
     })
     await fs.commit(id)
     await fs.invalidate(id)
-    expect(await fs.findConfirmedNear("pasta", "k")).toHaveLength(0)
+    expect(await fs.listConfirmed("k", 50)).toHaveLength(0)
   })
 })

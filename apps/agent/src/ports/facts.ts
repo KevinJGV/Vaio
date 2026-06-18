@@ -40,11 +40,10 @@ export interface FactStore {
   /** Desaprende un fact CONFIRMADO vigente: invalidAt=now, expiredAt=now, decidedAt=now; SIN supersede.
    *  Reversible/auditable (la fila queda). false si no existe o no está confirmed-vigente (idempotente). */
   invalidate(id: string): Promise<boolean>
-  /** Facts CONFIRMADOS vigentes de un principal, los más cercanos por coseno a `query` (para desaprender por
-   *  similitud → el owner los ve por ordinal, Inv #8). best-effort: embed falla → []. */
-  findConfirmedNear(
-    query: string,
+  /** TODOS los facts CONFIRMADOS vigentes de un principal (hasta `limit`, recientes primero), SIN orden semántico —
+   *  para que el matcher (LLM) juzgue la relevancia sobre el conjunto COMPLETO (recall total al desaprender). */
+  listConfirmed(
     principalId: string,
-    opts?: { limit?: number; maxDistance?: number }
+    limit: number
   ): Promise<ConflictCandidate[]>
 }

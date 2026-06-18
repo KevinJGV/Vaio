@@ -35,8 +35,7 @@ export function createFactStore(
     emb: number[],
     principalId: string,
     excludeId: string | undefined,
-    limit: number = cfg.conflictMax,
-    maxDistance: number = cfg.conflictDistance
+    limit: number = cfg.conflictMax
   ): Promise<ConflictCandidate[]> => {
     const dist = cosineDistance(facts.embedding, emb)
     // `excludeId` opcional: solo se filtra cuando hay un id real (propose excluye la fila recién insertada). NO
@@ -47,13 +46,13 @@ export function createFactStore(
           isNull(facts.invalidAt),
           eq(facts.principalId, principalId),
           ne(facts.id, excludeId),
-          lt(dist, maxDistance)
+          lt(dist, cfg.conflictDistance)
         )
       : and(
           eq(facts.status, "confirmed"),
           isNull(facts.invalidAt),
           eq(facts.principalId, principalId),
-          lt(dist, maxDistance)
+          lt(dist, cfg.conflictDistance)
         )
     const rows = await db
       .select({
@@ -219,24 +218,30 @@ export function createFactStore(
       return res.length > 0
     },
 
-    async findConfirmedNear(query, principalId, opts) {
-      // Best-effort: si el embed falla o no hay vector → [] (no romper el flujo de desaprender por similitud).
-      let emb: number[] | undefined
-      try {
-        const [e] = await embedder.embed([query])
-        emb = e
-      } catch {
-        emb = undefined
-      }
-      if (!emb) return []
-      // Sin excludeId → no filtra por id. `maxDistance` permite un corte ESTRICTO (unlearn) vs el de conflicto.
-      return await findNearConfirmed(
-        emb,
-        principalId,
-        undefined,
-        opts?.limit,
-        opts?.maxDistance
-      )
+    async listConfirmed(principalId, limit) {
+      // TODOS los confirmados vigentes del principal (recientes primero), sin coseno → el matcher juzga el conjunto
+      // COMPLETO (recall total al desaprender). El `limit` es el cap de seguridad (el caller loguea si lo alcanza).
+      const rows = await db
+        .select({
+          id: facts.id,
+          statement: facts.statement,
+          validAt: facts.validAt,
+        })
+        .from(facts)
+        .where(
+          and(
+            eq(facts.status, "confirmed"),
+            isNull(facts.invalidAt),
+            eq(facts.principalId, principalId)
+          )
+        )
+        .orderBy(sql`${facts.createdAt} desc`)
+        .limit(limit)
+      return rows.map((r) => ({
+        id: r.id,
+        statement: r.statement,
+        validAt: r.validAt,
+      }))
     },
   }
 }

@@ -57,6 +57,7 @@ function ctx(
     conflictJudge?: ConflictJudge
     factDecomposer?: FactDecomposer
     factMatcher?: FactMatcher
+    factUnlearnMax?: number
   } = {}
 ): ActionContext {
   return {
@@ -75,6 +76,9 @@ function ctx(
     ...(extra.conflictJudge ? { conflictJudge: extra.conflictJudge } : {}),
     ...(extra.factDecomposer ? { factDecomposer: extra.factDecomposer } : {}),
     ...(extra.factMatcher ? { factMatcher: extra.factMatcher } : {}),
+    ...(extra.factUnlearnMax !== undefined
+      ? { factUnlearnMax: extra.factUnlearnMax }
+      : {}),
   }
 }
 
@@ -387,31 +391,30 @@ describe("unlearnFact", () => {
     expect(String(out)).toMatch(/no configurada|no puedo/i)
   })
 
-  it("MATCHER: red ancha (≥2) pero ninguno pertenece al tema → «no encontré» (caso fútbol)", async () => {
+  it("MATCHER (sobre TODOS): ninguno pertenece al tema → «no encontré» (caso fútbol)", async () => {
     const fs = inMemoryFacts()
     await seed(fs, "A Kevin le gusta la pizza")
     await seed(fs, "A Kevin le gusta la pasta")
-    // El fake trae por substring; `about="le gusta"` matchea ambos (red ancha). El matcher (tema "fútbol") no deja
-    // ninguno → matches vacío → no ofrece pizza/pasta.
+    // listConfirmed pasa TODOS los facts al matcher; el matcher (tema "fútbol") no deja ninguno → no ofrece pizza/pasta.
     const out = await unlearnFact
       .build(ctx(fs, () => {}, { factMatcher: fakeMatcher("fútbol") }))
-      .execute?.({ about: "le gusta" }, { toolCallId: "u", messages: [] })
+      .execute?.({ about: "el fútbol" }, { toolCallId: "u", messages: [] })
     expect(String(out)).toMatch(/no encontré/i)
     expect(fs.rows().every((r) => r.invalidAt === null)).toBe(true) // no tocó nada
   })
 
-  it("MATCHER: 1 único cercano de la red ancha pero ajeno al tema → el matcher lo descarta → «no encontré»", async () => {
+  it("MATCHER (sobre TODOS): 1 solo fact y ajeno al tema → el matcher lo descarta → «no encontré»", async () => {
     const fs = inMemoryFacts()
     await seed(fs, "A Kevin le gusta el color negro")
-    // red ancha trae el único cercano por substring; el matcher (tema "pizza") no lo deja → no se borra a ciegas.
+    // el matcher (tema "pizza") no deja el único fact → no se borra a ciegas.
     const out = await unlearnFact
       .build(ctx(fs, () => {}, { factMatcher: fakeMatcher("pizza") }))
-      .execute?.({ about: "le gusta" }, { toolCallId: "u", messages: [] })
+      .execute?.({ about: "la pizza" }, { toolCallId: "u", messages: [] })
     expect(String(out)).toMatch(/no encontré/i)
     expect(fs.rows().every((r) => r.invalidAt === null)).toBe(true)
   })
 
-  it("MATCHER: red ancha (≥2) → el matcher deja 1 → lo olvida en el turno", async () => {
+  it("MATCHER (sobre TODOS): varios facts → el matcher deja 1 → lo olvida en el turno", async () => {
     const fs = inMemoryFacts()
     await seed(fs, "A Kevin le gusta la pasta")
     await seed(fs, "A Kevin le gusta la pizza")
@@ -431,12 +434,14 @@ describe("unlearnFact", () => {
   it("MATCHER forget-por-tema: ≥2 del tema → lista + ofrece TODOS; `all:true` los invalida a todos", async () => {
     const fs = inMemoryFacts()
     await seed(fs, "A Kevin le gusta la pizza napolitana")
-    await seed(fs, "A Kevin no le gusta la pizza con piña")
-    // (el fake matchea por substring → usamos "pizza"; el matcher es lo que se ejercita para el forget-por-tema)
+    await seed(fs, "A Kevin no le gusta la pizza con piña") // mismo tema, redactado distinto (positivo y negativo)
     const m = { factMatcher: fakeMatcher("pizza") }
     const list = await unlearnFact
       .build(ctx(fs, () => {}, m))
-      .execute?.({ about: "pizza" }, { toolCallId: "u1", messages: [] })
+      .execute?.(
+        { about: "lo de la pizza" },
+        { toolCallId: "u1", messages: [] }
+      )
     expect(String(list)).toMatch(/\[0\]/)
     expect(String(list)).toMatch(/\[1\]/)
     expect(String(list)).toMatch(/all:true|todos/i)
@@ -454,5 +459,21 @@ describe("unlearnFact", () => {
         .filter((r) => r.statement.toLowerCase().includes("pizza"))
         .every((r) => r.invalidAt !== null)
     ).toBe(true) // ambas pizzas invalidadas
+  })
+
+  it("CAP: con más facts que el cap, se acota (truncación visible por log) → un fact fuera del cap se escapa", async () => {
+    const fs = inMemoryFacts()
+    await seed(fs, "A Kevin le gusta el cine") // 1º (dentro del cap=1)
+    await seed(fs, "A Kevin le gusta la pizza") // 2º (queda FUERA del cap)
+    const out = await unlearnFact
+      .build(
+        ctx(fs, () => {}, {
+          factMatcher: fakeMatcher("pizza"),
+          factUnlearnMax: 1,
+        })
+      )
+      .execute?.({ about: "la pizza" }, { toolCallId: "u", messages: [] })
+    // el cap dejó solo el 1º (cine) → el matcher no encuentra pizza → "no encontré" (recall acotado, logueado)
+    expect(String(out)).toMatch(/no encontré/i)
   })
 })

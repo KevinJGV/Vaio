@@ -89,10 +89,10 @@ export interface AgentDeps {
   conflictJudge?: ConflictJudge | null
   /** Descomponedor atómico (cluster fact): parte statements compuestos en facts mono-idea. null = statement crudo como único átomo. */
   factDecomposer?: FactDecomposer | null
-  /** Matcher de relevancia (unlearnFact): filtra candidatos por aboutness. null = solo corte por coseno. */
+  /** Matcher de relevancia (unlearnFact): juzga sobre TODOS los facts cuáles pertenecen al tema a olvidar. */
   factMatcher?: FactMatcher | null
-  /** Umbral coseno estricto del 1er corte de unlearnFact. Default 0.35. */
-  factUnlearnDistance?: number
+  /** Cap de facts que se le pasan al matcher de una en unlearnFact. Default 150. */
+  factUnlearnMax?: number
   /** Rerank de la 2ª etapa del RAG. null = sin rerank → searchMemory cae a vector top-K. */
   reranker?: Reranker | null
   /** Pool de candidatos (wide-K) para el rerank. Default 30. */
@@ -190,7 +190,7 @@ export function createAgent(deps: AgentDeps) {
     conflictJudge = null,
     factDecomposer = null,
     factMatcher = null,
-    factUnlearnDistance = 0.35,
+    factUnlearnMax = 150,
     reranker = null,
     rerankCandidates = 30,
     factRetrieveMax = 4,
@@ -355,7 +355,7 @@ export function createAgent(deps: AgentDeps) {
           conflictJudge,
           factDecomposer,
           factMatcher,
-          factUnlearnDistance,
+          factUnlearnMax,
           emit,
           ids,
           logger: ctx.logger,

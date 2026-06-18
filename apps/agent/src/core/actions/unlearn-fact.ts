@@ -1,10 +1,11 @@
 // unlearnFact — desaprende hecho(s) CONFIRMADO(s) vigente(s) sobre Kevin (owner-only). Intención distinta de
 // resolveFact (que adjudica PROPUESTAS pendientes); acá se olvida algo ya sabido. Invariante #8 (el modelo nunca
 // toca uuids): pasa una descripción en lenguaje natural + (si hay lista) un ORDINAL o `all`; el sistema mapea e
-// INVALIDA bi-temporal (reversible/auditable, no borra). HÍBRIDO de matching: (1) red ANCHA por coseno (RECALL:
-// trae todo lo del mismo tema aunque esté redactado distinto); (2) el FactMatcher (LLM) filtra por RELEVANCIA/tema
-// (PRECISIÓN; corre con ≥1 candidato). Tras filtrar: 1 match → lo olvida en el turno; varios → lista por ordinal y
-// ofrece elegir uno (`which`) o todos (`all`); ninguno → "no encontré".
+// INVALIDA bi-temporal (reversible/auditable, no borra). RECALL TOTAL: "olvidá todo lo de [tema]" es COMPLETITUD,
+// no relevancia top-K → el FactMatcher (LLM) juzga sobre TODOS los facts confirmados del owner (no un subconjunto
+// por coseno, que recortaría recall). Cap `factUnlearnMax` (se loguea si se alcanza; a esa escala el norte es
+// grafo/tags). Tras filtrar: 1 match → lo olvida en el turno; varios → lista por ordinal y ofrece uno (`which`) o
+// todos (`all`); ninguno → "no encontré".
 
 import { tool } from "ai"
 import { z } from "zod"
@@ -27,7 +28,7 @@ export const unlearnFact: ActionDescriptor = {
           .string()
           .min(1)
           .describe(
-            "Qué desaprender, en lenguaje natural (ej. 'que le gusta la pasta', 'lo de la pizza'). Yo busco."
+            "Qué desaprender, en lenguaje natural: un dato/preferencia puntual o un tema entero. Yo busco."
           ),
         which: z
           .number()
@@ -67,27 +68,39 @@ export const unlearnFact: ActionDescriptor = {
         const factStore = ctx.factStore
         try {
           const locale = ctx.locale === "en" ? "en" : "es"
-          // (1) Red ANCHA por coseno (RECALL): trae todo lo del mismo tema, aunque esté redactado distinto. Si nada
-          // está siquiera cerca → "no encontré" (fast-path, sin LLM).
-          const near = await factStore.findConfirmedNear(
-            about,
+          const cap = ctx.factUnlearnMax ?? 150
+          // RECALL TOTAL: traer TODOS los confirmados vigentes del owner (hasta cap). No hay corte semántico previo
+          // → nada del tema se escapa por estar "lejos" en el vector. Si nada hay guardado → "no encontré".
+          const allFacts = await factStore.listConfirmed(
             ctx.principal.id,
-            { maxDistance: ctx.factUnlearnDistance }
+            cap + 1
           )
-          // (2) PRECISIÓN: el matcher (LLM) deja solo los que de verdad pertenecen al tema. Corre con ≥1 candidato
-          // (un único cercano de la red ancha también puede ser ajeno → no borrarlo a ciegas). Sin matcher → coseno.
-          let matches: ConflictCandidate[] = near
-          if (near.length >= 1 && ctx.factMatcher) {
+          if (allFacts.length === 0) {
+            return emit(true, "No encontré nada guardado para olvidar.")
+          }
+          if (allFacts.length > cap) {
+            // No truncar en silencio: a esta escala el recall por LLM-sobre-todo deja de alcanzar (el norte es
+            // grafo/tags). Se avisa y se sigue con los `cap` más recientes.
+            ctx.logger.warn(
+              { principalId: ctx.principal.id, cap },
+              "unlearnFact: facts > cap → recall acotado a los más recientes (revisar paginación/grafo)"
+            )
+          }
+          const candidates = allFacts.slice(0, cap)
+          // PRECISIÓN: el matcher (LLM) juzga, sobre el conjunto COMPLETO, cuáles pertenecen al tema a olvidar.
+          // Sin matcher (degradado) → no se filtra (el owner ve todo y elige).
+          let matches: ConflictCandidate[] = candidates
+          if (ctx.factMatcher) {
             const { ordinals } = await ctx.factMatcher.match({
               description: about,
-              candidates: near.map((c, i) => ({
+              candidates: candidates.map((c, i) => ({
                 ordinal: i,
                 statement: c.statement,
               })),
               locale,
             })
             const keep = new Set(ordinals)
-            matches = near.filter((_c, i) => keep.has(i)) // puede quedar vacío → "no encontré"
+            matches = candidates.filter((_c, i) => keep.has(i)) // vacío → "no encontré"
           }
           if (matches.length === 0) {
             return emit(

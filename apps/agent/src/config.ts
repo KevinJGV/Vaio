@@ -189,10 +189,11 @@ const envSchema = z.object({
   FACT_CONFLICT_DISTANCE: positiveFloatWithDefault(0.55),
   FACT_CONFLICT_MAX: positiveIntWithDefault(50),
   FACT_CONFLICT_CANDIDATES: positiveIntWithDefault(5),
-  // unlearnFact (desaprender por descripción): red coseno ANCHA (RECALL — captura facts del mismo tema aunque estén
-  // redactados distinto). La PRECISIÓN la pone el FactMatcher (LLM): filtra a los que de verdad pertenecen al tema.
-  // (Un umbral estricto recortaría recall: dejaría afuera facts relevantes pero lejanos en el vector.)
-  FACT_UNLEARN_DISTANCE: positiveFloatWithDefault(0.6),
+  // unlearnFact (desaprender por descripción): "olvidá todo lo de [tema]" es un problema de COMPLETITUD, no de
+  // relevancia top-K → el FactMatcher (LLM) juzga sobre TODOS los facts confirmados del owner (recall total a escala
+  // personal; el coseno recortaría recall). MAX = cap de seguridad de cuántos facts se le pasan al matcher de una
+  // (si se supera, se loguea — no truncar en silencio; a esa escala el norte es grafo/tags, no coseno).
+  FACT_UNLEARN_MAX: positiveIntWithDefault(150),
 })
 
 export type Env = z.infer<typeof envSchema>

@@ -282,7 +282,7 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
     conflictJudge,
     factDecomposer,
     factMatcher,
-    factUnlearnDistance: env.FACT_UNLEARN_DISTANCE,
+    factUnlearnMax: env.FACT_UNLEARN_MAX,
     conversations,
     summarizer,
     compressor,

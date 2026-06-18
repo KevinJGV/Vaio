@@ -104,19 +104,16 @@ export function inMemoryFacts(): FactStore & { rows: () => Row[] } {
       r.invalidAt = FIXED
       return true
     },
-    async findConfirmedNear(query, principalId, opts) {
-      // Stub determinístico: confirmados vigentes del mismo principal cuyo statement matchea la query por
-      // substring (la cercanía vectorial real + el umbral se validan en e2e). Conserva el contrato.
-      const q = query.toLowerCase()
+    async listConfirmed(principalId, limit) {
+      // TODOS los confirmados vigentes del mismo principal (hasta limit) — sin filtro semántico (el matcher juzga).
       return rows
         .filter(
           (x) =>
             x.status === "confirmed" &&
             x.invalidAt === null &&
-            x.principalId === principalId &&
-            x.statement.toLowerCase().includes(q)
+            x.principalId === principalId
         )
-        .slice(0, opts?.limit ?? 10)
+        .slice(0, limit)
         .map((x) => ({ id: x.id, statement: x.statement, validAt: x.validAt }))
     },
   }

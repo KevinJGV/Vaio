@@ -1,6 +1,7 @@
 // Puerto del FactMatcher: dado lo que el owner quiere OLVIDAR (descripción en lenguaje natural) + una lista de
 // candidatos (facts confirmados cercanos por coseno), decide cuáles PERTENECEN a esa descripción (relevancia/
-// aboutness — más amplio que "duplicado": "lo de la pizza" matchea «le gusta la pizza napolitana»). Emite ORDINALES
+// aboutness — más amplio que "duplicado": una descripción de un tema matchea los facts de ese tema aunque estén
+// redactados distinto). Emite ORDINALES
 // (Inv #8: el sistema mapea a uuids). Es la pieza de PRECISIÓN del híbrido de unlearnFact (umbral coseno = recall).
 
 export interface MatchInput {
