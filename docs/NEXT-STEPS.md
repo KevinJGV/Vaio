@@ -163,6 +163,17 @@
   `suggestion`); (ii) **abstención explícita** cuando la data es ambigua/incompleta → el juez puede decir "no tengo
   info suficiente" → el sistema NO actúa destructivo + flaggea al owner. Reusa la costura `suggestion`. ¿Polish de
   Inc 1 o su propio mini-incremento? — decidir.
+- [ ] **CLUSTER — reevaluar `FACT_RETRIEVE_DISTANCE` + `FACT_CONFLICT_DISTANCE`** (tarea PARA LUEGO, Kevin 2026-06-17,
+  a la luz de "completitud ≠ retrieval / el coseno es recall-acotado"). Las dos están en situaciones DISTINTAS:
+  (a) **`FACT_RETRIEVE_DISTANCE`** (0.7, `searchFacts`): acá el coseno SÍ es la herramienta correcta (top-K relevante
+  para el contexto del chat, no completitud). Pero el VALOR/K puede estar recortando recall en la charla — se observó
+  en e2e que una 1ª búsqueda trajo solo 1 de 2 facts del tema (el modelo re-buscó). Reevaluar umbral + `FACT_RETRIEVE_MAX`
+  + interacción con el rerank. (b) **`FACT_CONFLICT_DISTANCE`** (0.55, red que ve el juez al proponer): tiene la MISMA
+  falla de recall que tenía unlearn — una contradicción redactada distinta ("ya no [dato]" vs "[dato]" con otras
+  palabras) puede caer fuera del umbral → el juez NUNCA la evalúa → no hay supersede → sobrevive memoria rancia. PERO
+  el juicio de conflicto corre en CADA learn (sensible a costo), así que "juzgar sobre todos" es más caro que en
+  unlearn (raro/owner). Reevaluar: ¿ensanchar umbral? ¿all-facts a escala chica con cap? ¿o esperar a la estructura
+  (grafo/tags) que lo resuelve determinista? Ver lección en `LEARNINGS.md`.
 - [ ] **CLUSTER — diferidos apuntados** (no en Inc 1, decisión de Kevin 2026-06-17): (a) **portfolio↔facts** —
   reconciliar `documents` (RAG) vs `facts` curados + regla de **precedencia** (un fact confirmado gana sobre la
   fuente); (b) **consolidación ontológica** ("completar" facts del mismo tópico en vez de acumular parciales) → Fase 3
