@@ -141,8 +141,11 @@
   lista y ofrece uno `which` o TODOS `all`). **503 tests.** **🚫 PRINCIPIO PERMANENTE (Kevin, 2026-06-17):** prohibido
   hardcodear sujetos/casos concretos en prompts model-facing → `FactMatcher`/`ConflictJudge`/`FactDecomposer`
   refactorizados a descripciones abstractas (`CLAUDE.md` Inv #2 + memoria `prompts-no-hardcoded-subjects` + LEARNINGS).
-  **Falta re-correr (e2e #5):** "olvidá lo de [tema]" → lista + `all`. **"dice pero no hace"** (piña no guardada en
-  e2e #3) = WIP Inc 2 aparte, no del cluster.
+  **e2e #5:** el híbrido listó + ofreció `all` ✅, PERO el umbral estricto (0.35) recortaba RECALL (no traía un fact
+  del tema redactado distinto, ej. "…con piña", antes de que el matcher lo viera). **🔧 corregido** (commit
+  `dfc43ea`): red coseno ANCHA `FACT_UNLEARN_DISTANCE=0.6` (recall) + matcher con ≥1 (precisión); el umbral estricto
+  era un error de diseño (optimizaba latencia a costa de recall). **504 tests.** **Falta e2e #6:** re-correr "olvidá
+  lo de [tema]" → debe listar TODOS los del tema (incl. los redactados distinto). **"dice pero no hace"** (Inc 2 aparte).
 - [ ] **CLUSTER — Inc 2: HILO CONSCIENTE DE SU RAZÓN** (reencuadre de Kevin 2026-06-17; antes "hilo-puntero"). El
   aprender/desaprender NATURAL dentro del hilo **ya está** (Inc 1: tras responder, el hilo es charla normal con el
   owner → toolset pleno). Lo que falta: cuando el hilo pasa de "resolver el pendiente" a **charla natural**, que Vaio
