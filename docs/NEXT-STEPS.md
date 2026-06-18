@@ -141,11 +141,14 @@
   lista y ofrece uno `which` o TODOS `all`). **503 tests.** **🚫 PRINCIPIO PERMANENTE (Kevin, 2026-06-17):** prohibido
   hardcodear sujetos/casos concretos en prompts model-facing → `FactMatcher`/`ConflictJudge`/`FactDecomposer`
   refactorizados a descripciones abstractas (`CLAUDE.md` Inv #2 + memoria `prompts-no-hardcoded-subjects` + LEARNINGS).
-  **e2e #5:** el híbrido listó + ofreció `all` ✅, PERO el umbral estricto (0.35) recortaba RECALL (no traía un fact
-  del tema redactado distinto, ej. "…con piña", antes de que el matcher lo viera). **🔧 corregido** (commit
-  `dfc43ea`): red coseno ANCHA `FACT_UNLEARN_DISTANCE=0.6` (recall) + matcher con ≥1 (precisión); el umbral estricto
-  era un error de diseño (optimizaba latencia a costa de recall). **504 tests.** **Falta e2e #6:** re-correr "olvidá
-  lo de [tema]" → debe listar TODOS los del tema (incl. los redactados distinto). **"dice pero no hace"** (Inc 2 aparte).
+  **e2e #5 + replanteo de fondo (Kevin cuestionó si el coseno es lo mejor para "no dejar escapar nada"):** NO lo es.
+  El coseno es recall-ACOTADO (un fact del tema redactado distinto, "…con piña", se escapaba de cualquier umbral).
+  "Olvidá todo lo de [tema]" es **completitud**, no relevancia top-K → el coseno es la herramienta equivocada. **🔧
+  REDISEÑADO** (commit `bf4a5b8`): `unlearnFact` usa **RECALL TOTAL** — el `FactMatcher` (LLM) juzga sobre **TODOS**
+  los facts confirmados del owner (`FactStore.listConfirmed`, cap `FACT_UNLEARN_MAX=150` logueado). Removido el corte
+  coseno (`findConfirmedNear`/`FACT_UNLEARN_DISTANCE`). **Norte Fase 3:** estructura (entidad/tag/grafo) → query
+  determinística. Lección "completitud ≠ retrieval" en `LEARNINGS.md`. **505 tests.** **Falta e2e #6:** "olvidá lo de
+  [tema]" → debe listar TODOS los del tema (incl. los redactados distinto, como la piña). **"dice pero no hace"** (Inc 2 aparte).
 - [ ] **CLUSTER — Inc 2: HILO CONSCIENTE DE SU RAZÓN** (reencuadre de Kevin 2026-06-17; antes "hilo-puntero"). El
   aprender/desaprender NATURAL dentro del hilo **ya está** (Inc 1: tras responder, el hilo es charla normal con el
   owner → toolset pleno). Lo que falta: cuando el hilo pasa de "resolver el pendiente" a **charla natural**, que Vaio

@@ -6,6 +6,18 @@ para no repetirlas en próximas sesiones. Una línea por aprendizaje, concreta.
 > Esto es la memoria del **dev**. La memoria del **producto** (lo que el agente sabe de Kevin)
 > vive en Neon/pgvector — ver `docs/SPEC.md`.
 
+- **Completitud ("no dejar escapar nada") ≠ relevancia top-K → el coseno es la herramienta EQUIVOCADA** (cluster
+  fact, unlearnFact, 2026-06-17). "Olvidá todo lo de [tema]" necesita TODOS los facts del tema, no los K más
+  relevantes. El coseno/retrieval es recall-**acotado**: un fact del mismo tema redactado distinto cae fuera de
+  cualquier umbral razonable (caso real: «…con piña» no entraba en la red de «que le gusta la pizza»). Iteré mal
+  tuneando umbrales (estricto→recortaba recall; ancho→metía ruido) hasta que la respuesta correcta fue **cambiar de
+  herramienta**: el **matcher (LLM) juzga sobre TODOS los facts confirmados del owner** (a escala personal domina
+  estrictamente al coseno+matcher: ve un superconjunto con la misma precisión). El coseno solo serviría como
+  optimización de costo a escala de miles de facts (no es el caso). **Norte (Fase 3):** facts con estructura
+  (entidad/tema como tag o nodo de grafo) → olvidar-por-tema sería una query determinística exacta, sin LLM.
+  Jerarquía: grafo/tags > matcher-sobre-todos > coseno+matcher. Lección transversal: **elegí la herramienta por el
+  REQUISITO** (completitud vs ranking), no por reflejo (retrieval = coseno).
+
 - **PROHIBIDO hardcodear sujetos/casos concretos en prompts model-facing** (regla dura de Kevin, 2026-06-17).
   Ningún ejemplo literal con un sujeto específico («lo de la pizza», «le gusta el fútbol», «cambió de stack»,
   «'Java'/'TypeScript'») en system prompts, `system` de `generateObject` (juez/decomposer/matcher) ni `.describe()`
