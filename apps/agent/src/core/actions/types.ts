@@ -9,6 +9,7 @@ import type { ConflictJudge } from "../../ports/conflict-judge.js"
 import type { Connector } from "../../ports/connector.js"
 import type { EscalationStore } from "../../ports/escalation.js"
 import type { FactDecomposer } from "../../ports/fact-decomposer.js"
+import type { FactMatcher } from "../../ports/fact-matcher.js"
 import type { FactStore } from "../../ports/facts.js"
 import type { DetectorRegistry } from "../../ports/knowledge-detector.js"
 import type { Logger } from "../../ports/logger.js"
@@ -49,6 +50,10 @@ export interface ActionContext {
   conflictJudge?: ConflictJudge | null
   /** Descomponedor atómico (cluster fact): parte statements compuestos en facts mono-idea. null = statement crudo. */
   factDecomposer?: FactDecomposer | null
+  /** Matcher de relevancia (unlearnFact): filtra los candidatos a los que pertenecen a lo que se quiere olvidar. */
+  factMatcher?: FactMatcher | null
+  /** Umbral coseno ESTRICTO para el 1er corte de unlearnFact (default 0.35). */
+  factUnlearnDistance?: number
   /** Rerank de la 2ª etapa del RAG. null = sin rerank → searchMemory cae a vector top-K. */
   reranker?: Reranker | null
   /** Pool de candidatos (wide-K) a recuperar por vector antes de rerankear. Default 30. */

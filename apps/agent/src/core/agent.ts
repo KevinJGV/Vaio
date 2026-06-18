@@ -25,6 +25,7 @@ import type {
 } from "../ports/conversation.js"
 import type { EscalationStore } from "../ports/escalation.js"
 import type { FactDecomposer } from "../ports/fact-decomposer.js"
+import type { FactMatcher } from "../ports/fact-matcher.js"
 import type { FactStore, PendingFact } from "../ports/facts.js"
 import type { DetectorRegistry } from "../ports/knowledge-detector.js"
 import type { Logger } from "../ports/logger.js"
@@ -88,6 +89,10 @@ export interface AgentDeps {
   conflictJudge?: ConflictJudge | null
   /** Descomponedor atómico (cluster fact): parte statements compuestos en facts mono-idea. null = statement crudo como único átomo. */
   factDecomposer?: FactDecomposer | null
+  /** Matcher de relevancia (unlearnFact): filtra candidatos por aboutness. null = solo corte por coseno. */
+  factMatcher?: FactMatcher | null
+  /** Umbral coseno estricto del 1er corte de unlearnFact. Default 0.35. */
+  factUnlearnDistance?: number
   /** Rerank de la 2ª etapa del RAG. null = sin rerank → searchMemory cae a vector top-K. */
   reranker?: Reranker | null
   /** Pool de candidatos (wide-K) para el rerank. Default 30. */
@@ -184,6 +189,8 @@ export function createAgent(deps: AgentDeps) {
     factStore = null,
     conflictJudge = null,
     factDecomposer = null,
+    factMatcher = null,
+    factUnlearnDistance = 0.35,
     reranker = null,
     rerankCandidates = 30,
     factRetrieveMax = 4,
@@ -347,6 +354,8 @@ export function createAgent(deps: AgentDeps) {
           factStore,
           conflictJudge,
           factDecomposer,
+          factMatcher,
+          factUnlearnDistance,
           emit,
           ids,
           logger: ctx.logger,

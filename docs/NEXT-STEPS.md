@@ -134,13 +134,15 @@
   tras el OK final de Kevin. **e2e #4 (2026-06-17) — casi todo ✅:** caso C unificado (claim "ya no pasta, ahora
   tarta" → `learned:2 superseded:1`); claim grande (piña rica + se la comió → `learned:3 superseded:1`: invalida "no
   le gusta piña" + guarda "ahora sí" + 2 aditivos); **coexistencia + dedup** conversacional (napolitana→"ya lo tenía",
-  piña→"guardé", ambos coexisten). **🐞 PENDIENTE (sobre-corrección mía):** "olvidá lo de la pizza" → `unlearnFact`
-  respondió "no encontré" pese a haber 3 facts de pizza. El filtro del juez por verdict `duplicate` (commit `ef1bfe6`)
-  es demasiado estricto para **forget-por-tema**: "lo de la pizza" no es *idéntico* a "le gusta la pizza napolitana"
-  → falso negativo. El juicio correcto = **relevancia/aboutness** ("¿pertenece a lo que querés olvidar?"), no
-  igualdad. + ⚠️ latencia de unlearn alta (~26s; el juez suma). **Decisión pendiente:** matcher de relevancia (LLM,
-  robusto) vs umbral coseno estricto (rápido, frágil) vs híbrido → ver pregunta a Kevin. **497 tests** (el caso real
-  no lo cubre el fake). **"dice pero no hace"** (piña no guardada en e2e #3) = WIP Inc 2 aparte, no del cluster.
+  piña→"guardé", ambos coexisten). **🔧 unlearnFact HÍBRIDO** (e2e #4 mostró que el filtro por `duplicate` del commit
+  `ef1bfe6` era muy estricto: forget-por-tema → "no encontré" con facts del tema presentes). Fix (decisión de Kevin):
+  (1) corte coseno ESTRICTO `FACT_UNLEARN_DISTANCE=0.35` (rápido, sin LLM; un tema ajeno no trae candidatos); (2) si
+  ≥2, el nuevo **`FactMatcher`** (puerto+adapter LLM) filtra por RELEVANCIA/tema; + `unlearnFact` gana `all?` (≥2 →
+  lista y ofrece uno `which` o TODOS `all`). **503 tests.** **🚫 PRINCIPIO PERMANENTE (Kevin, 2026-06-17):** prohibido
+  hardcodear sujetos/casos concretos en prompts model-facing → `FactMatcher`/`ConflictJudge`/`FactDecomposer`
+  refactorizados a descripciones abstractas (`CLAUDE.md` Inv #2 + memoria `prompts-no-hardcoded-subjects` + LEARNINGS).
+  **Falta re-correr (e2e #5):** "olvidá lo de [tema]" → lista + `all`. **"dice pero no hace"** (piña no guardada en
+  e2e #3) = WIP Inc 2 aparte, no del cluster.
 - [ ] **CLUSTER — Inc 2: HILO CONSCIENTE DE SU RAZÓN** (reencuadre de Kevin 2026-06-17; antes "hilo-puntero"). El
   aprender/desaprender NATURAL dentro del hilo **ya está** (Inc 1: tras responder, el hilo es charla normal con el
   owner → toolset pleno). Lo que falta: cuando el hilo pasa de "resolver el pendiente" a **charla natural**, que Vaio

@@ -45,6 +45,6 @@ export interface FactStore {
   findConfirmedNear(
     query: string,
     principalId: string,
-    limit?: number
+    opts?: { limit?: number; maxDistance?: number }
   ): Promise<ConflictCandidate[]>
 }

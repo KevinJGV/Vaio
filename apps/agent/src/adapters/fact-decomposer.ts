@@ -18,8 +18,8 @@ const SCHEMA = z.object({
 
 const SYSTEM_ES = [
   "Sos el redactor de la memoria de Kevin. Te doy un texto (y opcionalmente la pregunta que lo originó).",
-  "Descomponé en hechos ATÓMICOS (UNA idea por hecho), en 3ª persona, autocontenidos (ej. «A Kevin le gusta la pasta»).",
-  "NO mezcles ideas en un mismo hecho.",
+  "Descomponelo en hechos ATÓMICOS: UNA idea por hecho, en 3ª persona, autocontenido (cada uno una afirmación",
+  "completa que se entienda por sí sola). NO mezcles dos ideas en un mismo hecho.",
   "DESCARTÁ lo sensible/privado (teléfonos, direcciones, documentos, credenciales, o si Kevin pide no compartirlo) y",
   "lo no-factual (saludos, «no sé», opiniones efímeras): no los incluyas.",
   "Si no hay ningún hecho durable → lista vacía. Nunca inventes más de lo que el texto dice.",
@@ -27,8 +27,8 @@ const SYSTEM_ES = [
 
 const SYSTEM_EN = [
   "You curate Kevin's memory. I give you a text (and optionally the question that originated it).",
-  "Decompose it into ATOMIC facts (ONE idea per fact), in the third person, self-contained (e.g. «Kevin likes pasta»).",
-  "Do NOT mix ideas within a single fact.",
+  "Decompose it into ATOMIC facts: ONE idea per fact, in the third person, self-contained (each a complete statement",
+  "that stands on its own). Do NOT mix two ideas within a single fact.",
   "DISCARD anything sensitive/private (phone numbers, addresses, documents, credentials, or if Kevin asks not to share it) and",
   "anything non-factual (greetings, «I don't know», ephemeral opinions): do not include them.",
   "If there is no durable fact → empty list. Never invent beyond what the text says.",

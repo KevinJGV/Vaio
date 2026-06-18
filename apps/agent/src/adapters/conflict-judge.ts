@@ -25,8 +25,8 @@ const SCHEMA = z.object({
       verdict: z
         .enum(["contradicts", "duplicate", "coexists", "unsure"])
         .describe(
-          "contradicts = no pueden ser ambos ciertos a la vez (cambió de stack/ciudad, 'ya no le gusta X'); " +
-            "duplicate = dicen lo MISMO; coexists = ambos ciertos (aditivo); unsure = no estás seguro"
+          "contradicts = los dos no pueden ser ciertos a la vez (un mismo dato cambió, o una preferencia se " +
+            "invirtió); duplicate = afirman lo mismo; coexists = ambos ciertos (aditivo); unsure = no estás seguro"
         ),
     })
   ),
@@ -38,21 +38,23 @@ const SCHEMA = z.object({
 const SYSTEM_ES = [
   "Sos el juez de contradicción de la memoria de Kevin. Te doy un hecho NUEVO sobre Kevin + una lista numerada de",
   "hechos VIGENTES cercanos. Para CADA número decidí la relación con el hecho nuevo.",
-  "Cercanía de tema NO es contradicción — distinguí dimensiones: preferencia ≠ atributo ≠ anécdota/evento.",
-  "Ejemplos: «no le gusta el fútbol» + «una anécdota de fútbol» COEXISTEN; «le gusta la pasta» + «le gusta el fútbol» COEXISTEN.",
-  "Solo `contradicts` cuando NO pueden ser ambos ciertos a la vez (cambió de stack o de ciudad, «ya no le gusta X»).",
-  "`duplicate` = dicen lo mismo. `coexists` = ambos ciertos (aditivo). `unsure` = no estás seguro.",
-  "Devolvé una decisión por cada número que te di, con su ordinal. `suggestion` vacío salvo que tengas una recomendación útil para el owner.",
+  "La cercanía de TEMA no implica contradicción: distinguí la DIMENSIÓN de cada hecho — una preferencia, un",
+  "atributo/dato y una anécdota/evento sobre un mismo tema son dimensiones DISTINTAS y COEXISTEN; dos hechos sobre",
+  "temas distintos también COEXISTEN.",
+  "`contradicts` SOLO cuando los dos no pueden ser ciertos a la vez (un mismo dato cambió de valor, o una",
+  "preferencia se invirtió). `duplicate` = afirman lo mismo. `coexists` = ambos ciertos (aditivo). `unsure` = no",
+  "estás seguro. Devolvé una decisión por cada número, con su ordinal. `suggestion` vacío salvo recomendación útil al owner.",
 ].join(" ")
 
 const SYSTEM_EN = [
   "You are the contradiction judge of Kevin's memory. I give you a NEW fact about Kevin + a numbered list of nearby",
   "CURRENT facts. For EACH number decide its relation to the new fact.",
-  "Topic closeness is NOT contradiction — distinguish dimensions: preference ≠ attribute ≠ anecdote/event.",
-  "Examples: «he dislikes football» + «a football anecdote» COEXIST; «he likes pasta» + «he likes football» COEXIST.",
-  "Only `contradicts` when both CANNOT be true at once (changed stack or city, «he no longer likes X»).",
+  "Topic closeness does NOT imply contradiction: distinguish each fact's DIMENSION — a preference, an attribute/datum",
+  "and an anecdote/event about the same topic are DIFFERENT dimensions and COEXIST; facts about different topics also",
+  "COEXIST.",
+  "`contradicts` ONLY when both cannot be true at once (one datum changed value, or a preference was reversed).",
   "`duplicate` = they state the same thing. `coexists` = both true (additive). `unsure` = you're not sure.",
-  "Return one decision per number I gave you, with its ordinal. `suggestion` empty unless you have a useful recommendation for the owner.",
+  "Return one decision per number, with its ordinal. `suggestion` empty unless you have a useful recommendation for the owner.",
 ].join(" ")
 
 function numbered(

@@ -6,6 +6,17 @@ para no repetirlas en próximas sesiones. Una línea por aprendizaje, concreta.
 > Esto es la memoria del **dev**. La memoria del **producto** (lo que el agente sabe de Kevin)
 > vive en Neon/pgvector — ver `docs/SPEC.md`.
 
+- **PROHIBIDO hardcodear sujetos/casos concretos en prompts model-facing** (regla dura de Kevin, 2026-06-17).
+  Ningún ejemplo literal con un sujeto específico («lo de la pizza», «le gusta el fútbol», «cambió de stack»,
+  «'Java'/'TypeScript'») en system prompts, `system` de `generateObject` (juez/decomposer/matcher) ni `.describe()`
+  de tools/inputs. **Por qué:** esos fragmentos SESGAN al modelo a "optimizarse" para ese sujeto y a copiar las
+  estructuras TEXTUALMENTE en sus outputs; Vaio debe servir a la generalidad. **Cómo:** describir la regla/criterio
+  de forma abstracta, o usar **placeholders representativos** («lo de [referencia]», «[tema A]/[tema B]», «el nombre
+  de un lenguaje») que el modelo lea como patrón con variable, no como texto a reusar. Que de casos prácticos surjan
+  excepciones/bugs es normal; lo prohibido es CODIFICARLOS tan explícitos. Origen: `FactMatcher`/`ConflictJudge`/
+  `FactDecomposer` nacieron con ejemplos pizza/fútbol/pasta → refactorizados a descripciones abstractas. Auditar
+  cada prompt nuevo contra esto. Ver `CLAUDE.md` (Invariante #2) + memoria `prompts-no-hardcoded-subjects`.
+
 - **✅ RESUELTO en Inc 1 del cluster (2026-06-17, rama `feat/fact-lifecycle-judge`) — cercanía vectorial ≠
   contradicción.** El fix = **opción B**: un puerto `ConflictJudge` (LLM, `generateObject`, modelo de chat) que,
   dados el statement nuevo + los candidatos cercanos, decide por cada uno `contradicts`/`duplicate`/`coexists`/

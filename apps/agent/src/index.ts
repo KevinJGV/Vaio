@@ -11,6 +11,7 @@ import { createDb } from "./adapters/db/client.js"
 import { EMBEDDING_DIM } from "./adapters/db/schema.js"
 import { createEmbedder } from "./adapters/embeddings.js"
 import { createFactDecomposer } from "./adapters/fact-decomposer.js"
+import { createFactMatcher } from "./adapters/fact-matcher.js"
 import { buildApp } from "./adapters/http/routes.js"
 import { createLogger } from "./adapters/logger.js"
 import {
@@ -61,6 +62,7 @@ import type { Connector } from "./ports/connector.js"
 import type { ConversationStore } from "./ports/conversation.js"
 import type { EscalationStore } from "./ports/escalation.js"
 import type { FactDecomposer } from "./ports/fact-decomposer.js"
+import type { FactMatcher } from "./ports/fact-matcher.js"
 import type { FactStore } from "./ports/facts.js"
 import type { DetectorRegistry } from "./ports/knowledge-detector.js"
 import type { MediaUnderstanding, Transcriber } from "./ports/media.js"
@@ -122,6 +124,7 @@ let escalations: EscalationStore | null = null
 let factStore: FactStore | null = null
 let conflictJudge: ConflictJudge | null = null
 let factDecomposer: FactDecomposer | null = null
+let factMatcher: FactMatcher | null = null
 let summarizer: Summarizer | null = null
 let transcriber: Transcriber | null = null
 let mediaUnderstanding: MediaUnderstanding | null = null
@@ -232,6 +235,7 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
   // parte statements compuestos en facts atómicos mono-idea antes de juzgar/curar (reemplazó al viejo FactDrafter).
   conflictJudge = createConflictJudge({ model, logger })
   factDecomposer = createFactDecomposer({ model, logger })
+  factMatcher = createFactMatcher({ model, logger })
   // Comprensión de media POR MODALIDAD (cada una su modelo/endpoint; no la cadena de chat):
   //  - STT: REST /audio/transcriptions con la cadena TRANSCRIBE_MODELS (fallback client-side).
   //  - Visión: chat+file-part con la cadena VISION_MODELS.
@@ -277,6 +281,8 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
     factStore,
     conflictJudge,
     factDecomposer,
+    factMatcher,
+    factUnlearnDistance: env.FACT_UNLEARN_DISTANCE,
     conversations,
     summarizer,
     compressor,

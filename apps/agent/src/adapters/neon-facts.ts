@@ -35,7 +35,8 @@ export function createFactStore(
     emb: number[],
     principalId: string,
     excludeId: string | undefined,
-    limit: number = cfg.conflictMax
+    limit: number = cfg.conflictMax,
+    maxDistance: number = cfg.conflictDistance
   ): Promise<ConflictCandidate[]> => {
     const dist = cosineDistance(facts.embedding, emb)
     // `excludeId` opcional: solo se filtra cuando hay un id real (propose excluye la fila recién insertada). NO
@@ -46,13 +47,13 @@ export function createFactStore(
           isNull(facts.invalidAt),
           eq(facts.principalId, principalId),
           ne(facts.id, excludeId),
-          lt(dist, cfg.conflictDistance)
+          lt(dist, maxDistance)
         )
       : and(
           eq(facts.status, "confirmed"),
           isNull(facts.invalidAt),
           eq(facts.principalId, principalId),
-          lt(dist, cfg.conflictDistance)
+          lt(dist, maxDistance)
         )
     const rows = await db
       .select({
@@ -218,7 +219,7 @@ export function createFactStore(
       return res.length > 0
     },
 
-    async findConfirmedNear(query, principalId, limit) {
+    async findConfirmedNear(query, principalId, opts) {
       // Best-effort: si el embed falla o no hay vector → [] (no romper el flujo de desaprender por similitud).
       let emb: number[] | undefined
       try {
@@ -228,8 +229,14 @@ export function createFactStore(
         emb = undefined
       }
       if (!emb) return []
-      // Sin excludeId → no filtra por id (trae los confirmados vigentes más cercanos a la query).
-      return await findNearConfirmed(emb, principalId, undefined, limit)
+      // Sin excludeId → no filtra por id. `maxDistance` permite un corte ESTRICTO (unlearn) vs el de conflicto.
+      return await findNearConfirmed(
+        emb,
+        principalId,
+        undefined,
+        opts?.limit,
+        opts?.maxDistance
+      )
     },
   }
 }

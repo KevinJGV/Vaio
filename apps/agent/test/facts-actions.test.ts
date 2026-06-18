@@ -10,6 +10,7 @@ import type {
   ConflictVerdict,
 } from "../src/ports/conflict-judge.js"
 import type { FactDecomposer } from "../src/ports/fact-decomposer.js"
+import type { FactMatcher } from "../src/ports/fact-matcher.js"
 import type { LogFields, Logger } from "../src/ports/logger.js"
 import { inMemoryFacts } from "./fakes/in-memory-facts.js"
 
@@ -25,16 +26,13 @@ function fakeJudge(verdict: ConflictVerdict): ConflictJudge {
 function fakeDecomposer(statements: string[]): FactDecomposer {
   return { decompose: async () => ({ statements }) }
 }
-/** Fake ConflictJudge SELECTIVO: marca "duplicate" los candidatos cuyo statement incluye `needle`, el resto "coexists". */
-function fakeJudgeMatching(needle: string): ConflictJudge {
+/** Fake FactMatcher: devuelve los ordinales de los candidatos cuyo statement incluye `needle` (relevancia stub). */
+function fakeMatcher(needle: string): FactMatcher {
   return {
-    judge: async ({ candidates }) => ({
-      decisions: candidates.map((c) => ({
-        ordinal: c.ordinal,
-        verdict: c.statement.toLowerCase().includes(needle.toLowerCase())
-          ? ("duplicate" as const)
-          : ("coexists" as const),
-      })),
+    match: async ({ candidates }) => ({
+      ordinals: candidates
+        .filter((c) => c.statement.toLowerCase().includes(needle.toLowerCase()))
+        .map((c) => c.ordinal),
     }),
   }
 }
@@ -58,6 +56,7 @@ function ctx(
   extra: {
     conflictJudge?: ConflictJudge
     factDecomposer?: FactDecomposer
+    factMatcher?: FactMatcher
   } = {}
 ): ActionContext {
   return {
@@ -75,6 +74,7 @@ function ctx(
     logger: noopLogger(),
     ...(extra.conflictJudge ? { conflictJudge: extra.conflictJudge } : {}),
     ...(extra.factDecomposer ? { factDecomposer: extra.factDecomposer } : {}),
+    ...(extra.factMatcher ? { factMatcher: extra.factMatcher } : {}),
   }
 }
 
@@ -387,25 +387,25 @@ describe("unlearnFact", () => {
     expect(String(out)).toMatch(/no configurada|no puedo/i)
   })
 
-  it("FILTRO del juez: el coseno trae no-relacionados pero ninguno coincide → «no encontré» (caso fútbol)", async () => {
+  it("MATCHER: red ancha (≥2) pero ninguno pertenece al tema → «no encontré» (caso fútbol)", async () => {
     const fs = inMemoryFacts()
     await seed(fs, "A Kevin le gusta la pizza")
     await seed(fs, "A Kevin le gusta la pasta")
-    // El fake trae por substring; forzamos red ancha con `about` que matchea ambos ("le gusta"), y el juez (que
-    // busca "fútbol") no marca ninguno como duplicate → matches vacío → no ofrece pizza/pasta.
+    // El fake trae por substring; `about="le gusta"` matchea ambos (red ancha). El matcher (tema "fútbol") no deja
+    // ninguno → matches vacío → no ofrece pizza/pasta.
     const out = await unlearnFact
-      .build(ctx(fs, () => {}, { conflictJudge: fakeJudgeMatching("fútbol") }))
+      .build(ctx(fs, () => {}, { factMatcher: fakeMatcher("fútbol") }))
       .execute?.({ about: "le gusta" }, { toolCallId: "u", messages: [] })
     expect(String(out)).toMatch(/no encontré/i)
     expect(fs.rows().every((r) => r.invalidAt === null)).toBe(true) // no tocó nada
   })
 
-  it("FILTRO del juez: red ancha (≥2 coseno) → el juez deja 1 → lo olvida en el turno", async () => {
+  it("MATCHER: red ancha (≥2) → el matcher deja 1 → lo olvida en el turno", async () => {
     const fs = inMemoryFacts()
     await seed(fs, "A Kevin le gusta la pasta")
     await seed(fs, "A Kevin le gusta la pizza")
     const out = await unlearnFact
-      .build(ctx(fs, () => {}, { conflictJudge: fakeJudgeMatching("pasta") }))
+      .build(ctx(fs, () => {}, { factMatcher: fakeMatcher("pasta") }))
       .execute?.({ about: "le gusta" }, { toolCallId: "u", messages: [] })
     expect(String(out)).toMatch(/olvidé/i)
     expect(String(out)).toContain("pasta")
@@ -415,5 +415,33 @@ describe("unlearnFact", () => {
     expect(
       fs.rows().find((r) => r.statement.includes("pizza"))?.invalidAt
     ).toBeNull() // la pizza intacta
+  })
+
+  it("MATCHER forget-por-tema: ≥2 del tema → lista + ofrece TODOS; `all:true` los invalida a todos", async () => {
+    const fs = inMemoryFacts()
+    await seed(fs, "A Kevin le gusta la pizza napolitana")
+    await seed(fs, "A Kevin no le gusta la pizza con piña")
+    // (el fake matchea por substring → usamos "pizza"; el matcher es lo que se ejercita para el forget-por-tema)
+    const m = { factMatcher: fakeMatcher("pizza") }
+    const list = await unlearnFact
+      .build(ctx(fs, () => {}, m))
+      .execute?.({ about: "pizza" }, { toolCallId: "u1", messages: [] })
+    expect(String(list)).toMatch(/\[0\]/)
+    expect(String(list)).toMatch(/\[1\]/)
+    expect(String(list)).toMatch(/all:true|todos/i)
+    expect(fs.rows().every((r) => r.invalidAt === null)).toBe(true)
+    const out = await unlearnFact
+      .build(ctx(fs, () => {}, m))
+      .execute?.(
+        { about: "pizza", all: true },
+        { toolCallId: "u2", messages: [] }
+      )
+    expect(String(out)).toMatch(/olvid/i)
+    expect(
+      fs
+        .rows()
+        .filter((r) => r.statement.toLowerCase().includes("pizza"))
+        .every((r) => r.invalidAt !== null)
+    ).toBe(true) // ambas pizzas invalidadas
   })
 })

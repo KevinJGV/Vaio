@@ -47,7 +47,7 @@ export const findRepos: ActionDescriptor = {
         language: z
           .string()
           .optional()
-          .describe("Lenguaje de programación (p.ej. 'Java', 'TypeScript')."),
+          .describe("Lenguaje de programación por el que filtrar (el nombre del lenguaje)."),
         topic: z.string().optional().describe("Topic/tema del repo."),
         hasOpenPRs: z
           .boolean()

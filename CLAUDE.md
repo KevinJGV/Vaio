@@ -21,6 +21,13 @@ lateral) y —más adelante— por Telegram y correo. **TypeScript** · **Hono**
    pgvector → `facts` → grafo) y entran al contexto **solo por la tool** (`searchMemory`). La persona/voseo
    es la **voz de Vaio**, no un dato sobre Kevin: no la proyectes ni la asumas (ya gatilló un bug real — ver
    `LEARNINGS.md` y la memoria `system-prompt-voice-not-facts`).
+   **PROHIBIDO hardcodear sujetos/casos concretos en CUALQUIER prompt model-facing** (system prompts, `system` de
+   `generateObject` del juez/decomposer/matcher, `.describe()` de tools/inputs): nada de ejemplos literales tipo
+   «lo de la pizza»/«le gusta el fútbol»/«'Java'». Sesgan al modelo a "optimizarse" para ese sujeto y a copiarlos
+   textualmente en sus outputs; Vaio debe funcionar para la GENERALIDAD. Describí la regla de forma abstracta o usá
+   **placeholders representativos** («lo de [referencia]», «[tema A]/[tema B]», «el nombre de un lenguaje»), que el
+   modelo entienda como patrón con variable, no como texto a reusar. Auditá cada prompt nuevo (memoria
+   `prompts-no-hardcoded-subjects`).
 3. **Crecimiento orgánico > prompt estático**: el conocimiento crece en la memoria/grafos; el prompt no
    compite con eso. No hardcodees el dominio "para que suene natural".
 4. **ports/adapters-lite**: el `core` depende de **puertos**, nunca de adapters; el I/O vive en adapters;
