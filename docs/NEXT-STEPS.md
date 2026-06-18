@@ -131,13 +131,16 @@
   `LEARNINGS.md`. **Falta re-correr (e2e #3):** caso C con la unificación (claim aditivo+contradictorio → ambos),
   conversacional (pasta+fútbol coexisten/sin pending; "ya no"→pending→resolveFact). **Costuras Inc 2 dejadas:**
   `invalidate` standalone, juez por ordinales, `linkFact` al 1er fact, idempotencia por `escalationId`. Merge a `main`
-  tras el OK final de Kevin. **e2e #3 (2026-06-17):** ✅ `unlearnFact` pasta (which:0→olvida); **🔧 BUG corregido**
-  (commit `ef1bfe6`): "olvidá el fútbol" (fact ya borrado) ofrecía «pizza»/«pasta» — `findConfirmedNear` es solo
-  coseno (0.55) sin filtro semántico → ahora el **juez filtra** los candidatos (coseno=recall, juez "duplicate"=
-  precisión); ninguno coincide → "no encontré". **497 tests.** ⚠️ **NO es del cluster:** en e2e #3, "acordate piña"
-  tras "acordate napolitana" → el modelo razonó "voy a guardarlos" pero `finishReason:stop` **sin emitir el tool
-  call** → es el **"dice pero no hace"** (WIP "Incremento 2 — guard transversal", abajo), comportamiento del modelo,
-  no de la curación. **Falta e2e #4:** re-correr la piña (coexistencia) cuando el modelo sí dispare la tool.
+  tras el OK final de Kevin. **e2e #4 (2026-06-17) — casi todo ✅:** caso C unificado (claim "ya no pasta, ahora
+  tarta" → `learned:2 superseded:1`); claim grande (piña rica + se la comió → `learned:3 superseded:1`: invalida "no
+  le gusta piña" + guarda "ahora sí" + 2 aditivos); **coexistencia + dedup** conversacional (napolitana→"ya lo tenía",
+  piña→"guardé", ambos coexisten). **🐞 PENDIENTE (sobre-corrección mía):** "olvidá lo de la pizza" → `unlearnFact`
+  respondió "no encontré" pese a haber 3 facts de pizza. El filtro del juez por verdict `duplicate` (commit `ef1bfe6`)
+  es demasiado estricto para **forget-por-tema**: "lo de la pizza" no es *idéntico* a "le gusta la pizza napolitana"
+  → falso negativo. El juicio correcto = **relevancia/aboutness** ("¿pertenece a lo que querés olvidar?"), no
+  igualdad. + ⚠️ latencia de unlearn alta (~26s; el juez suma). **Decisión pendiente:** matcher de relevancia (LLM,
+  robusto) vs umbral coseno estricto (rápido, frágil) vs híbrido → ver pregunta a Kevin. **497 tests** (el caso real
+  no lo cubre el fake). **"dice pero no hace"** (piña no guardada en e2e #3) = WIP Inc 2 aparte, no del cluster.
 - [ ] **CLUSTER — Inc 2: HILO CONSCIENTE DE SU RAZÓN** (reencuadre de Kevin 2026-06-17; antes "hilo-puntero"). El
   aprender/desaprender NATURAL dentro del hilo **ya está** (Inc 1: tras responder, el hilo es charla normal con el
   owner → toolset pleno). Lo que falta: cuando el hilo pasa de "resolver el pendiente" a **charla natural**, que Vaio
