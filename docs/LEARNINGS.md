@@ -6,6 +6,47 @@ para no repetirlas en próximas sesiones. Una línea por aprendizaje, concreta.
 > Esto es la memoria del **dev**. La memoria del **producto** (lo que el agente sabe de Kevin)
 > vive en Neon/pgvector — ver `docs/SPEC.md`.
 
+- **Memoria multilingüe: los facts van en UN idioma CANÓNICO, no en el de la conversación** (cluster fact, Inc 2,
+  2026-06-18). El `FactDecomposer` no fijaba el idioma de salida → con locale `es` el modelo a veces redactaba en
+  inglés → memoria FRAGMENTADA y **duplicados cross-idioma que el dedup no caza** ("Vin believes there is life after
+  death" ≡ "Vin cree que existe vida…" coexistiendo). **Insight de Kevin:** pinear al idioma de la conversación
+  obligaría a "ingestar en 2 idiomas" (ineficiente); lo correcto es **un idioma canónico** (`FACT_CANONICAL_LOCALE`,
+  default `es`) y que el modelo lo **converse** en el idioma del usuario. Daña los FACTS, **no** los `documents`
+  ingestados (esos van verbatim). Lección: la consistencia de idioma de la memoria es un requisito de
+  dedup/juez/retrieval, no un detalle de redacción.
+
+- **El embedder multilingüe NO casa bien cross-idioma — el idioma DOMINA el espacio vectorial sobre el significado**
+  (2026-06-18, `gemini-embedding-2` truncado a 1536 dims). Verificado e2e: una query ES ("muerte") NO recuperó el
+  fact EN del mismo tema, y un fact ES de OTRO tema quedó **más cerca** que el EN del mismo tema. Yo había afirmado
+  lo contrario ("el multilingüe casa solo") → REFUTADO por evidencia (lección: **no asumir propiedades del embedder;
+  medirlas**). **Fix:** `searchMemory` traduce la **query → idioma canónico** antes de `searchFacts` (retrieval) Y los
+  **facts recuperados → idioma del usuario** (presentación), solo cuando `locale ≠ canónico` (el owner en su idioma no
+  paga nada). Puerto `Translator` (best-effort → query/fact crudo si falla). Los docs (código) NO se traducen.
+
+- **El idioma de la RESPUESTA: ni el system prompt en inglés ni el grounding traducido alcanzan — la persona española
+  arrastra al modelo** (2026-06-18). Con TODO en inglés (persona-EN, policy-EN, facts traducidos a EN, reasoning EN,
+  pregunta EN) el modelo SEGUÍA respondiendo en español: la persona de Vaio es **intrínsecamente española** (voseo
+  valluno) y eso pesa más que un "reply in the user's language" suave. Hicieron falta **tres** capas, cada una
+  necesaria (depuradas en e2e iterativo, no de una): (1) **policies de canal localizadas** por `locale`
+  (`resolve(channel, principal, locale)`) → system prompt coherente en un idioma; (2) **traducir el grounding** (facts)
+  al idioma del usuario → el modelo espeja el idioma del grounding; (3) **directiva de idioma DOMINANTE al TOPE** del
+  system prompt para `locale≠es`. Lección: contra una persona fuertemente tipada en un idioma, el control de idioma
+  de salida necesita una orden **explícita, prominente y temprana** + grounding en ese idioma; las instrucciones
+  suaves embebidas en la persona pierden.
+
+- **3er eje de gating de tools: CONTEXTO del turno** (`ActionDescriptor.available?(ctx)`, 2026-06-18). Antes el gating
+  era canal + principal (clearance). Se agregó `available(ctx)`: si false, la tool **NI se instancia** (el modelo no
+  la ve, ni como `deniedTool`) → no cree que tiene una capacidad que el contexto no da. 1er consumidor: `updateVisitor`
+  (solo en un hilo de escalada resuelta). Pedido de Kevin (fundamento de higiene): mantener a Vaio con SOLO las tools
+  necesarias en cada situación; auditar los 3 ejes por tool. Hermano del Invariante #10 (anti-tool-bloat).
+
+- **Coherencia tool ↔ prompt: una tool contextual se menciona SOLO donde se instancia** (2026-06-18). `updateVisitor`
+  no se nombra en la policy siempre-on; su única instrucción va en la **nota del hilo** (co-gated: aparece exactamente
+  cuando la tool existe). Además: el modelo NO disparaba `updateVisitor` solo con su `.describe()` (preguntaba "¿le
+  aviso?") → hubo que **nudgearlo en la nota del hilo** ("avisá automáticamente, mismo turno, sin pedir permiso, salvo
+  veto"). Lección: para que el modelo USE una tool contextual con cierta política (automática/proactiva), la
+  instrucción de USO va junto al contexto que la habilita, no solo en la descripción de la tool.
+
 - **Completitud ("no dejar escapar nada") ≠ relevancia top-K → el coseno es la herramienta EQUIVOCADA** (cluster
   fact, unlearnFact, 2026-06-17). "Olvidá todo lo de [tema]" necesita TODOS los facts del tema, no los K más
   relevantes. El coseno/retrieval es recall-**acotado**: un fact del mismo tema redactado distinto cae fuera de

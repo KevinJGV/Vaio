@@ -1,12 +1,11 @@
 # Pendientes — Vaio (para retomar)
 
 > **ESTADO ACTUAL (2026-06-18) — fuente de verdad viva.**
-> **`origin/main` SINCRONIZADO con `main`** (2026-06-18): escalate v1+v2 (Inc 1), turnos proactivos, fix 400 Telegram,
-> `hasOpenPRs` y **el cluster "ciclo de vida del fact" Inc 1** ya pusheados → el deploy de Railway aplica las
-> migraciones por su `preDeployCommand`. **RECONCILIADO 2026-06-18:** `main`, `feat/fact-lifecycle-judge` y
-> `origin/main` apuntan al MISMO commit `b9613a0` (historia lineal) → el cluster **Inc 1 está MERGEADO en `main` y
-> pusheado**, e2e #1-6 ✅ (recall total verificado). Ya **no** es "EN CURSO/codeando" (drift corregido). Detalle del
-> cluster e Inc 2/followups abiertos → "🚧 En proceso".
+> **Cluster "ciclo de vida del fact": Inc 1 MERGEADO en `main`/`origin/main` (commit `b9613a0`, e2e #1-6 ✅).
+> Inc 2 (hilo consciente) + `updateVisitor` + idioma canónico COMPLETOS y VERIFICADOS e2e en la rama
+> `feat/fact-lifecycle-inc2` (commits hasta `e78924b`), LISTOS PARA MERGE a `main`** (esperan el "go" de Kevin).
+> Ambos hitos → Historial. **532 tests; typecheck/biome/`/health` limpios.** El deploy de Railway aplica las
+> migraciones por su `preDeployCommand` al pushear `main`.
 > **Fase 1: completa y DESPLEGADA** (Railway/Docker; RAG real Neon+pgvector; observabilidad pino) — en `main`.
 > **Iteración 2 — MERGEADA en `main`:** núcleo *stateful* + capacidades por canal + Telegram `/tg`,
 > **compresión cavemem** (`@vaio/compress`), **refinamiento Telegram** (hilos/topics, HTML, identidad/owner),
@@ -109,55 +108,9 @@
 > por escalada (Threaded Mode) + curación default-por-tipo + "transmití real" + los fixes post-e2e (P1 escala directo,
 > hilo desbloqueado, drafter al modelo de chat, visibilidad por kind). Flujo principal verificado en vivo. Queda P2
 > (falso conflicto) diferido al cluster (abajo).
-- [?] **CLUSTER "ciclo de vida del fact" — Inc 1 MERGEADO en `main` + pusheado a `origin/main` (commit `b9613a0`),
-  e2e #1-6 ✅ (VERIFICADO por Kevin).** ⏳ *Reconciliado 2026-06-18: estaba marcado "PEND. e2e / en `feat/fact-lifecycle-judge`"
-  pero git muestra `main`==`feat/fact-lifecycle-judge`==`origin/main` en el mismo commit → ya está integrado. Falta solo
-  el OK de Kevin para mover este bloque al Historial.* PRÓXIMO MAYOR del roadmap, faseado. **Inc 1 hecho** = (1) **`ConflictJudge`** (puerto+adapter, LLM)
-  compartido por los DOS caminos (`curate` determinístico + `rememberFact` conversacional) — cierra el bug P2
-  (pasta/fútbol: coexiste→commit, NADA pending); (2) **`FactDecomposer`** (reemplazó al `FactDrafter`: facts atómicos
-  mono-idea antes de juzgar); (3) **desaprender** (`FactStore.invalidate` bi-temporal + tool nueva `unlearnFact`,
-  owner-only); + **middleware-siempre** (contradicción invalida aunque no se aprenda, visible) + **juicio completo**
-  (sin truncar, `FACT_CONFLICT_MAX` logueado; `FACT_CONFLICT_CANDIDATES`→presentación "+N más"; umbral 0.45→0.55).
-  **Verificado local:** typecheck/biome/build limpios; **494 tests** (+12); `/health` 200. **e2e #1 de Kevin
-  (2026-06-17, `logs.txt`):** ✅ atomicidad (compuesto→3 átomos), ✅ escalada knowledge contradice → `learned:2
-  superseded:1` (auto-invalida+visible: "trabaja en Anthropic" dado de baja), ✅ curación knowledge básica.
-  **🐞 BUG uuid CORREGIDO** (commit `1977398`): `findConfirmedNear` pasaba `excludeId=""` → `ne(id,"")` casteaba a
-  uuid → Postgres lanzaba → `unlearnFact` y el middleware fallaban. Gap de testing: facts son fake-based (sin uuid
-  real) → e2e-only. **e2e #2 ✅:** `unlearnFact` completo (1 match→in-turn; ≥2→lista por ordinal→`which`→olvida).
-  **🔧 CURACIÓN UNIFICADA** (commit `45d6fcd`, decisión de Kevin tras e2e #2): el e2e mostró que el gate por `kind`
-  (claim/contact no aprenden) **descartaba hechos durables de la respuesta del owner** (claim "ya no me gusta la
-  pasta, ahora la tarta" → `learned:0` — invalidaba la pasta pero perdía la tarta y el contrapuesto). Fix: el `kind`
-  describe la pregunta del visitante; la respuesta del owner es info suya → la curación **aprende SIEMPRE** (decompose
-  → juez → commit/supersede), gateada solo por el **decomposer** (filtra no-factual/sensible/contacto) + el **veto**;
-  el `kind` queda solo para el framing del DM. Eliminada la rama middleware-solo-invalida y `FORCE_RE`. Caso C →
-  `learned:2, superseded:1` (tarta guardada + contrapuesto de la pasta + viejo invalidado). **495 tests.** Specs
-  [`…-fact-lifecycle-{design,plan}.md`](superpowers/specs/2026-06-17-fact-lifecycle-design.md); lección en
-  `LEARNINGS.md`. **Falta re-correr (e2e #3):** caso C con la unificación (claim aditivo+contradictorio → ambos),
-  conversacional (pasta+fútbol coexisten/sin pending; "ya no"→pending→resolveFact). **Costuras Inc 2 dejadas:**
-  `invalidate` standalone, juez por ordinales, `linkFact` al 1er fact, idempotencia por `escalationId`. Merge a `main`
-  tras el OK final de Kevin. **e2e #4 (2026-06-17) — casi todo ✅:** caso C unificado (claim "ya no pasta, ahora
-  tarta" → `learned:2 superseded:1`); claim grande (piña rica + se la comió → `learned:3 superseded:1`: invalida "no
-  le gusta piña" + guarda "ahora sí" + 2 aditivos); **coexistencia + dedup** conversacional (napolitana→"ya lo tenía",
-  piña→"guardé", ambos coexisten). **🔧 unlearnFact HÍBRIDO** (e2e #4 mostró que el filtro por `duplicate` del commit
-  `ef1bfe6` era muy estricto: forget-por-tema → "no encontré" con facts del tema presentes). Fix (decisión de Kevin):
-  (1) corte coseno ESTRICTO `FACT_UNLEARN_DISTANCE=0.35` (rápido, sin LLM; un tema ajeno no trae candidatos); (2) si
-  ≥2, el nuevo **`FactMatcher`** (puerto+adapter LLM) filtra por RELEVANCIA/tema; + `unlearnFact` gana `all?` (≥2 →
-  lista y ofrece uno `which` o TODOS `all`). **503 tests.** **🚫 PRINCIPIO PERMANENTE (Kevin, 2026-06-17):** prohibido
-  hardcodear sujetos/casos concretos en prompts model-facing → `FactMatcher`/`ConflictJudge`/`FactDecomposer`
-  refactorizados a descripciones abstractas (`CLAUDE.md` Inv #2 + memoria `prompts-no-hardcoded-subjects` + LEARNINGS).
-  **e2e #5 + replanteo de fondo (Kevin cuestionó si el coseno es lo mejor para "no dejar escapar nada"):** NO lo es.
-  El coseno es recall-ACOTADO (un fact del tema redactado distinto, "…con piña", se escapaba de cualquier umbral).
-  "Olvidá todo lo de [tema]" es **completitud**, no relevancia top-K → el coseno es la herramienta equivocada. **🔧
-  REDISEÑADO** (commit `bf4a5b8`): `unlearnFact` usa **RECALL TOTAL** — el `FactMatcher` (LLM) juzga sobre **TODOS**
-  los facts confirmados del owner (`FactStore.listConfirmed`, cap `FACT_UNLEARN_MAX=150` logueado). Removido el corte
-  coseno (`findConfirmedNear`/`FACT_UNLEARN_DISTANCE`). **Norte Fase 3:** estructura (entidad/tag/grafo) → query
-  determinística. Lección "completitud ≠ retrieval" en `LEARNINGS.md`. **505 tests.** **e2e #6 ✅ (recall total
-  VERIFICADO):** "olvidá lo de la pizza" listó las **3** (incl. «ahora le gusta la pizza con piña»). **Inc 1
-  funcionalmente verificado (e2e #1-6); listo para MERGE a `main` tras el OK final de Kevin.** Observaciones laterales
-  registradas (no bloquean): (i) continuidad de ordinales entre turnos — el modelo cambió `about` entre listar y
-  elegir → `which` no matcheó (cae en el problema que Inc 2/hilo-puntero resuelve; el modelo se recuperó re-llamando);
-  (ii) latencia alta (`rememberFact` 99s con múltiples átomos+conflictos) → followup de perf del juez/decompose.
-  **"dice pero no hace"** (Inc 2 aparte).
+> **✅ Cerrado 2026-06-18 (e2e #1-6 ✅, MERGEADO en `main`+`origin/main` commit `b9613a0`) → Historial "CLUSTER
+> ciclo-de-vida del fact — Inc 1".** Juez de contradicción + atomicidad (decomposer) + desaprender (unlearnFact por
+> recall total) + curación unificada. Detalle completo → Historial.
 - [ ] **CLUSTER — "CONCIENCIA DE HUECOS" / self-feedback (VISIÓN, Kevin 2026-06-17; completar con su propio
   brainstorming+análisis).** Disparador: al olvidar «le gusta la pizza con piña» quedó un GAP (al re-preguntar, Vaio
   no sabía nada) cuando el contrafact valioso era «ya no le gusta». **Razonamiento (memoria
@@ -170,76 +123,11 @@
   fabrica). (4) **extiende la costura `suggestion` del juez** (ya existe) + hermano de "feedback consciente de
   fuentes". **Dos altitudes:** acotado (unlearn→contrafact grounded) vs capacidad transversal. **Decisión de Kevin:
   completar con su propio `brainstorming`/design antes de codear** (no meterlo crudo en este cluster).
-- [?] **CLUSTER — Inc 2: HILO CONSCIENTE DE SU RAZÓN** — núcleo IMPLEMENTADO + **e2e VERIFICADO por Kevin**
-  (2026-06-18, rama `feat/fact-lifecycle-inc2`, commit `ac9a115`). **e2e ✅:** visitante preguntó "¿qué piensa Vin de
-  la muerte?" → escalate → Kevin respondió en el hilo ("es una falla de la realidad") → curación guardó el fact +
-  retomo al visitante; luego Kevin en el MISMO hilo: "olvidá eso, en realidad pienso que hay vida, un ciclo…" →
-  `unlearnFact({thisThread:true})` invalidó el fact anclado (sin matcher, ✅ ancla determinística) + `rememberFact`
-  guardó la creencia nueva. **514 tests (+9); typecheck/biome/`/health` limpios.** Specs durables:
-  [`…-inc2-thread-aware-{design,plan}.md`](superpowers/specs/2026-06-18-fact-lifecycle-inc2-thread-aware-design.md).
-  Slice: `findResolvedByTopic` (port+adapter, LEFT JOIN a facts) → `TurnContext.threadOrigin` → nota en
-  `buildSystemPrompt` (sin uuid, Inv #2) → ancla `thisThread` en `unlearnFact` (Inv #8/#10). "ajustá eso" lo cubre
-  `rememberFact`+juez. **✅ `updateVisitor` (owner→visitante) IMPLEMENTADO + e2e VERIFICADO** (commits `346562b` +
-  fix nota): brainstorming → tool hermana de `escalate`, automática + veto 2 capas; **3er eje de gating contextual**
-  `ActionDescriptor.available?(ctx)` (la tool ni se instancia fuera del hilo). Specs
-  [`…-update-visitor-{design,plan}.md`](superpowers/specs/2026-06-18-update-visitor-design.md). **e2e ✅:** el
-  visitante recibió la corrección ("Kevin matizó: hay vida después…"). **🔧 FIX post-e2e:** el modelo NO disparaba
-  `updateVisitor` solo (preguntaba "¿le aviso?") → re-ejecutaba la corrección en un 2º turno (un `unlearnFact`
-  SIN `thisThread` llegó a ofrecer borrar los facts NUEVOS). Causa: la nota del hilo no mencionaba `updateVisitor`.
-  **Fix:** la nota ahora instruye el relay AUTOMÁTICO (mismo turno, sin pedir permiso, salvo veto) → colapsa el
-  multi-turno. **525 tests.** **✅✅ RE-e2e tras el fix (2026-06-18) — LIMPIO:** corrección en el hilo → las **3 tools
-  en UN solo turno** (`unlearnFact(thisThread)` + `rememberFact` + `updateVisitor` automático, sin preguntar) → el
-  visitante recibió "Vin se retractó… hay vida después…". Sin turno extra, sin el `unlearnFact` rebelde. **✅✅ VETO
-  e2e VERIFICADO (2026-06-18):** "No le digas nada de esto al visitante" → el modelo NO llamó `updateVisitor`
-  (corrigió el fact, no avisó). **updateVisitor: feature COMPLETA (auto-relay ✅ + veto ✅).** **Observaciones menores
-  (followups, no bloquean):** (i) `unlearnFact` re-llamado
-  SIN `thisThread` sobre un tema ya corregido trae por recall-total los facts nuevos como candidatos a borrar
-  (inherente al recall-total; mitigado por el auto-relay que evita el 2º turno) → revisar con la reevaluación de
-  umbrales/estructura; (ii) `rememberFact` LENTO con varios átomos (20–72s observados; perf juez/decompose, ya en followup);
-  (iii) `rememberFact` fragmenta 1 corrección en 2 facts (decomposer, pre-existente).
-- [~] **🐞 BUG idioma de facts → IDIOMA CANÓNICO (decomposer) — FIX aplicado, pendiente cleanup + e2e** (Kevin
-  2026-06-18). El `FactDecomposer` no fijaba el idioma de salida → derivaba a inglés aun en charlas `es` (ej. "Vin
-  asserts that death is a bug…" junto a facts ES) → **memoria fragmentada + dupes cross-idioma** ("Vin believes there
-  is life after death" ≡ "Vin cree que existe vida…" coexistiendo, el coseno ES↔EN no los casa → dedup falla; y el
-  retrieval cross-idioma cae bajo `FACT_RETRIEVE_DISTANCE`). **Daña los facts, NO los `documents` ingestados.**
-  **Insight de Kevin (clave):** pinear al locale de la conversación obligaría a "ingestar en 2 idiomas" → ineficiente;
-  lo correcto es **UN idioma CANÓNICO** y que el modelo lo **converse en el idioma del usuario** (que ya hace: prompt
-  localizado). **Viable acá** porque el embedder es `gemini-embedding-2` (**multilingüe**) → una query en cualquier
-  idioma casa con el fact canónico. **Fix aplicado:** nueva env `FACT_CANONICAL_LOCALE` (default `es`), threadeada a
-  `rememberFact` (decompose+juez) y a la curación de escalate; `fact-decomposer.ts` redacta SIEMPRE en el canónico sin
-  importar el idioma de entrada. Retrieval/response sin cambios. **525 tests; typecheck/biome/`/health` limpios.**
-  **🔵 PENDIENTE: (a) CLEANUP** de los facts-fantasma en inglés ya en la DB real (dar de baja los dupes EN; necesita
-  OK de Kevin, como el seed de trends); **(b) e2e:** charla `es` → fact guardado en español (no inglés) + dupe
-  cross-idioma deja de generarse.
-  **✅ RETRIEVAL CROSS-IDIOMA RESUELTO (no era opcional):** el log de Kevin probó que el coseno cross-idioma es DÉBIL
-  (query ES "muerte" no trajo el fact EN "death is a bug"; peor, un fact ES de OTRO tema quedó más cerca → el
-  embedder agrupa por IDIOMA sobre el significado). Mi afirmación previa "gemini multilingüe casa cross-idioma" quedó
-  REFUTADA por evidencia. **Fix:** `searchMemory` traduce la query al canónico ANTES de `searchFacts` SOLO si
-  `locale ≠ canónico` (el owner en su idioma no paga nada). Puerto `Translator` + adapter (modelo, best-effort →
-  query cruda si falla); threadeado por `ActionContext`. **529 tests; typecheck/biome/`/health` limpios.**
-  **✅✅ e2e CROSS-IDIOMA VERIFICADO por Claude (2026-06-18, visitante web `locale:en` vía `/chat` contra la DB real):**
-  "what does Kevin believe happens after we die?" (die ≠ muerte, NO cognado) → recuperó los facts canónicos en
-  ESPAÑOL sobre la muerte → solo posible si el traductor llevó la query a ES antes de `searchFacts`. **El traductor
-  funciona.** Followup abierto: reevaluar `FACT_RETRIEVE/CONFLICT_DISTANCE` (mixed-language = otro caso recall-acotado).
-  **✅✅ IDIOMA DE LA RESPUESTA — RESUELTO Y VERIFICADO e2e (2026-06-18, opción A de Kevin):** el visitante EN recibía
-  respuesta en ESPAÑOL (el grounding canónico + la persona española dominaban). **Tres ajustes, cada uno necesario
-  (depurados en e2e iterativo):** (1) **policies de canal LOCALIZADAS** por `locale` (`capabilities.ts`: WEB/TELEGRAM/
-  UNTRUSTED es+en; `resolve(channel, principal, locale)`); (2) **`searchMemory` traduce los FACTS recuperados al idioma
-  del usuario** (presentación) además de la query→canónico (retrieval) — el grounding y la respuesta coinciden; storage
-  sigue canónico; docs NO se traducen; (3) **directiva de idioma DOMINANTE** al tope del system prompt para `locale≠es`
-  (la persona valluna intrínsecamente española arrastraba al modelo aun con todo en inglés). **e2e final:** EN visitor
-  → respuesta EN con el fact ES recuperado vía traducción ✅; ES visitor → respuesta ES con voseo, sin regresión ✅.
-  **532 tests; typecheck/biome/`/health` limpios.** Followup que QUEDA: reevaluar `FACT_RETRIEVE/CONFLICT_DISTANCE`
-  (mixed-language fue otro caso de "coseno recall-acotado"). **El arco IDIOMA (storage canónico + retrieval + respuesta)
-  está COMPLETO.**
-  (reencuadre de Kevin 2026-06-17; antes "hilo-puntero"). El
-  aprender/desaprender NATURAL dentro del hilo **ya está** (Inc 1: tras responder, el hilo es charla normal con el
-  owner → toolset pleno). Lo que falta: cuando el hilo pasa de "resolver el pendiente" a **charla natural**, que Vaio
-  lleve el **CONTEXTO de su origen** — inyectar como nota del sistema "este hilo nació de una escalada: un visitante
-  preguntó «X», respondiste «Y», aprendí «Z»" (lookup `threadId → escalación` sin filtro de status; `handleTurn`
-  detecta el hilo y pasa el contexto al `ActionContext`). El **anclaje del `factId`** (Inv #8) es el *mecanismo* para
-  "ajustá/desaprendé ESO" por pronombre; la **conciencia del motivo** es el *objetivo*. Costuras de Inc 1 listas
-  (`invalidate` standalone, juez por ordinales, `linkFact` al 1er fact, idempotencia por `escalationId`). Su design+plan.
+> **✅ Cerrado 2026-06-18 (e2e ✅ por Kevin + Claude; rama `feat/fact-lifecycle-inc2`, lista para merge) → Historial
+> "Inc 2 (hilo consciente) + updateVisitor + idioma canónico".** Hilo consciente de su razón (nota de fondo + ancla
+> `thisThread`), `updateVisitor` (owner→visitante, auto-relay + veto, 3er eje de gating `available?`), e idioma
+> canónico de facts (`FACT_CANONICAL_LOCALE`) + retrieval/respuesta cross-idioma (`Translator` + directiva dominante).
+> Detalle completo → Historial. **Followup que queda:** reevaluar `FACT_RETRIEVE/CONFLICT_DISTANCE`.
 - [ ] **CLUSTER — refuerzo del JUEZ: escape ante incertidumbre/gaps** (Kevin 2026-06-17). Hoy `unsure` es conservador
   (charla→pendiente; escalada→coexiste). Reforzar: (i) en **escalada, hacer VISIBLE** el `unsure`/baja confianza (no
   coexistir en silencio → confirmar "guardé X, puede relacionarse con Y pero no estoy seguro, revisalo" vía
@@ -355,6 +243,39 @@
 ---
 
 ## Historial de lo implementado (cronológico; los conteos de tests son snapshots de cada hito)
+
+**🟢 CLUSTER "ciclo de vida del fact" — Inc 2 (HILO CONSCIENTE) + `updateVisitor` + IDIOMA CANÓNICO — EN
+`feat/fact-lifecycle-inc2` + VERIFICADO e2e (Kevin + Claude)** (2026-06-18). Brainstorming + design+plan por feature.
+**(A) Inc 2 "hilo consciente de su razón":** tras resolverse una escalada, el hilo lleva el CONTEXTO de su origen
+como nota de fondo (`findResolvedByTopic` port+adapter, LEFT JOIN a facts; `TurnContext.threadOrigin`; nota en
+`buildSystemPrompt` sin uuid) + **ancla determinística** `thisThread` en `unlearnFact` (el modelo pasa booleano, el
+sistema invalida el `factId` anclado — Inv #8/#10). Hallazgo clave: el intercambio de la escalada NO toca
+`conversations` → el historial del hilo está vacío de su origen ⇒ la nota es necesaria. e2e ✅ (muerte: corregir en
+el hilo → unlearn(thisThread)+remember en 1 turno). **(B) `updateVisitor` (owner→visitante):** hermana de `escalate`
+(cierra el bucle de escalación); cuando el owner corrige en el hilo un dato YA transmitido, Vaio avisa al visitante
+(auto-relay vía la nota del hilo, mismo turno, sin pedir permiso) con **veto en 2 capas** (modelo + `VISITOR_VETO_RE`).
+Introdujo el **3er eje de gating contextual** `ActionDescriptor.available?(ctx)` (la tool ni se instancia fuera del
+hilo). e2e ✅ (auto-relay en 1 turno + veto respetado). **(C) idioma CANÓNICO de facts** (`FACT_CANONICAL_LOCALE`,
+default `es`): los facts se guardan en un idioma (no el de la charla) → memoria consistente (el decomposer derivaba a
+inglés → dupes cross-idioma que el dedup no cazaba). **Retrieval cross-idioma:** el embedder agrupa por idioma sobre
+significado (verificado: query ES no traía facts EN) → `Translator` traduce la query→canónico (retrieval) y los
+facts→idioma del usuario (presentación), solo cross-idioma. **Idioma de respuesta:** policies de canal localizadas +
+directiva de idioma dominante al tope del prompt (la persona valluna arrastraba al español). e2e ✅ (visitante EN →
+respuesta EN con fact ES; visitante ES → ES con voseo). **532 tests; typecheck/biome/`/health` limpios.** Specs
+`2026-06-18-fact-lifecycle-inc2-thread-aware-{design,plan}.md` + `2026-06-18-update-visitor-{design,plan}.md`;
+lecciones en `LEARNINGS.md`. **Followups (no bloquean):** reevaluar `FACT_RETRIEVE/CONFLICT_DISTANCE`; perf
+`rememberFact` (20–72s); coherencia prompt↔toolset + higiene de tools. **Pendiente: merge a `main`** (rama lista).
+
+**🟢 CLUSTER "ciclo de vida del fact" — Inc 1 (juez + atomicidad + desaprender) — MERGEADO en `main`+`origin/main`
+(commit `b9613a0`) + VERIFICADO e2e #1-6 por Kevin** (2026-06-17). **`ConflictJudge`** (LLM, puerto+adapter)
+compartido por `curate` (escalate) y `rememberFact` — decide contradice/duplica/coexiste/unsure por ordinal (Inv #8);
+cierra el bug "cercanía vectorial ≠ contradicción" (pasta/fútbol). **`FactDecomposer`** (reemplazó al `FactDrafter`):
+facts atómicos mono-idea antes de juzgar. **Desaprender:** `FactStore.invalidate` bi-temporal + `unlearnFact`
+owner-only por **recall total** (FactMatcher LLM sobre TODOS los confirmados; el coseno es recall-acotado →
+"completitud ≠ retrieval"). Curación **unificada** (aprende siempre de la respuesta del owner, gateada por
+decomposer+veto). **PRINCIPIO PERMANENTE:** prohibido hardcodear sujetos en prompts model-facing (Inv #2). **505
+tests**; e2e #1-6 ✅ (atomicidad, supersede visible, unlearn por tema, recall total). Specs
+`2026-06-17-fact-lifecycle-{design,plan}.md`; lecciones en `LEARNINGS.md`.
 
 **🟢 ESCALATE v2 (Incremento 1) — hilos por escalada + curación default-por-tipo + "transmití real" — EN `main`
 (local) + VERIFICADO EN VIVO por el Telegram de Kevin** (2026-06-16, commiteado en `main`). Aprobado en plan mode tras
