@@ -187,10 +187,14 @@
   `updateVisitor` solo (preguntaba "¿le aviso?") → re-ejecutaba la corrección en un 2º turno (un `unlearnFact`
   SIN `thisThread` llegó a ofrecer borrar los facts NUEVOS). Causa: la nota del hilo no mencionaba `updateVisitor`.
   **Fix:** la nota ahora instruye el relay AUTOMÁTICO (mismo turno, sin pedir permiso, salvo veto) → colapsa el
-  multi-turno. **525 tests.** **Observaciones menores (followups, no bloquean):** (i) `unlearnFact` re-llamado
+  multi-turno. **525 tests.** **✅✅ RE-e2e tras el fix (2026-06-18) — LIMPIO:** corrección en el hilo → las **3 tools
+  en UN solo turno** (`unlearnFact(thisThread)` + `rememberFact` + `updateVisitor` automático, sin preguntar) → el
+  visitante recibió "Vin se retractó… hay vida después…". Sin turno extra, sin el `unlearnFact` rebelde. **🔵 FALTA
+  e2e del VETO** ("corregilo pero NO le avises" → no llega; hoy solo unit-tested). **Observaciones menores (followups,
+  no bloquean):** (i) `unlearnFact` re-llamado
   SIN `thisThread` sobre un tema ya corregido trae por recall-total los facts nuevos como candidatos a borrar
   (inherente al recall-total; mitigado por el auto-relay que evita el 2º turno) → revisar con la reevaluación de
-  umbrales/estructura; (ii) `rememberFact` ~20s con varios átomos (perf juez/decompose, ya en followup);
+  umbrales/estructura; (ii) `rememberFact` LENTO con varios átomos (20–50s observados; perf juez/decompose, ya en followup);
   (iii) `rememberFact` fragmenta 1 corrección en 2 facts (decomposer, pre-existente). **🔵 PENDIENTE: re-correr e2e
   del veto** ("corregilo pero NO le avises" → no llega) y confirmar el auto-relay en 1 turno tras el fix.
   (reencuadre de Kevin 2026-06-17; antes "hilo-puntero"). El
