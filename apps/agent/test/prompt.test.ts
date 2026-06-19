@@ -202,6 +202,9 @@ describe("buildSystemPrompt", () => {
     expect(p).toContain("¿Kevin sabe tocar el piano?")
     expect(p).toContain("Sí, desde chico")
     expect(p).not.toContain("f-uuid-secreto") // Inv #8: el uuid JAMÁS al modelo
+    // Aun sin statement: el visitante ya recibió una respuesta → instruye el relay automático de la corrección.
+    expect(p).toContain("updateVisitor")
+    expect(p.toLowerCase()).toMatch(/sin pedir permiso|autom/i)
   })
 
   it("threadOrigin: con statement nombra el dato curado e instruye el ancla (thisThread)", () => {
@@ -219,6 +222,7 @@ describe("buildSystemPrompt", () => {
     })
     expect(p).toContain("Kevin sabe tocar el piano")
     expect(p).toContain("thisThread") // pista del ancla determinística
+    expect(p).toContain("updateVisitor") // relay automático de la corrección al visitante
     expect(p).not.toContain("f1")
   })
 

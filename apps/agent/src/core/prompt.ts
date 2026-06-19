@@ -140,21 +140,27 @@ export function buildSystemPrompt(args: {
   const threadOriginBlock = to
     ? args.locale === "en"
       ? `[system note (background context — don't mention it unless the owner brings it back up): this thread ` +
-        `started from an escalation. A visitor asked «${to.question}»; you answered «${to.answer}».` +
+        `started from an escalation. A visitor asked «${to.question}»; you already relayed to them: «${to.answer}».` +
         (to.statement
           ? ` From that you saved as Kevin's fact: «${to.statement}». If the owner asks to adjust or unlearn it ` +
             `by deixis ("that", "what you just learned here"), they mean THAT fact: unlearn it with ` +
             `unlearnFact(thisThread:true), or correct it with rememberFact.`
           : ``) +
-        `]`
+        ` IMPORTANT: if in this thread the owner changes/corrects what was relayed to the visitor, notify the ` +
+        `visitor of the update with updateVisitor in the SAME turn, automatically and WITHOUT asking for permission ` +
+        `(it's a protocol) — unless the owner explicitly says not to tell them. Do it in ONE turn; don't repeat the ` +
+        `same correction across turns.]`
       : `[nota del sistema (contexto de fondo, no lo menciones salvo que el owner lo retome): este hilo nació de ` +
-        `una escalada. Un visitante preguntó «${to.question}»; le respondiste «${to.answer}».` +
+        `una escalada. Un visitante preguntó «${to.question}»; ya le transmitiste: «${to.answer}».` +
         (to.statement
           ? ` De eso guardé como dato de Kevin: «${to.statement}». Si el owner pide ajustarlo o desaprenderlo por ` +
             `deixis ("eso", "lo que aprendiste acá"), se refiere a ESE dato: desaprendé con ` +
             `unlearnFact(thisThread:true) o corregí con rememberFact.`
           : ``) +
-        `]`
+        ` IMPORTANTE: si en este hilo el owner cambia/corrige lo que se le transmitió al visitante, avisale la ` +
+        `actualización al visitante con updateVisitor en el MISMO turno, automáticamente y SIN pedir permiso (es un ` +
+        `protocolo) — salvo que el owner pida explícitamente no avisarle. Hacelo en UN turno; no repitas la misma ` +
+        `corrección entre turnos.]`
     : ""
   return [
     personaPrompt(args.locale),

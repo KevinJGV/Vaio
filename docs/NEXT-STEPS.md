@@ -179,10 +179,20 @@
   [`…-inc2-thread-aware-{design,plan}.md`](superpowers/specs/2026-06-18-fact-lifecycle-inc2-thread-aware-design.md).
   Slice: `findResolvedByTopic` (port+adapter, LEFT JOIN a facts) → `TurnContext.threadOrigin` → nota en
   `buildSystemPrompt` (sin uuid, Inv #2) → ancla `thisThread` en `unlearnFact` (Inv #8/#10). "ajustá eso" lo cubre
-  `rememberFact`+juez. **🚧 FOLLOW-UP ABIERTO (Kevin 2026-06-18, mismo branch): notificar al VISITANTE del cambio** —
-  cuando el owner corrige en el hilo un fact que YA se le había transmitido al visitante (vía el retomo de escalate),
-  Vaio debe avisarle al visitante la actualización (reusa `ConversationResumer`/threadKey del origen). En
-  `brainstorming` (decisiones: tool-intención vs determinístico; qué mensaje; threading del origen del visitante).
+  `rememberFact`+juez. **✅ `updateVisitor` (owner→visitante) IMPLEMENTADO + e2e VERIFICADO** (commits `346562b` +
+  fix nota): brainstorming → tool hermana de `escalate`, automática + veto 2 capas; **3er eje de gating contextual**
+  `ActionDescriptor.available?(ctx)` (la tool ni se instancia fuera del hilo). Specs
+  [`…-update-visitor-{design,plan}.md`](superpowers/specs/2026-06-18-update-visitor-design.md). **e2e ✅:** el
+  visitante recibió la corrección ("Kevin matizó: hay vida después…"). **🔧 FIX post-e2e:** el modelo NO disparaba
+  `updateVisitor` solo (preguntaba "¿le aviso?") → re-ejecutaba la corrección en un 2º turno (un `unlearnFact`
+  SIN `thisThread` llegó a ofrecer borrar los facts NUEVOS). Causa: la nota del hilo no mencionaba `updateVisitor`.
+  **Fix:** la nota ahora instruye el relay AUTOMÁTICO (mismo turno, sin pedir permiso, salvo veto) → colapsa el
+  multi-turno. **525 tests.** **Observaciones menores (followups, no bloquean):** (i) `unlearnFact` re-llamado
+  SIN `thisThread` sobre un tema ya corregido trae por recall-total los facts nuevos como candidatos a borrar
+  (inherente al recall-total; mitigado por el auto-relay que evita el 2º turno) → revisar con la reevaluación de
+  umbrales/estructura; (ii) `rememberFact` ~20s con varios átomos (perf juez/decompose, ya en followup);
+  (iii) `rememberFact` fragmenta 1 corrección en 2 facts (decomposer, pre-existente). **🔵 PENDIENTE: re-correr e2e
+  del veto** ("corregilo pero NO le avises" → no llega) y confirmar el auto-relay en 1 turno tras el fix.
   (reencuadre de Kevin 2026-06-17; antes "hilo-puntero"). El
   aprender/desaprender NATURAL dentro del hilo **ya está** (Inc 1: tras responder, el hilo es charla normal con el
   owner → toolset pleno). Lo que falta: cuando el hilo pasa de "resolver el pendiente" a **charla natural**, que Vaio
