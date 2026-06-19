@@ -272,9 +272,9 @@ describe("searchMemory (descriptor migrado)", () => {
     })
   })
 
-  it("cross-idioma: traduce la query al canónico ANTES de searchFacts (locale ≠ canónico)", async () => {
+  it("cross-idioma: query → canónico (retrieval) Y facts → idioma del usuario (presentación)", async () => {
     let factsQuery = ""
-    let translatedFrom = ""
+    const calls: { text: string; target: "es" | "en" }[] = []
     const memory: MemoryStore = {
       searchMemory: async () => [],
       searchFacts: async (q) => {
@@ -290,20 +290,36 @@ describe("searchMemory (descriptor migrado)", () => {
       replaceFile: async () => {},
     }
     const translator = {
-      translate: async (text: string, _t: "es" | "en") => {
-        translatedFrom = text
-        return "qué piensa Kevin sobre la muerte" // simulación: en→es
+      translate: async (text: string, target: "es" | "en") => {
+        calls.push({ text, target })
+        // simula: la query EN→ES (retrieval) y el fact ES→EN (presentación)
+        return target === "es"
+          ? "qué piensa Kevin sobre el fútbol"
+          : "Kevin likes football"
       },
     }
     const t = searchMemory.build(
       ctx({ memory, translator, locale: "en", factCanonicalLocale: "es" })
     )
-    await t.execute?.(
-      { query: "what does Kevin think about death" },
-      { toolCallId: "tc", messages: [] }
+    const out = String(
+      await t.execute?.(
+        { query: "what does Kevin think about football" },
+        { toolCallId: "tc", messages: [] }
+      )
     )
-    expect(translatedFrom).toBe("what does Kevin think about death")
-    expect(factsQuery).toBe("qué piensa Kevin sobre la muerte") // buscó con la query traducida
+    // (1) retrieval: buscó facts con la query traducida al canónico
+    expect(factsQuery).toBe("qué piensa Kevin sobre el fútbol")
+    expect(calls).toContainEqual({
+      text: "what does Kevin think about football",
+      target: "es",
+    })
+    // (2) presentación: el fact canónico (ES) se tradujo al idioma del usuario (EN) en el output
+    expect(calls).toContainEqual({
+      text: "A Kevin le gusta el fútbol",
+      target: "en",
+    })
+    expect(out).toContain("Kevin likes football")
+    expect(out).not.toContain("le gusta el fútbol")
   })
 
   it("same-idioma: NO traduce (locale == canónico) → busca con la query cruda", async () => {

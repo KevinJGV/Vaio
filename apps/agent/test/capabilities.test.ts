@@ -85,6 +85,35 @@ describe("createCapabilityResolver", () => {
     }
   })
 
+  it("localiza el policyText por locale: en → policy en inglés (web, visitante, owner)", () => {
+    const web = resolver.resolve(
+      "web",
+      principal("web", false),
+      "en"
+    ).policyText
+    expect(web).toContain("PUBLIC CHAT")
+    expect(web).not.toContain("CHAT PÚBLICO")
+    const visitor = resolver.resolve(
+      "telegram",
+      principal("telegram", false),
+      "en"
+    ).policyText
+    expect(visitor).toContain("NOT Kevin")
+    const owner = resolver.resolve(
+      "telegram",
+      principal("telegram", true),
+      "en"
+    ).policyText
+    expect(owner).toContain("PRIVATE")
+    expect(owner).toContain("HTML") // formato localizado también
+  })
+
+  it("default locale = es (sin arg) y cae a es para idiomas no soportados", () => {
+    expect(
+      resolver.resolve("web", principal("web", false)).policyText
+    ).toContain("CHAT PÚBLICO")
+  })
+
   it("ambas policies de telegram piden formato HTML", () => {
     expect(
       resolver.resolve("telegram", principal("telegram", true)).policyText

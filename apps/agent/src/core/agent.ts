@@ -245,7 +245,7 @@ export function createAgent(deps: AgentDeps) {
         id: req.principalId,
         trusted: req.trusted,
       }
-      const resolvedCaps = capabilities.resolve(req.channel, principal)
+      const resolvedCaps = capabilities.resolve(req.channel, principal, locale)
       // toolDenylist: deshabilita tools SOLO en este turno (retomo sintético de escalate → `escalate` denegada,
       // anti-loop). Se resta de allowedTools antes de gatear el ToolSet; el resto del perfil queda intacto.
       const caps: typeof resolvedCaps = ctx.toolDenylist?.length

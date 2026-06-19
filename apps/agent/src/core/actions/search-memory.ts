@@ -76,16 +76,33 @@ export const searchMemory: ActionDescriptor = {
           // conversación está en otro idioma, traducimos la query al canónico ANTES de buscar facts (solo cross-
           // idioma → el owner en su idioma no paga nada). best-effort: sin traductor o si falla → query cruda.
           const canonical = ctx.factCanonicalLocale === "en" ? "en" : "es"
+          const userLocale = ctx.locale === "en" ? "en" : "es"
+          const crossLang = !!ctx.translator && userLocale !== canonical
+          // (1) RETRIEVAL: la query va al idioma CANÓNICO para casar con los facts (coseno cross-idioma es débil).
           const factQuery =
-            ctx.translator && ctx.locale && ctx.locale !== canonical
+            crossLang && ctx.translator
               ? await ctx.translator.translate(query, canonical)
               : query
-          const facts = memory.searchFacts
+          let facts = memory.searchFacts
             ? await memory.searchFacts(factQuery, {
                 k: factRetrieveMax,
                 maxDistance: factRetrieveDistance,
               })
             : []
+          // (2) PRESENTACIÓN: los facts están en el canónico; el modelo ESPEJA el idioma del grounding al
+          // responder (verificado en e2e: instruirlo no alcanza). Traducirlos al idioma del usuario hace que el
+          // grounding y la respuesta coincidan → responde natural en ese idioma. Solo cross-idioma; best-effort
+          // (si falla una, queda el canónico). El STORAGE sigue canónico (dedup/consistencia intactos); esto es
+          // solo presentación. Los DOCS (código/markdown) NO se traducen.
+          if (crossLang && ctx.translator && facts.length > 0) {
+            const tr = ctx.translator
+            facts = await Promise.all(
+              facts.map(async (f) => ({
+                ...f,
+                chunk: await tr.translate(f.chunk, userLocale),
+              }))
+            )
+          }
           const docs = await retrieve()
           // Facts PRIMERO (verdad curada que lidera el contexto), luego los docs del repo.
           // El contexto recuperado va al modelo CRUDO (verbatim): NO se comprime. Comprimir RAG

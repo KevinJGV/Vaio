@@ -194,6 +194,24 @@ describe("buildSystemPrompt", () => {
     expect(p).not.toContain("pendientes de tu confirmación")
   })
 
+  it("directiva de idioma DOMINANTE: en → la inyecta primera; es → no (la persona ya es ES)", () => {
+    const en = buildSystemPrompt({
+      locale: "en",
+      audience: "public",
+      policyText: "P",
+      summary: "",
+    })
+    expect(en).toContain("RESPONSE LANGUAGE")
+    expect(en.indexOf("RESPONSE LANGUAGE")).toBeLessThan(en.indexOf("Vaio")) // va primera
+    const es = buildSystemPrompt({
+      locale: "es",
+      audience: "public",
+      policyText: "P",
+      summary: "",
+    })
+    expect(es).not.toContain("RESPONSE LANGUAGE")
+  })
+
   it("threadOrigin: inyecta la nota de fondo del origen del hilo (sin statement) y NO el factId", () => {
     const p = buildSystemPrompt({
       locale: "es",

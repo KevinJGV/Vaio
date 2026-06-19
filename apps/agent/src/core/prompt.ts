@@ -162,7 +162,19 @@ export function buildSystemPrompt(args: {
         `protocolo) — salvo que el owner pida explícitamente no avisarle. Hacelo en UN turno; no repitas la misma ` +
         `corrección entre turnos.]`
     : ""
+  // Directiva de idioma DOMINANTE (va PRIMERA): la persona de Vaio es intrínsecamente española (voseo valluno) y
+  // arrastra al modelo a responder en español aun con el usuario en inglés y el grounding traducido (verificado en
+  // e2e). Una orden explícita y al tope fija el idioma de salida sin pelear con la persona. Solo se emite si NO es
+  // el idioma default (es): el español ya lo cubre la persona.
+  const langDirective =
+    args.locale === "en"
+      ? "RESPONSE LANGUAGE — TOP PRIORITY: this user is writing in English. Write your ENTIRE reply in natural, " +
+        "fluent English. Your Spanish voseo and local quirks apply ONLY in Spanish conversations; with this " +
+        "English-speaking user do NOT reply in Spanish — if the memory/facts come in Spanish, translate their " +
+        "meaning into English when you answer."
+      : ""
   return [
+    langDirective,
     personaPrompt(args.locale),
     identityBlock(args.audience, args.locale),
     nowBlock,
