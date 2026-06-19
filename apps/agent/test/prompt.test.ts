@@ -12,6 +12,14 @@ describe("personaPrompt", () => {
     // grounding duro: hechos de Kevin SOLO de searchMemory (constraint de fuente, no "no inventes")
     expect(p.toLowerCase()).toMatch(/solo con lo que/)
   })
+  it("es/en → exige responder en el idioma del usuario aunque la memoria esté en otro idioma", () => {
+    const es = personaPrompt("es")
+    expect(es.toLowerCase()).toMatch(/idioma del usuario/)
+    expect(es.toLowerCase()).toMatch(/otro idioma/) // cubre el grounding canónico en otra lengua
+    const en = personaPrompt("en")
+    expect(en.toLowerCase()).toMatch(/user's language/)
+    expect(en.toLowerCase()).toMatch(/another language/)
+  })
   it("es → voz ≠ hechos: NO afirma origen/ciudad como biografía (raíz del bug 'caleño')", () => {
     const p = personaPrompt("es")
     expect(p).not.toContain("caleño")
