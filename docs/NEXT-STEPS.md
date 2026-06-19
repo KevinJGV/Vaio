@@ -170,15 +170,20 @@
   fabrica). (4) **extiende la costura `suggestion` del juez** (ya existe) + hermano de "feedback consciente de
   fuentes". **Dos altitudes:** acotado (unlearn→contrafact grounded) vs capacidad transversal. **Decisión de Kevin:
   completar con su propio `brainstorming`/design antes de codear** (no meterlo crudo en este cluster).
-- [~] **CLUSTER — Inc 2: HILO CONSCIENTE DE SU RAZÓN** — 🚧 EN PROGRESO (2026-06-18, rama `feat/fact-lifecycle-inc2`).
-  Brainstorming + plan aprobados por Kevin. **Decisiones:** anclaje determinístico por pronombre (no solo conciencia) +
-  nota **cada turno** (stateless, sin migración). **Hallazgo clave:** el intercambio de la escalada NO toca
-  `conversations` → el historial del hilo está vacío de su origen ⇒ la nota es necesaria sí o sí. Specs durables:
+- [?] **CLUSTER — Inc 2: HILO CONSCIENTE DE SU RAZÓN** — núcleo IMPLEMENTADO + **e2e VERIFICADO por Kevin**
+  (2026-06-18, rama `feat/fact-lifecycle-inc2`, commit `ac9a115`). **e2e ✅:** visitante preguntó "¿qué piensa Vin de
+  la muerte?" → escalate → Kevin respondió en el hilo ("es una falla de la realidad") → curación guardó el fact +
+  retomo al visitante; luego Kevin en el MISMO hilo: "olvidá eso, en realidad pienso que hay vida, un ciclo…" →
+  `unlearnFact({thisThread:true})` invalidó el fact anclado (sin matcher, ✅ ancla determinística) + `rememberFact`
+  guardó la creencia nueva. **514 tests (+9); typecheck/biome/`/health` limpios.** Specs durables:
   [`…-inc2-thread-aware-{design,plan}.md`](superpowers/specs/2026-06-18-fact-lifecycle-inc2-thread-aware-design.md).
   Slice: `findResolvedByTopic` (port+adapter, LEFT JOIN a facts) → `TurnContext.threadOrigin` → nota en
   `buildSystemPrompt` (sin uuid, Inv #2) → ancla `thisThread` en `unlearnFact` (Inv #8/#10). "ajustá eso" lo cubre
-  `rememberFact`+juez (YAGNI). Ejecución directa (slice acoplado/secuencial). (reencuadre de Kevin 2026-06-17; antes
-  "hilo-puntero"). El
+  `rememberFact`+juez. **🚧 FOLLOW-UP ABIERTO (Kevin 2026-06-18, mismo branch): notificar al VISITANTE del cambio** —
+  cuando el owner corrige en el hilo un fact que YA se le había transmitido al visitante (vía el retomo de escalate),
+  Vaio debe avisarle al visitante la actualización (reusa `ConversationResumer`/threadKey del origen). En
+  `brainstorming` (decisiones: tool-intención vs determinístico; qué mensaje; threading del origen del visitante).
+  (reencuadre de Kevin 2026-06-17; antes "hilo-puntero"). El
   aprender/desaprender NATURAL dentro del hilo **ya está** (Inc 1: tras responder, el hilo es charla normal con el
   owner → toolset pleno). Lo que falta: cuando el hilo pasa de "resolver el pendiente" a **charla natural**, que Vaio
   lleve el **CONTEXTO de su origen** — inyectar como nota del sistema "este hilo nació de una escalada: un visitante
@@ -216,6 +221,13 @@
   el tool call (o pregunta en vez de actuar — el fix de prompt P1 lo reduce pero no lo cierra). Registro de tool calls
   del turno + firma de promesa por tool + 2º `streamText` forzado (`prepareStep`/`toolChoice`). Toca el hot path del
   streaming → su propio design/plan.
+- [ ] **FOLLOWUP GENERAL — coherencia system prompt ↔ toolset realmente instanciado** (Kevin 2026-06-18). Hoy el
+  gating de tools es por **canal + principal**; con `updateVisitor` se agrega el 3er eje **contexto del turno**
+  (`ActionDescriptor.available?(ctx)` → la tool ni se instancia fuera de su circunstancia). PERO la **prosa de policy
+  siempre-on** (`capabilities.ts`) menciona tools que no siempre están instanciadas → el modelo puede creer que tiene
+  capacidades que no, y errar. **Tarea:** hacer que las instrucciones del prompt sobre tools sean **coherentes con el
+  toolset real del turno** (derivar/condicionar la prosa de tools desde el set instanciado, no hardcodearla siempre).
+  Revisar también todas las menciones de tools en `personaPrompt`/policy. Su propio design+plan (toca prompt + registry).
 > **✅ Cerrado 2026-06-16 (VERIFICADO EN VIVO por el Telegram de Kevin) → Historial "ESCALATE v1":** el e2e completo
 > cerró dos veces (DM #262/#271 entregados → `tg: escalada respondida por el owner` → `tg: retomo cross-conversation`
 > chatId 703228104 → Vaio relató al visitante en su voz sin mencionar el mecanismo). Bug de la 1ª prueba (tabla
