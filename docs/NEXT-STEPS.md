@@ -221,13 +221,17 @@
   "what does Kevin believe happens after we die?" (die ≠ muerte, NO cognado) → recuperó los facts canónicos en
   ESPAÑOL sobre la muerte → solo posible si el traductor llevó la query a ES antes de `searchFacts`. **El traductor
   funciona.** Followup abierto: reevaluar `FACT_RETRIEVE/CONFLICT_DISTANCE` (mixed-language = otro caso recall-acotado).
-  **🐞 HALLAZGO del e2e — IDIOMA DE LA RESPUESTA:** el visitante preguntó en inglés pero Vaio respondió en ESPAÑOL
-  (el idioma del grounding canónico se filtró). Refuerzo en `personaEs/En` ("respondé SIEMPRE en el idioma del usuario,
-  traduciendo el contenido aunque la memoria esté en otro idioma") AYUDA pero NO alcanza: **root cause = las policies
-  de canal (`WEB_POLICY`/`TELEGRAM_POLICY`) están hardcodeadas en ESPAÑOL** (`policyText` no se localiza) → para un
-  visitante en inglés el system prompt es persona-EN + policy-ES + facts-ES → el español domina. **Fix real =
-  localizar las policies de canal por `locale`** → es la materialización concreta del followup "coherencia system
-  prompt ↔ toolset/idioma" (abajo). Decidir con Kevin: hacerlo ya o en ese followup.
+  **✅✅ IDIOMA DE LA RESPUESTA — RESUELTO Y VERIFICADO e2e (2026-06-18, opción A de Kevin):** el visitante EN recibía
+  respuesta en ESPAÑOL (el grounding canónico + la persona española dominaban). **Tres ajustes, cada uno necesario
+  (depurados en e2e iterativo):** (1) **policies de canal LOCALIZADAS** por `locale` (`capabilities.ts`: WEB/TELEGRAM/
+  UNTRUSTED es+en; `resolve(channel, principal, locale)`); (2) **`searchMemory` traduce los FACTS recuperados al idioma
+  del usuario** (presentación) además de la query→canónico (retrieval) — el grounding y la respuesta coinciden; storage
+  sigue canónico; docs NO se traducen; (3) **directiva de idioma DOMINANTE** al tope del system prompt para `locale≠es`
+  (la persona valluna intrínsecamente española arrastraba al modelo aun con todo en inglés). **e2e final:** EN visitor
+  → respuesta EN con el fact ES recuperado vía traducción ✅; ES visitor → respuesta ES con voseo, sin regresión ✅.
+  **532 tests; typecheck/biome/`/health` limpios.** Followup que QUEDA: reevaluar `FACT_RETRIEVE/CONFLICT_DISTANCE`
+  (mixed-language fue otro caso de "coseno recall-acotado"). **El arco IDIOMA (storage canónico + retrieval + respuesta)
+  está COMPLETO.**
   (reencuadre de Kevin 2026-06-17; antes "hilo-puntero"). El
   aprender/desaprender NATURAL dentro del hilo **ya está** (Inc 1: tras responder, el hilo es charla normal con el
   owner → toolset pleno). Lo que falta: cuando el hilo pasa de "resolver el pendiente" a **charla natural**, que Vaio
