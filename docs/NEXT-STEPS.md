@@ -228,6 +228,11 @@
   capacidades que no, y errar. **Tarea:** hacer que las instrucciones del prompt sobre tools sean **coherentes con el
   toolset real del turno** (derivar/condicionar la prosa de tools desde el set instanciado, no hardcodearla siempre).
   Revisar también todas las menciones de tools en `personaPrompt`/policy. Su propio design+plan (toca prompt + registry).
+  **FUNDAMENTO DE DESARROLLO (Kevin 2026-06-18):** una vez concretado el análisis/ajuste del system prompt para
+  coherencia, **auditar que CADA tool esté gateada correctamente y que NO existan más tools de las necesarias para Vaio
+  en cada situación** — mantenerlo lo más LIMPIO posible, siempre solo con las tools realmente necesarias para su
+  funcionamiento en cada momento (revisar los 3 ejes: canal + contexto `available` + clearance, por cada tool del
+  catálogo). Es criterio permanente de higiene del harness (hermano del Inv #10 anti-tool-bloat).
 > **✅ Cerrado 2026-06-16 (VERIFICADO EN VIVO por el Telegram de Kevin) → Historial "ESCALATE v1":** el e2e completo
 > cerró dos veces (DM #262/#271 entregados → `tg: escalada respondida por el owner` → `tg: retomo cross-conversation`
 > chatId 703228104 → Vaio relató al visitante en su voz sin mencionar el mecanismo). Bug de la 1ª prueba (tabla

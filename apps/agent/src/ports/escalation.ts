@@ -39,6 +39,14 @@ export interface ThreadOrigin {
   statement?: string
   /** uuid del fact anclado — SOLO server-side (ancla del "desaprendé ESO"); nunca se expone al modelo (Inv #8). */
   factId?: string
+  /** Origen del visitante que escaló — para retomarlo si el owner ACTUALIZA el dato (`updateVisitor`). Ausente
+   *  si no es recuperable (p.ej. web stateless sin threadKey). El sistema resuelve el routing; el modelo no. */
+  visitor?: {
+    channel: string
+    /** conversationKey con que se persistió el origen (Telegram: chatId[:threadId]; web: conversationId). */
+    conversationKey: string
+    locale: string
+  }
 }
 
 export interface EscalationStore {

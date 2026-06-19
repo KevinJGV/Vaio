@@ -57,6 +57,12 @@ describe("EscalationStore (contrato, vía fake)", () => {
     expect(to?.question).toBe("¿toca el piano?")
     expect(to?.answer).toBe("sí, desde chico")
     expect(to?.factId).toBe("fact-123")
+    // origen del visitante (para updateVisitor): canal + conversationKey (threadKey) + locale
+    expect(to?.visitor).toEqual({
+      channel: "telegram",
+      conversationKey: "555",
+      locale: "es",
+    })
     // topic ajeno → null
     expect(await es.findResolvedByTopic("telegram", "otro")).toBeNull()
   })

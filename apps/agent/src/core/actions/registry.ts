@@ -1,6 +1,8 @@
-// Registry del HARNESS: arma el ToolSet para streamText con GATING DE 2 CAPAS.
-//   (1) canal OCULTA   → name ∉ caps.allowedTools ⇒ la tool ni se expone al modelo.
-//   (2) principal DENIEGA → no cumple clearance ⇒ se expone, pero su execute deniega limpio
+// Registry del HARNESS: arma el ToolSet para streamText con GATING DE 3 CAPAS.
+//   (1) canal OCULTA    → name ∉ caps.allowedTools ⇒ la tool ni se expone al modelo.
+//   (2) contexto OMITE  → available(ctx) === false ⇒ la tool NI se instancia (el modelo no la ve, ni
+//        como deniedTool) → no cree que tiene una capacidad que el contexto no da (coherencia tool↔prompt).
+//   (3) principal DENIEGA → no cumple clearance ⇒ se expone, pero su execute deniega limpio
 //        con traza (seam HITL DELGADO: punto de decisión, sin maquinaria async).
 // Sumar una acción = nuevo ActionDescriptor + listarlo en ACTIONS.
 
@@ -16,6 +18,7 @@ import { resolveFact } from "./resolve-fact.js"
 import { searchMemory } from "./search-memory.js"
 import type { ActionContext, ActionDescriptor } from "./types.js"
 import { unlearnFact } from "./unlearn-fact.js"
+import { updateVisitor } from "./update-visitor.js"
 
 /** Único lugar donde se listan las acciones que el harness sabe construir. */
 export const ACTIONS: ActionDescriptor[] = [
@@ -28,6 +31,7 @@ export const ACTIONS: ActionDescriptor[] = [
   findRepos,
   recentActivity,
   escalate,
+  updateVisitor,
 ]
 
 /** ¿El principal cumple el clearance de la acción? */
@@ -71,9 +75,10 @@ export function buildTools(
   const tools: ToolSet = {}
   for (const d of actions) {
     if (!ctx.caps.allowedTools.includes(d.name)) continue // capa 1: canal oculta
+    if (d.available && !d.available(ctx)) continue // capa 2: contexto no la habilita → ni se instancia
     tools[d.name] = meetsClearance(d.clearance, ctx.principal)
       ? d.build(ctx) // permitido
-      : deniedTool(d, ctx) // capa 2: principal deniega (seam HITL)
+      : deniedTool(d, ctx) // capa 3: principal deniega (seam HITL)
   }
   return tools
 }

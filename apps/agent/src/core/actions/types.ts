@@ -19,7 +19,10 @@ import type {
   OwnerRepoActivity,
   OwnerRepoCatalog,
 } from "../../ports/owner-repos.js"
-import type { ProactiveResume } from "../../ports/proactive.js"
+import type {
+  ConversationResumer,
+  ProactiveResume,
+} from "../../ports/proactive.js"
 import type { RepoSyncPort, RepoSyncSpec } from "../../ports/repo-sync.js"
 import type { Reranker } from "../../ports/rerank.js"
 import type { CapabilityProfile, Principal, ToolName } from "../capabilities.js"
@@ -89,6 +92,13 @@ export interface ActionContext {
    *  curado (ancla del "desaprendé ESO" por pronombre, Inv #8: el factId NUNCA se expone al modelo). null = turno
    *  normal. */
   threadOrigin?: ThreadOrigin | null
+  /** Retomo de la conversación de OTRO interlocutor (el visitante que escaló) — lo usa `updateVisitor` para avisarle
+   *  una actualización. Inyectado por-turno por el adapter de canal (tiene el `agent` → evita el circular). null =
+   *  canal sin push (web) → degrada. */
+  conversationResumer?: ConversationResumer | null
+  /** Texto del turno actual del usuario (derivedText). Backstop del veto de `updateVisitor` (Inv #1: la petición
+   *  del owner gana aunque el modelo se distraiga). Solo lectura; el modelo no lo pasa. */
+  userText?: string
   /** conversationKey crudo del turno (para que escalate persista el threadKey del origen y poder retomar). */
   conversationKey?: string
   /** locale del turno (para componer el DM al owner y el retomo en el idioma del visitante). */
@@ -109,6 +119,10 @@ export interface ActionDescriptor {
   sideEffecting: boolean
   /** Principal mínimo que puede invocarla. `searchMemory` = "anyone". */
   clearance: Clearance
+  /** Gating CONTEXTUAL (3er eje, además de canal+principal): si devuelve false, la tool NI se instancia
+   *  (el modelo no la ve, ni como deniedTool) → no cree que tiene una capacidad que el contexto no da.
+   *  Ausente = siempre disponible. Ej.: `updateVisitor` solo si el turno es un hilo de escalada resuelta. */
+  available?(ctx: ActionContext): boolean
   /** Construye la `tool()` del AI SDK con el contexto del turno; encapsula
    *  description + inputSchema + execute (typing por-tool intacto adentro). */
   build(ctx: ActionContext): Tool

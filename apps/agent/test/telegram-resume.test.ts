@@ -126,6 +126,65 @@ describe("createTelegramConversationResumer", () => {
     expect(sent).toHaveLength(0)
   })
 
+  it("kind:'update' → framing de ACTUALIZACIÓN (no repite como respuesta nueva)", async () => {
+    const calls: { req: TurnRequest; ctx: TurnContext }[] = []
+    const resumer = createTelegramConversationResumer({
+      agent: fakeAgent("ok", calls),
+      client: fakeClient([]),
+      logger: noopLogger(),
+      sink,
+      newRequestId: () => "rid",
+    })
+    resumer.resumeConversation({ ...baseInput, kind: "update" })
+    await vi.waitFor(() => expect(calls).toHaveLength(1))
+    const text = calls[0]?.req.userText ?? ""
+    expect(text.toLowerCase()).toMatch(/actualiz/i) // encuadre de corrección
+    expect(text).toContain("En ClonAI, como dev de IA.") // el nuevo dato
+  })
+
+  it("sin routing → deriva chatId/threadId de la conversationKey (telegram); uuid (web) → no-op", async () => {
+    // conversationKey "888:42" sin routing → chatId 888, threadId 42
+    const sent: { chatId: number; text: string; thread?: number }[] = []
+    const resumer = createTelegramConversationResumer({
+      agent: fakeAgent("hola", []),
+      client: fakeClient(sent),
+      logger: noopLogger(),
+      sink,
+      newRequestId: () => "rid",
+    })
+    resumer.resumeConversation({
+      conversationKey: "888:42",
+      channel: "telegram",
+      locale: "es",
+      originalQuestion: "q",
+      injectedAnswer: "a",
+    })
+    await vi.waitFor(() => expect(sent).toHaveLength(1))
+    expect(sent[0]?.chatId).toBe(888)
+    expect(sent[0]?.thread).toBe(42)
+
+    // conversationKey uuid (web) sin routing → chatId no numérico → no-op
+    const sent2: { chatId: number; text: string; thread?: number }[] = []
+    const calls2: { req: TurnRequest; ctx: TurnContext }[] = []
+    const resumer2 = createTelegramConversationResumer({
+      agent: fakeAgent("no corre", calls2),
+      client: fakeClient(sent2),
+      logger: noopLogger(),
+      sink,
+      newRequestId: () => "rid",
+    })
+    resumer2.resumeConversation({
+      conversationKey: "550e8400-e29b-41d4-a716-446655440000",
+      channel: "web",
+      locale: "es",
+      originalQuestion: "q",
+      injectedAnswer: "a",
+    })
+    await new Promise((r) => setTimeout(r, 10))
+    expect(calls2).toHaveLength(0)
+    expect(sent2).toHaveLength(0)
+  })
+
   it("si el agente tira, NO propaga (best-effort, Inv #1)", async () => {
     const warns: string[] = []
     const logger = noopLogger()

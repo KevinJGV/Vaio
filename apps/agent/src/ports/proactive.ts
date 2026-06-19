@@ -25,7 +25,11 @@ export interface ResumeConversationInput {
   originalQuestion: string
   /** El insumo nuevo a transmitir (la respuesta de Kevin/owner). */
   injectedAnswer: string
-  /** Routing del canal (Telegram: chatId/threadId del visitante). Sin chatId (web) → no-op limpio. */
+  /** Encuadre del retomo: `answer` = 1ª respuesta a la escalada (default); `update` = el owner CORRIGIÓ un dato
+   *  ya transmitido → el framing avisa la actualización (no repite como si fuera nuevo). */
+  kind?: "answer" | "update"
+  /** Routing del canal (Telegram: chatId/threadId del visitante). Si se omite, el adapter lo deriva de
+   *  `conversationKey`. Sin chatId resoluble (web) → no-op limpio. */
   routing?: { chatId?: number; threadId?: number }
 }
 

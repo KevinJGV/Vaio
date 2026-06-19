@@ -16,12 +16,29 @@ import type { TraceSink } from "../../ports/trace.js"
 import type { TelegramClient } from "./client.js"
 
 /** Nota del sistema que encuadra el turno sintético: el modelo transmite la respuesta de Kevin en su voz, sin
- *  inventar ni mencionar el mecanismo interno. */
+ *  inventar ni mencionar el mecanismo interno. `kind:"update"` = el owner CORRIGIÓ un dato ya transmitido →
+ *  el encuadre avisa la actualización (no lo repite como si fuera la 1ª vez). */
 function framing(input: ResumeConversationInput): string {
   const locale = input.locale === "en" ? "en" : "es"
+  if (input.kind === "update") {
+    return locale === "en"
+      ? `[System note] Earlier you told the visitor something about: «${input.originalQuestion}». Kevin (the owner) has now UPDATED it: «${input.injectedAnswer}». Let the visitor know about the correction in YOUR voice, naturally — acknowledge it's an update to what you said before, without inventing anything beyond what Kevin said and without mentioning this internal mechanism.`
+      : `[Nota del sistema] Antes le dijiste al visitante algo sobre: «${input.originalQuestion}». Kevin (el owner) lo ACTUALIZÓ: «${input.injectedAnswer}». Avisale al visitante la corrección en TU voz, natural — dando a entender que es una actualización de lo que le dijiste antes, sin inventar nada más allá de lo que Kevin dijo y sin mencionar este mecanismo interno.`
+  }
   return locale === "en"
     ? `[System note] Earlier the visitor asked: «${input.originalQuestion}». Kevin (the owner) answered: «${input.injectedAnswer}». Relay that answer to the visitor in YOUR voice, naturally and directly, without inventing anything beyond what Kevin said. Don't mention that you escalated or this internal mechanism.`
     : `[Nota del sistema] El visitante había preguntado: «${input.originalQuestion}». Kevin (el owner) respondió: «${input.injectedAnswer}». Transmitile esa respuesta al visitante en TU voz, natural y directa, sin inventar nada más allá de lo que Kevin dijo. No menciones que escalaste ni este mecanismo interno.`
+}
+
+/** Deriva el routing (chatId/threadId) desde la conversationKey de Telegram ("chatId" | "chatId:threadId").
+ *  Web (key = uuid) → chatId no numérico → undefined (no-op limpio aguas abajo). */
+function routingFromKey(key: string): { chatId?: number; threadId?: number } {
+  const [chatPart, threadPart] = key.split(":")
+  const chatId = Number(chatPart)
+  if (!Number.isInteger(chatId)) return {}
+  if (threadPart === undefined) return { chatId }
+  const threadId = Number(threadPart)
+  return Number.isInteger(threadId) ? { chatId, threadId } : { chatId }
 }
 
 export function createTelegramConversationResumer(deps: {
@@ -34,8 +51,10 @@ export function createTelegramConversationResumer(deps: {
 }): ConversationResumer {
   return {
     async resumeConversation(input) {
-      const chatId = input.routing?.chatId
-      // Web (sin push) → no-op limpio: el cierre va por el fact (la próxima consulta lo recupera).
+      // Routing explícito (inbound) o derivado de la conversationKey (updateVisitor desde el core, que no
+      // toca el formato de keys Telegram). Web (key = uuid) → chatId no resoluble → no-op limpio.
+      const routing = input.routing ?? routingFromKey(input.conversationKey)
+      const chatId = routing.chatId
       if (chatId === undefined) {
         deps.logger.info(
           { channel: input.channel },
@@ -44,8 +63,8 @@ export function createTelegramConversationResumer(deps: {
         return { delivered: false }
       }
       const thread =
-        input.routing?.threadId !== undefined
-          ? { messageThreadId: input.routing.threadId }
+        routing.threadId !== undefined
+          ? { messageThreadId: routing.threadId }
           : {}
       try {
         deps.logger.info(

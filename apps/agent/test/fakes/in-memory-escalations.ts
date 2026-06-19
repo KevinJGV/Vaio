@@ -116,6 +116,15 @@ export function inMemoryEscalations(): EscalationStore & { rows: () => Row[] } {
         question: r.question,
         answer: r.answer ?? "",
         ...(r.factId ? { factId: r.factId } : {}),
+        ...(r.origin.threadKey
+          ? {
+              visitor: {
+                channel: r.origin.channel,
+                conversationKey: r.origin.threadKey,
+                locale: r.origin.locale,
+              },
+            }
+          : {}),
       }
     },
     async countOpenByPrincipal(principalId) {

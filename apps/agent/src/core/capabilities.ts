@@ -16,6 +16,7 @@ export type ToolName =
   | "findRepos"
   | "recentActivity"
   | "escalate"
+  | "updateVisitor"
 
 export interface CapabilityProfile {
   channel: Channel
@@ -117,6 +118,9 @@ export function createCapabilityResolver(): CapabilityResolver {
             "learnRepo",
             "findRepos",
             "recentActivity",
+            // Contextual: el registry solo la instancia en un hilo de escalada resuelta (available). NO se
+            // menciona en TELEGRAM_POLICY → su única instrucción va en la nota del hilo (coherencia tool↔prompt).
+            "updateVisitor",
           ],
           memoryScope: { maxK: 8 },
           policyText: TELEGRAM_POLICY,

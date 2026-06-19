@@ -145,6 +145,9 @@ export function createEscalationStore(db: Database): EscalationStore {
           answer: escalations.answer,
           factId: escalations.factId,
           statement: facts.statement,
+          originChannel: escalations.originChannel,
+          originThreadKey: escalations.originThreadKey,
+          locale: escalations.locale,
         })
         .from(escalations)
         .leftJoin(facts, eq(facts.id, escalations.factId))
@@ -162,6 +165,16 @@ export function createEscalationStore(db: Database): EscalationStore {
         answer: row.answer ?? "",
         ...(row.statement ? { statement: row.statement } : {}),
         ...(row.factId ? { factId: row.factId } : {}),
+        // Origen del visitante (para updateVisitor). Sin threadKey (web stateless) → sin visitor → degrada.
+        ...(row.originThreadKey
+          ? {
+              visitor: {
+                channel: row.originChannel,
+                conversationKey: row.originThreadKey,
+                locale: row.locale,
+              },
+            }
+          : {}),
       }
     },
 

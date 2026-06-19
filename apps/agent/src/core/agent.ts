@@ -40,7 +40,10 @@ import type {
   OwnerRepoActivity,
   OwnerRepoCatalog,
 } from "../ports/owner-repos.js"
-import type { ProactiveResume } from "../ports/proactive.js"
+import type {
+  ConversationResumer,
+  ProactiveResume,
+} from "../ports/proactive.js"
 import type { RepoSyncPort, RepoSyncSpec } from "../ports/repo-sync.js"
 import type { Reranker } from "../ports/rerank.js"
 import type { Summarizer } from "../ports/summary.js"
@@ -138,6 +141,9 @@ export interface TurnContext {
    *  el adapter de canal por lookup). Inyecta una nota de fondo al prompt + ancla el factId para "desaprendé ESO"
    *  (server-side; el modelo nunca toca el uuid, Inv #8). null/ausente = turno normal. */
   threadOrigin?: ThreadOrigin | null
+  /** Retomo de la conversación de OTRO interlocutor (el visitante que escaló) — lo usa `updateVisitor`. Lo inyecta
+   *  el adapter de canal (tiene el `agent` → evita el circular resumer↔agent). null = canal sin push (web). */
+  conversationResumer?: ConversationResumer | null
 }
 
 /** Resultado de un turno: `stream` (passthrough HTTP) + `text` (drenaje no-streaming, p.ej. Telegram).
@@ -379,6 +385,8 @@ export function createAgent(deps: AgentDeps) {
           escalations,
           notifier: ownerNotifier,
           threadOrigin: ctx.threadOrigin ?? null,
+          conversationResumer: ctx.conversationResumer ?? null,
+          userText: derivedText,
           conversationKey: req.conversationKey,
           locale,
         }),

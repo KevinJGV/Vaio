@@ -67,6 +67,41 @@ describe("buildTools — gating de 2 capas", () => {
   it("ACTIONS contiene searchMemory por defecto", () => {
     expect(ACTIONS.some((a) => a.name === "searchMemory")).toBe(true)
   })
+
+  it("capa contexto: `available(ctx)` false → la tool NO se instancia (ni como deniedTool)", () => {
+    const contextual: ActionDescriptor = {
+      name: "searchMemory",
+      sideEffecting: false,
+      clearance: "anyone",
+      available: () => false,
+      build: () => {
+        throw new Error("no debería construirse si available=false")
+      },
+    }
+    const tools = buildTools(ctx(["searchMemory"], true), [contextual])
+    expect(tools.searchMemory).toBeUndefined()
+  })
+
+  it("capa contexto: `available(ctx)` true → se instancia normal; sin `available` → disponible (backward-compat)", () => {
+    const onWhenTrusted: ActionDescriptor = {
+      name: "searchMemory",
+      sideEffecting: false,
+      clearance: "anyone",
+      available: (c) => c.principal.trusted,
+      build: () =>
+        tool({
+          description: "x",
+          inputSchema: z.object({}),
+          execute: async () => "ok",
+        }),
+    }
+    expect(
+      buildTools(ctx(["searchMemory"], true), [onWhenTrusted]).searchMemory
+    ).toBeDefined()
+    expect(
+      buildTools(ctx(["searchMemory"], false), [onWhenTrusted]).searchMemory
+    ).toBeUndefined()
+  })
 })
 
 describe("seam HITL — clearance 'owner' deniega en runtime", () => {

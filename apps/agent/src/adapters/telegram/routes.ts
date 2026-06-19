@@ -172,9 +172,25 @@ export function mountTelegram(
           )
         }
       }
+      // updateVisitor (camino owner→visitante): el agente necesita el resumer para avisarle al visitante una
+      // actualización. Se crea acá (tiene el `agent`) → evita el circular resumer↔agent; inyectado por-turno.
+      const conversationResumer = createTelegramConversationResumer({
+        agent: deps.agent,
+        client: deps.client,
+        logger: log,
+        sink: deps.sink,
+        newRequestId: randomUUID,
+      })
       const { stream, text } = await deps.agent.respond(
         req,
-        { logger: log, sink: deps.sink, requestId, resume, threadOrigin },
+        {
+          logger: log,
+          sink: deps.sink,
+          requestId,
+          resume,
+          threadOrigin,
+          conversationResumer,
+        },
         resolved
       )
       // Salida de voz (TTS): default texto; voz si entró voz (espejo) o el usuario la pidió. Decidible por la
