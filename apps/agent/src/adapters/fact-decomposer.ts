@@ -23,6 +23,8 @@ const SYSTEM_ES = [
   "DESCARTÁ lo sensible/privado (teléfonos, direcciones, documentos, credenciales, o si Kevin pide no compartirlo) y",
   "lo no-factual (saludos, «no sé», opiniones efímeras): no los incluyas.",
   "Si no hay ningún hecho durable → lista vacía. Nunca inventes más de lo que el texto dice.",
+  "REDACTÁ CADA HECHO EN ESPAÑOL, sin importar el idioma del texto de entrada (la memoria es consistente en un solo",
+  "idioma para no fragmentarse ni duplicarse).",
 ].join(" ")
 
 const SYSTEM_EN = [
@@ -32,6 +34,8 @@ const SYSTEM_EN = [
   "DISCARD anything sensitive/private (phone numbers, addresses, documents, credentials, or if Kevin asks not to share it) and",
   "anything non-factual (greetings, «I don't know», ephemeral opinions): do not include them.",
   "If there is no durable fact → empty list. Never invent beyond what the text says.",
+  "WRITE EACH FACT IN ENGLISH, regardless of the input text's language (the memory stays consistent in a single",
+  "language so it doesn't fragment or duplicate).",
 ].join(" ")
 
 export function createFactDecomposer(deps: {

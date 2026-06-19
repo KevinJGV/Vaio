@@ -62,7 +62,10 @@ export const rememberFact: ActionDescriptor = {
           )
         }
         const factStore = ctx.factStore
-        const locale = ctx.locale === "en" ? "en" : "es"
+        // El fact se REDACTA en el idioma CANÓNICO (no el de la conversación) → memoria consistente en un idioma
+        // (dedup/juez/retrieval). El embedder multilingüe casa queries de cualquier idioma; el modelo lo conversa
+        // en el idioma del usuario al responder.
+        const locale = ctx.factCanonicalLocale === "en" ? "en" : "es"
 
         // 1. Descomponer en átomos mono-idea (degrada al statement crudo si no hay decomposer).
         let atoms: string[]

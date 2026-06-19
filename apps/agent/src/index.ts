@@ -306,6 +306,7 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
     ownerNotifier,
     escalations,
     ownerTimezone: env.OWNER_TIMEZONE,
+    factCanonicalLocale: env.FACT_CANONICAL_LOCALE,
   })
   // Salida de voz (TTS) — cadena de fallback (model|voice|format). Vacía → Vaio solo habla por texto.
   const ttsChain = speechChain(env)
@@ -350,6 +351,7 @@ if (
     ...(factStore ? { factStore } : {}),
     ...(factDecomposer ? { factDecomposer } : {}),
     ...(conflictJudge ? { conflictJudge } : {}),
+    factCanonicalLocale: env.FACT_CANONICAL_LOCALE,
     draftStreaming: env.TELEGRAM_DRAFT_STREAMING,
     sink,
     // Descarga de media de Telegram (audio/voz + imágenes). El core decide transcribir/describir.

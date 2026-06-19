@@ -194,6 +194,11 @@ const envSchema = z.object({
   // personal; el coseno recortaría recall). MAX = cap de seguridad de cuántos facts se le pasan al matcher de una
   // (si se supera, se loguea — no truncar en silencio; a esa escala el norte es grafo/tags, no coseno).
   FACT_UNLEARN_MAX: positiveIntWithDefault(150),
+  // Idioma CANÓNICO de los facts: se guardan SIEMPRE en este idioma, sin importar el de la conversación. La memoria
+  // de Kevin queda en UN solo idioma (consistencia de dedup/juez/retrieval; el embedder multilingüe ya casa queries
+  // de cualquier idioma con el fact canónico, y el modelo lo CONVERSA en el idioma del usuario). Default "es" (idioma
+  // del owner); configurable por despliegue (Vaio para la generalidad, sin hardcodear).
+  FACT_CANONICAL_LOCALE: z.enum(["es", "en"]).default("es"),
 })
 
 export type Env = z.infer<typeof envSchema>

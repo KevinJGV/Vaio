@@ -49,6 +49,8 @@ export interface TelegramDeps {
   factStore?: FactStore
   factDecomposer?: FactDecomposer
   conflictJudge?: ConflictJudge
+  /** Idioma CANÓNICO en que se redactan los facts curados desde el inbound (no el del visitante/owner). Default "es". */
+  factCanonicalLocale?: "es" | "en"
   sink: TraceSink
   /** Descarga de media (audio/voz + imágenes). undefined = sin multimodal → se ignoran adjuntos. */
   media?: TelegramMedia
@@ -338,6 +340,9 @@ export function mountTelegram(
           factStore: deps.factStore,
           factDecomposer: deps.factDecomposer,
           conflictJudge: deps.conflictJudge,
+          ...(deps.factCanonicalLocale
+            ? { factCanonicalLocale: deps.factCanonicalLocale }
+            : {}),
         },
         norm
       )

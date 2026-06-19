@@ -124,6 +124,10 @@ export interface AgentDeps {
   escalations?: EscalationStore | null
   /** Zona horaria de Kevin para el "sentido del ahora" (default America/Bogota). */
   ownerTimezone?: string
+  /** Idioma CANÓNICO de los facts: se guardan SIEMPRE en este idioma (no el de la conversación) → memoria
+   *  consistente; el embedder multilingüe casa queries de cualquier idioma y el modelo lo conversa en el del
+   *  usuario. Default "es". */
+  factCanonicalLocale?: Locale
 }
 
 /** Contexto de observabilidad de un turno (lo arma el adapter de canal por request). */
@@ -215,6 +219,7 @@ export function createAgent(deps: AgentDeps) {
     ownerNotifier = null,
     escalations = null,
     ownerTimezone = "America/Bogota",
+    factCanonicalLocale = "es",
   } = deps
 
   return {
@@ -387,6 +392,7 @@ export function createAgent(deps: AgentDeps) {
           threadOrigin: ctx.threadOrigin ?? null,
           conversationResumer: ctx.conversationResumer ?? null,
           userText: derivedText,
+          factCanonicalLocale,
           conversationKey: req.conversationKey,
           locale,
         }),

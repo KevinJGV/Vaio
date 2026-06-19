@@ -99,6 +99,9 @@ export interface ActionContext {
   /** Texto del turno actual del usuario (derivedText). Backstop del veto de `updateVisitor` (Inv #1: la petición
    *  del owner gana aunque el modelo se distraiga). Solo lectura; el modelo no lo pasa. */
   userText?: string
+  /** Idioma CANÓNICO en que se REDACTAN los facts (no el de la conversación) → memoria consistente en un solo
+   *  idioma. Lo usa el decomposer en rememberFact. Default "es". */
+  factCanonicalLocale?: string
   /** conversationKey crudo del turno (para que escalate persista el threadKey del origen y poder retomar). */
   conversationKey?: string
   /** locale del turno (para componer el DM al owner y el retomo en el idioma del visitante). */

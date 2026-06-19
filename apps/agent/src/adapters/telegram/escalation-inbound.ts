@@ -37,6 +37,8 @@ interface InboundDeps {
   factStore?: FactStore
   factDecomposer?: FactDecomposer
   conflictJudge?: ConflictJudge
+  /** Idioma CANÓNICO en que se redactan los facts curados (no el del visitante/owner) → memoria consistente. Default "es". */
+  factCanonicalLocale?: "es" | "en"
 }
 
 interface CurationResult {
@@ -70,9 +72,10 @@ async function curate(
   deps: InboundDeps,
   esc: AnsweredEscalation,
   ownerText: string,
-  ownerPrincipalId: string,
-  locale: "es" | "en"
+  ownerPrincipalId: string
 ): Promise<CurationResult> {
+  // Los facts se REDACTAN/juzgan en el idioma CANÓNICO (no el del visitante/owner) → memoria consistente.
+  const locale: "es" | "en" = deps.factCanonicalLocale ?? "es"
   const empty: CurationResult = { learned: [], superseded: [] }
   if (!deps.factStore || !deps.factDecomposer) {
     deps.logger.info(
@@ -251,7 +254,6 @@ export async function tryHandleEscalationReply(
   )
 
   const ownerPrincipalId = String(norm.fromId)
-  const locale: "es" | "en" = norm.locale === "en" ? "en" : "es"
 
   // Trabajo PESADO (retomo re-entra el agente; curación llama al LLM) en BACKGROUND: ya consumimos (answered),
   // retornamos rápido para el ACK. Awaitea INTERNAMENTE para confirmarle a Kevin el resultado real.
@@ -277,8 +279,7 @@ export async function tryHandleEscalationReply(
       deps,
       esc,
       norm.text,
-      ownerPrincipalId,
-      locale
+      ownerPrincipalId
     )
     // 3) Confirmar a Kevin en el MISMO hilo, según el resultado real.
     const send =

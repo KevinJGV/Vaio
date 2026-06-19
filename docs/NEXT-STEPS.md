@@ -189,14 +189,30 @@
   **Fix:** la nota ahora instruye el relay AUTOMÁTICO (mismo turno, sin pedir permiso, salvo veto) → colapsa el
   multi-turno. **525 tests.** **✅✅ RE-e2e tras el fix (2026-06-18) — LIMPIO:** corrección en el hilo → las **3 tools
   en UN solo turno** (`unlearnFact(thisThread)` + `rememberFact` + `updateVisitor` automático, sin preguntar) → el
-  visitante recibió "Vin se retractó… hay vida después…". Sin turno extra, sin el `unlearnFact` rebelde. **🔵 FALTA
-  e2e del VETO** ("corregilo pero NO le avises" → no llega; hoy solo unit-tested). **Observaciones menores (followups,
-  no bloquean):** (i) `unlearnFact` re-llamado
+  visitante recibió "Vin se retractó… hay vida después…". Sin turno extra, sin el `unlearnFact` rebelde. **✅✅ VETO
+  e2e VERIFICADO (2026-06-18):** "No le digas nada de esto al visitante" → el modelo NO llamó `updateVisitor`
+  (corrigió el fact, no avisó). **updateVisitor: feature COMPLETA (auto-relay ✅ + veto ✅).** **Observaciones menores
+  (followups, no bloquean):** (i) `unlearnFact` re-llamado
   SIN `thisThread` sobre un tema ya corregido trae por recall-total los facts nuevos como candidatos a borrar
   (inherente al recall-total; mitigado por el auto-relay que evita el 2º turno) → revisar con la reevaluación de
-  umbrales/estructura; (ii) `rememberFact` LENTO con varios átomos (20–50s observados; perf juez/decompose, ya en followup);
-  (iii) `rememberFact` fragmenta 1 corrección en 2 facts (decomposer, pre-existente). **🔵 PENDIENTE: re-correr e2e
-  del veto** ("corregilo pero NO le avises" → no llega) y confirmar el auto-relay en 1 turno tras el fix.
+  umbrales/estructura; (ii) `rememberFact` LENTO con varios átomos (20–72s observados; perf juez/decompose, ya en followup);
+  (iii) `rememberFact` fragmenta 1 corrección en 2 facts (decomposer, pre-existente).
+- [~] **🐞 BUG idioma de facts → IDIOMA CANÓNICO (decomposer) — FIX aplicado, pendiente cleanup + e2e** (Kevin
+  2026-06-18). El `FactDecomposer` no fijaba el idioma de salida → derivaba a inglés aun en charlas `es` (ej. "Vin
+  asserts that death is a bug…" junto a facts ES) → **memoria fragmentada + dupes cross-idioma** ("Vin believes there
+  is life after death" ≡ "Vin cree que existe vida…" coexistiendo, el coseno ES↔EN no los casa → dedup falla; y el
+  retrieval cross-idioma cae bajo `FACT_RETRIEVE_DISTANCE`). **Daña los facts, NO los `documents` ingestados.**
+  **Insight de Kevin (clave):** pinear al locale de la conversación obligaría a "ingestar en 2 idiomas" → ineficiente;
+  lo correcto es **UN idioma CANÓNICO** y que el modelo lo **converse en el idioma del usuario** (que ya hace: prompt
+  localizado). **Viable acá** porque el embedder es `gemini-embedding-2` (**multilingüe**) → una query en cualquier
+  idioma casa con el fact canónico. **Fix aplicado:** nueva env `FACT_CANONICAL_LOCALE` (default `es`), threadeada a
+  `rememberFact` (decompose+juez) y a la curación de escalate; `fact-decomposer.ts` redacta SIEMPRE en el canónico sin
+  importar el idioma de entrada. Retrieval/response sin cambios. **525 tests; typecheck/biome/`/health` limpios.**
+  **🔵 PENDIENTE: (a) CLEANUP** de los facts-fantasma en inglés ya en la DB real (dar de baja los dupes EN; necesita
+  OK de Kevin, como el seed de trends); **(b) e2e:** charla `es` → fact guardado en español (no inglés) + dupe
+  cross-idioma deja de generarse; **(c) plan B (solo si el coseno cross-idioma quedara corto en e2e):** traducir la
+  query al canónico antes de `searchFacts` — con gemini no debería hacer falta. Atado a la reevaluación de
+  `FACT_RETRIEVE/CONFLICT_DISTANCE`.
   (reencuadre de Kevin 2026-06-17; antes "hilo-puntero"). El
   aprender/desaprender NATURAL dentro del hilo **ya está** (Inc 1: tras responder, el hilo es charla normal con el
   owner → toolset pleno). Lo que falta: cuando el hilo pasa de "resolver el pendiente" a **charla natural**, que Vaio
