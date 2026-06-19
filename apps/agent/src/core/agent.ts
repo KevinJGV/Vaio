@@ -48,6 +48,7 @@ import type { RepoSyncPort, RepoSyncSpec } from "../ports/repo-sync.js"
 import type { Reranker } from "../ports/rerank.js"
 import type { Summarizer } from "../ports/summary.js"
 import type { TraceSink } from "../ports/trace.js"
+import type { Translator } from "../ports/translator.js"
 import { buildTools } from "./actions/registry.js"
 import type { TraceIds } from "./actions/types.js"
 import {
@@ -125,9 +126,11 @@ export interface AgentDeps {
   /** Zona horaria de Kevin para el "sentido del ahora" (default America/Bogota). */
   ownerTimezone?: string
   /** Idioma CANÓNICO de los facts: se guardan SIEMPRE en este idioma (no el de la conversación) → memoria
-   *  consistente; el embedder multilingüe casa queries de cualquier idioma y el modelo lo conversa en el del
-   *  usuario. Default "es". */
+   *  consistente. Default "es". */
   factCanonicalLocale?: Locale
+  /** Traductor para llevar la query de facts al idioma canónico cuando la charla está en otro idioma (el coseno
+   *  cross-idioma es débil). null = sin traductor → searchMemory busca facts con la query cruda. */
+  translator?: Translator | null
 }
 
 /** Contexto de observabilidad de un turno (lo arma el adapter de canal por request). */
@@ -220,6 +223,7 @@ export function createAgent(deps: AgentDeps) {
     escalations = null,
     ownerTimezone = "America/Bogota",
     factCanonicalLocale = "es",
+    translator = null,
   } = deps
 
   return {
@@ -393,6 +397,7 @@ export function createAgent(deps: AgentDeps) {
           conversationResumer: ctx.conversationResumer ?? null,
           userText: derivedText,
           factCanonicalLocale,
+          translator,
           conversationKey: req.conversationKey,
           locale,
         }),

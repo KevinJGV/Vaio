@@ -272,6 +272,96 @@ describe("searchMemory (descriptor migrado)", () => {
     })
   })
 
+  it("cross-idioma: traduce la query al canónico ANTES de searchFacts (locale ≠ canónico)", async () => {
+    let factsQuery = ""
+    let translatedFrom = ""
+    const memory: MemoryStore = {
+      searchMemory: async () => [],
+      searchFacts: async (q) => {
+        factsQuery = q
+        return [
+          { source: "fact", url: "", chunk: "A Kevin le gusta el fútbol" },
+        ]
+      },
+      upsertDocuments: async () => {},
+      clearSource: async () => {},
+      listIndexedFiles: async () => [],
+      deleteFiles: async () => {},
+      replaceFile: async () => {},
+    }
+    const translator = {
+      translate: async (text: string, _t: "es" | "en") => {
+        translatedFrom = text
+        return "qué piensa Kevin sobre la muerte" // simulación: en→es
+      },
+    }
+    const t = searchMemory.build(
+      ctx({ memory, translator, locale: "en", factCanonicalLocale: "es" })
+    )
+    await t.execute?.(
+      { query: "what does Kevin think about death" },
+      { toolCallId: "tc", messages: [] }
+    )
+    expect(translatedFrom).toBe("what does Kevin think about death")
+    expect(factsQuery).toBe("qué piensa Kevin sobre la muerte") // buscó con la query traducida
+  })
+
+  it("same-idioma: NO traduce (locale == canónico) → busca con la query cruda", async () => {
+    let factsQuery = ""
+    let translatorCalled = false
+    const memory: MemoryStore = {
+      searchMemory: async () => [],
+      searchFacts: async (q) => {
+        factsQuery = q
+        return []
+      },
+      upsertDocuments: async () => {},
+      clearSource: async () => {},
+      listIndexedFiles: async () => [],
+      deleteFiles: async () => {},
+      replaceFile: async () => {},
+    }
+    const translator = {
+      translate: async (text: string) => {
+        translatorCalled = true
+        return text
+      },
+    }
+    const t = searchMemory.build(
+      ctx({ memory, translator, locale: "es", factCanonicalLocale: "es" })
+    )
+    await t.execute?.(
+      { query: "qué piensa Kevin de la muerte" },
+      { toolCallId: "tc", messages: [] }
+    )
+    expect(translatorCalled).toBe(false) // el owner en su idioma no paga traducción
+    expect(factsQuery).toBe("qué piensa Kevin de la muerte")
+  })
+
+  it("sin traductor: busca facts con la query cruda (degrada)", async () => {
+    let factsQuery = ""
+    const memory: MemoryStore = {
+      searchMemory: async () => [],
+      searchFacts: async (q) => {
+        factsQuery = q
+        return []
+      },
+      upsertDocuments: async () => {},
+      clearSource: async () => {},
+      listIndexedFiles: async () => [],
+      deleteFiles: async () => {},
+      replaceFile: async () => {},
+    }
+    const t = searchMemory.build(
+      ctx({ memory, locale: "en", factCanonicalLocale: "es" })
+    )
+    await t.execute?.(
+      { query: "raw english query" },
+      { toolCallId: "tc", messages: [] }
+    )
+    expect(factsQuery).toBe("raw english query")
+  })
+
   it("con reranker que devuelve [] (falló): degrada a vector top-K", async () => {
     const cands: DocChunk[] = [
       { source: "a", url: "", chunk: "v0" },

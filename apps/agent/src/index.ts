@@ -39,6 +39,7 @@ import type { TelegramDeps } from "./adapters/telegram/routes.js"
 import { createCompositeTraceSink } from "./adapters/trace-composite.js"
 import { createLoggerTraceSink } from "./adapters/trace-logger.js"
 import { createPgTraceSink } from "./adapters/trace-pg.js"
+import { createTranslator } from "./adapters/translator.js"
 import {
   attribution as buildAttribution,
   loadConfig,
@@ -307,6 +308,8 @@ if (env.OPENROUTER_API_KEY && models.length > 0) {
     escalations,
     ownerTimezone: env.OWNER_TIMEZONE,
     factCanonicalLocale: env.FACT_CANONICAL_LOCALE,
+    // Traductor de la query de facts al canónico (searchMemory) cuando la charla está en otro idioma.
+    translator: createTranslator({ model, logger }),
   })
   // Salida de voz (TTS) — cadena de fallback (model|voice|format). Vacía → Vaio solo habla por texto.
   const ttsChain = speechChain(env)

@@ -25,6 +25,7 @@ import type {
 } from "../../ports/proactive.js"
 import type { RepoSyncPort, RepoSyncSpec } from "../../ports/repo-sync.js"
 import type { Reranker } from "../../ports/rerank.js"
+import type { Translator } from "../../ports/translator.js"
 import type { CapabilityProfile, Principal, ToolName } from "../capabilities.js"
 
 /** Ids base de traza del turno (se esparcen en cada evento emitido por una acción). */
@@ -102,6 +103,9 @@ export interface ActionContext {
   /** Idioma CANÓNICO en que se REDACTAN los facts (no el de la conversación) → memoria consistente en un solo
    *  idioma. Lo usa el decomposer en rememberFact. Default "es". */
   factCanonicalLocale?: string
+  /** Traductor (searchMemory): lleva la query al idioma canónico antes de `searchFacts` cuando la conversación está
+   *  en otro idioma (el coseno cross-idioma es débil). null = sin traductor → busca con la query cruda (degrada). */
+  translator?: Translator | null
   /** conversationKey crudo del turno (para que escalate persista el threadKey del origen y poder retomar). */
   conversationKey?: string
   /** locale del turno (para componer el DM al owner y el retomo en el idioma del visitante). */

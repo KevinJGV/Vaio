@@ -71,8 +71,17 @@ export const searchMemory: ActionDescriptor = {
 
           // FACTS curados: tan importantes como los repos para la naturalidad → se recuperan SIEMPRE aparte
           // (no compiten con los chunks del repo) y se ANTEPONEN al contexto. Degrada si el store no los soporta.
+          // Los facts están en el idioma CANÓNICO; el coseno cross-idioma es DÉBIL (el embedder agrupa por idioma
+          // por encima del significado → una query en otro idioma NO recupera el fact canónico). Por eso, si la
+          // conversación está en otro idioma, traducimos la query al canónico ANTES de buscar facts (solo cross-
+          // idioma → el owner en su idioma no paga nada). best-effort: sin traductor o si falla → query cruda.
+          const canonical = ctx.factCanonicalLocale === "en" ? "en" : "es"
+          const factQuery =
+            ctx.translator && ctx.locale && ctx.locale !== canonical
+              ? await ctx.translator.translate(query, canonical)
+              : query
           const facts = memory.searchFacts
-            ? await memory.searchFacts(query, {
+            ? await memory.searchFacts(factQuery, {
                 k: factRetrieveMax,
                 maxDistance: factRetrieveDistance,
               })
