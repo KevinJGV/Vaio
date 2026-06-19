@@ -216,8 +216,18 @@
   embedder agrupa por IDIOMA sobre el significado). Mi afirmación previa "gemini multilingüe casa cross-idioma" quedó
   REFUTADA por evidencia. **Fix:** `searchMemory` traduce la query al canónico ANTES de `searchFacts` SOLO si
   `locale ≠ canónico` (el owner en su idioma no paga nada). Puerto `Translator` + adapter (modelo, best-effort →
-  query cruda si falla); threadeado por `ActionContext`. **528 tests; typecheck/biome/`/health` limpios.** Followup
-  abierto: reevaluar `FACT_RETRIEVE/CONFLICT_DISTANCE` (mixed-language fue otro caso de "coseno recall-acotado").
+  query cruda si falla); threadeado por `ActionContext`. **529 tests; typecheck/biome/`/health` limpios.**
+  **✅✅ e2e CROSS-IDIOMA VERIFICADO por Claude (2026-06-18, visitante web `locale:en` vía `/chat` contra la DB real):**
+  "what does Kevin believe happens after we die?" (die ≠ muerte, NO cognado) → recuperó los facts canónicos en
+  ESPAÑOL sobre la muerte → solo posible si el traductor llevó la query a ES antes de `searchFacts`. **El traductor
+  funciona.** Followup abierto: reevaluar `FACT_RETRIEVE/CONFLICT_DISTANCE` (mixed-language = otro caso recall-acotado).
+  **🐞 HALLAZGO del e2e — IDIOMA DE LA RESPUESTA:** el visitante preguntó en inglés pero Vaio respondió en ESPAÑOL
+  (el idioma del grounding canónico se filtró). Refuerzo en `personaEs/En` ("respondé SIEMPRE en el idioma del usuario,
+  traduciendo el contenido aunque la memoria esté en otro idioma") AYUDA pero NO alcanza: **root cause = las policies
+  de canal (`WEB_POLICY`/`TELEGRAM_POLICY`) están hardcodeadas en ESPAÑOL** (`policyText` no se localiza) → para un
+  visitante en inglés el system prompt es persona-EN + policy-ES + facts-ES → el español domina. **Fix real =
+  localizar las policies de canal por `locale`** → es la materialización concreta del followup "coherencia system
+  prompt ↔ toolset/idioma" (abajo). Decidir con Kevin: hacerlo ya o en ese followup.
   (reencuadre de Kevin 2026-06-17; antes "hilo-puntero"). El
   aprender/desaprender NATURAL dentro del hilo **ya está** (Inc 1: tras responder, el hilo es charla normal con el
   owner → toolset pleno). Lo que falta: cuando el hilo pasa de "resolver el pendiente" a **charla natural**, que Vaio
