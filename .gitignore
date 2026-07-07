@@ -8,3 +8,8 @@ dist/
 
 # Datos personales privados (respuestas de cuestionarios, notas) — nunca al remoto/ingesta
 *.local.md
+
+# OMO ephemeral runtime state (machine-local, not project knowledge)
+.omo/run-continuation/
+.omo/boulder.json
+.omo/evidence/
