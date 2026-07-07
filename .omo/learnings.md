@@ -524,3 +524,31 @@ El código typecheckeó sin cambios de API salvo **dos rupturas reales**:
   `.env.example` whitelisted) descarta los contenedores obvios ANTES de bajarlos; (2) `scanSecrets` sobre el
   CONTENIDO bajado (alto-recall) → **SKIP del archivo entero (no redact)**: redactar deja el riesgo de un patrón no
   cubierto. Falsos-positivos cubiertos: `.env.example` real, `process.env.X`, placeholders.
+
+### Routing de planificación: cuándo Brainstorming vs ulw-plan vs Hyperplan (nota, 2026-07-07)
+- **No implementado aún — nota para sesión futura.** OMO tiene 3 modos de planificación pero la regla de cuándo usar
+  cuál es **implícita** (el usuario tiene que saber que existen y pedirlos). Falta una sola regla de routing en
+  `~/.config/opencode/AGENTS.md` (o en skill ulw-plan) con 3 filas:
+  (1) **intención fuzzy a nivel CONCEPTUAL** (el usuario no sabe qué quiere, hay que explorar intenciones/alternativas
+  de producto) → `Brainstorming` (Superpowers, divergente) PRIMERO, output = spec/RFC, luego `ulw-plan`;
+  (2) **intención clara, implementación fuzzy** (el usuario sabe el qué, no el cómo técnico) → `ulw-plan` directo
+  (Prometheus hace intent routing CLEAR/UNCLEAR y adopta defaults);
+  (3) **plan escrito con trade-offs hostiles cross-cutting** (arquitectura que toca muchos módulos, migración,
+  decisión irreversible) → `/hyperplan` (team-mode, 5 hostiles + lead) para ROMPER el plan antes de `/start-work`.
+- **Diagnóstico anterior era correcto, implementación propuesta era excesiva.** La respuesta recibida (Brainstorming
+  = divergente, OMO = convergente) acertaba en el conflicto pero pedía inyectar 2 reglas grandes de aislamiento en
+  AGENTS.md. Hoy no hace falta: OMO ya separa fases (Prometheus plan-mode sticky, Sisyphus ejecuta, Momus critica,
+  dual-Momus review auto en ulw-plan). La separación conceptual-antes-técnico **ya existe**. Solo falta la regla de
+  routing de 3 vías arriba.
+- **Hyperplan NO sustituye Brainstorming.** Hyperplan es convergente-hostil (critica un plan formulado), no
+  divergente (no genera ideas). Brainstorming genera, Hyperplan rompe, ulw-plan estructura. Roles distintos.
+- **Hyperplan hay que pedirlo explícitamente** (`/hyperplan`), no es innato. No pedirlo para todo — quema 5 modelos
+  en paralelo. Reservar para decisiones cross-cutting con trade-offs hostiles reales.
+
+## Morph routing policy established (2026-07-07)
+
+- Morph es un recurso finito (créditos mensuales, sin rollover, Free=200 req/250K credits). Política de routing agent-tier + fallback en `~/.config/opencode/instructions/morph-routing-omo.md` (cargado via opencode.json instructions array junto a morph-tools.md).
+- Agent-tier: high-cap (glm-5.2) + code-tier (kimi-k2.7-code) PREFIEREN morph_edit para edición grande y warpgrep para exploración NL. mid-tier (deepseek-v4-pro) DEFAULT a nativo. read-only (plan/explore) tienen morph_edit bloqueado por el plugin.
+- Fallback: 429/403/timeout/key-missing → switch a nativo (`edit`, `grep`+`read`) SIN reintentar Morph. Informar al usuario una vez. Reanudar solo en nueva sesión.
+- Invariante #15-18 en `~/.config/opencode/AGENTS.md` ("Morph usage wisdom").
+- NO editar morph-tools.md (plugin-owned, se pierde al actualizar). NO editar skills empaquetadas (cache, se pierde con @latest). Routing es por instrucción, no por permisos.
