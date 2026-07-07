@@ -1052,6 +1052,24 @@ El puerto `Compressor` (Tier 1, determinístico) hoy se aplica a **conversación
 >   **resumen Tier 2 (LLM)** de historiales largos, y la **salida terse agente→agente**. Validar con medición
 >   real cuando "Vaio como harness" tenga su par design+plan (no asumir el % del CV).
 
+### 🔵 Pendiente FUTURO — Vaio observa el entorno del dev en tiempo real (input side del harness MCP)
+**Visión (evaluada 2026-07-07):** Vaio como harness personal necesita un **input reactivo** — observar
+el FS/logs/builds del dev en vivo, no solo responder a prompts. Inspiración: "background agents" tipo
+daemon inotify (hot indexing, linting pasivo, telemetría de builds). **Decisión arquitectónica
+preliminar:** NO como daemon OS separado que escribe archivos (duplica `DetectorRegistry`, rompe Inv #9,
+race condition vs dev flow). SÍ como **extensión event-driven del `DetectorRegistry`** (puerto
+`KnowledgeDetector` ya existe) + **conector persistente** (patrón github-stats/wakatime) que acumula
+señales en Neon cuando Vaio está caído. Tres frentes candidatos (cada uno su par brainstorming→design+plan):
+- **inotify detector:** adapter FS → DetectorRegistry → "nota del sistema" (repo cambió, hay errores de
+  lint, build falló). Reusa la costura existente. Toca el event loop del adapter.
+- **Hot indexing continuo:** el sync incremental ya existe per-repo; extender a watch del working dir del
+  dev (ojo: race vs worktrees/boulder de OMO — coordinar si Vaio y OMO corren a la vez).
+- **Telemetría de builds/logs:** conector que captura stack traces de Railway/local → Neon → Vaio los
+  consume al despertar (patrón conector, no detector — sobrevive a Vaio caído).
+**Tensión a resolver al diseñar:** Vaio-on + OMO corriendo a la vez sobre el mismo repo → quién indexa,
+quién muta. Posible hyperplan (toca detectores, MCP harness, conectores, Neon, race conditions).
+**Relacionado:** "Vaio como harness personal" (↑), "Queries vivas a GitHub" (↑), "Neon DB reactiva" (↑).
+
 **Después de la iteración 2: integración del portafolio** (`ChatSheet.tsx` + proxy `/api/agent` →
 apuntar al dominio **público** de Railway, no al `.internal`). Luego `apps/web`. Diseño:
 [`SPEC.md`](SPEC.md) · Workflow: [`../CLAUDE.md`](../CLAUDE.md).
